@@ -15,6 +15,7 @@ export const APP_ROUTE_PATHS = {
 export type AppRoutePath = (typeof APP_ROUTE_PATHS)[NavigationItemId]
 
 export const DEFAULT_APP_ROUTE: AppRoutePath = APP_ROUTE_PATHS.dashboard
+export const UI_SHOWCASE_ROUTE = '/ui-showcase'
 
 export const APP_ROUTE_TITLES: Record<NavigationItemId, string> = {
   dashboard: 'Dashboard',

@@ -1,5 +1,5 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { Check, ChevronDown } from 'lucide-react'
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { Check, ChevronDown, Search } from 'lucide-react'
 import './ui.css'
 
 export type SelectOption<TValue extends string> = {
@@ -8,6 +8,7 @@ export type SelectOption<TValue extends string> = {
   description?: string
   meta?: string
   badge?: string
+  disabled?: boolean
   actionLabel?: string
   onAction?: () => void
 }
@@ -38,9 +39,22 @@ export function Select<TValue extends string>({
   value,
 }: SelectProps<TValue>) {
   const [isOpen, setIsOpen] = useState(false)
+  const [searchValue, setSearchValue] = useState('')
   const rootRef = useRef<HTMLDivElement>(null)
   const listboxId = useId()
   const selectedOption = options.find((option) => option.value === value) ?? options[0]
+  const shouldSearch = options.length > 10
+  const visibleOptions = useMemo(() => {
+    if (!shouldSearch || !searchValue.trim()) {
+      return options
+    }
+
+    const normalizedSearch = searchValue.trim().toLowerCase()
+
+    return options.filter((option) =>
+      [option.label, option.description, option.meta].filter(Boolean).some((text) => text!.toLowerCase().includes(normalizedSearch)),
+    )
+  }, [options, searchValue, shouldSearch])
 
   useEffect(() => {
     if (!isOpen) {
@@ -69,8 +83,15 @@ export function Select<TValue extends string>({
   }, [isOpen])
 
   function selectOption(nextValue: TValue) {
+    const nextOption = options.find((option) => option.value === nextValue)
+
+    if (nextOption?.disabled) {
+      return
+    }
+
     onChange(nextValue)
     setIsOpen(false)
+    setSearchValue('')
   }
 
   function handleOptionKeyDown(event: KeyboardEvent<HTMLDivElement>, nextValue: TValue) {
@@ -104,18 +125,33 @@ export function Select<TValue extends string>({
       {isOpen ? (
         <div aria-labelledby={`${id}-label`} className="select-menu" id={listboxId} role="listbox">
           {menuHeader ? <div className="select-menu__header">{menuHeader}</div> : null}
-          {options.map((option) => {
+          {shouldSearch ? (
+            <label className="select-menu__search">
+              <Search aria-hidden="true" size={15} />
+              <input
+                aria-label={`Search ${label}`}
+                autoFocus
+                onChange={(event) => setSearchValue(event.target.value)}
+                placeholder="Search options..."
+                value={searchValue}
+              />
+            </label>
+          ) : null}
+          {visibleOptions.length === 0 ? <div className="select-menu__empty">No options found</div> : null}
+          {visibleOptions.map((option) => {
             const isSelected = option.value === value
 
             return (
               <div
                 aria-selected={isSelected}
-                className={`select-menu__option ${isSelected ? 'select-menu__option--selected' : ''}`}
+                className={`select-menu__option ${isSelected ? 'select-menu__option--selected' : ''} ${
+                  option.disabled ? 'select-menu__option--disabled' : ''
+                }`}
                 key={option.value}
                 onClick={() => selectOption(option.value)}
                 onKeyDown={(event) => handleOptionKeyDown(event, option.value)}
                 role="option"
-                tabIndex={0}
+                tabIndex={option.disabled ? -1 : 0}
               >
                 {renderOption ? (
                   renderOption(option, isSelected)
