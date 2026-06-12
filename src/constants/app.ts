@@ -10,6 +10,7 @@ import {
   ReceiptText,
   UsersRound,
 } from 'lucide-react'
+import { getNavigationPath } from '../routes/appRoutes'
 
 export const AOP_ROLES = [
   'AOP - Division Member',
@@ -76,19 +77,19 @@ export type NavigationItem = {
   id: NavigationItemId
   label: string
   icon: LucideIcon
-  href: string
+  path: string
 }
 
 export const NAVIGATION_ITEMS: NavigationItem[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: '#dashboard' },
-  { id: 'createActivity', label: 'Create Activity', icon: Activity, href: '#create-activity' },
-  { id: 'overview', label: 'Sector / Division Overview', icon: Landmark, href: '#overview' },
-  { id: 'activityLeads', label: 'Activity Leads', icon: UsersRound, href: '#activity-leads' },
-  { id: 'activitiesList', label: 'Activities List', icon: ClipboardCheck, href: '#activities-list' },
-  { id: 'approvals', label: 'Approvals', icon: Gauge, href: '#approvals' },
-  { id: 'procurementPlan', label: 'Procurement Plan', icon: BriefcaseBusiness, href: '#procurement-plan' },
-  { id: 'engagementPlan', label: 'Engagement Plan', icon: BarChart3, href: '#engagement-plan' },
-  { id: 'financialSpending', label: 'Financial Spending', icon: ReceiptText, href: '#financial-spending' },
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: getNavigationPath('dashboard') },
+  { id: 'createActivity', label: 'Create Activity', icon: Activity, path: getNavigationPath('createActivity') },
+  { id: 'overview', label: 'Sector / Division Overview', icon: Landmark, path: getNavigationPath('overview') },
+  { id: 'activityLeads', label: 'Activity Leads', icon: UsersRound, path: getNavigationPath('activityLeads') },
+  { id: 'activitiesList', label: 'Activities List', icon: ClipboardCheck, path: getNavigationPath('activitiesList') },
+  { id: 'approvals', label: 'Approvals', icon: Gauge, path: getNavigationPath('approvals') },
+  { id: 'procurementPlan', label: 'Procurement Plan', icon: BriefcaseBusiness, path: getNavigationPath('procurementPlan') },
+  { id: 'engagementPlan', label: 'Engagement Plan', icon: BarChart3, path: getNavigationPath('engagementPlan') },
+  { id: 'financialSpending', label: 'Financial Spending', icon: ReceiptText, path: getNavigationPath('financialSpending') },
 ]
 
 export type NotificationTone = 'info' | 'warning' | 'success'

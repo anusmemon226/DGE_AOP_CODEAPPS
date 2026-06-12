@@ -1,4 +1,5 @@
 import { PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
+import { NavLink } from 'react-router-dom'
 import { AOP_ROLES, type AopRole } from '../../constants/app'
 import { getNavigationForRole } from '../../utils/permissions'
 import { closeMobileSidebar, setSelectedRole, toggleSidebarCollapsed } from '../../store/appSlice'
@@ -54,19 +55,19 @@ export function Sidebar() {
         <nav aria-label="Primary navigation" className="sidebar__nav">
           {navigationItems.map((item) => {
             const Icon = item.icon
-            const isActive = item.id === 'dashboard'
 
             return (
-              <a
+              <NavLink
                 aria-label={item.label}
-                className={`sidebar__link ${isActive ? 'sidebar__link--active' : ''}`}
-                href={item.href}
+                className={({ isActive }) => `sidebar__link ${isActive ? 'sidebar__link--active' : ''}`}
                 key={item.id}
+                onClick={() => dispatch(closeMobileSidebar())}
+                to={item.path}
                 title={item.label}
               >
                 <Icon aria-hidden="true" size={18} />
                 <span>{item.label}</span>
-              </a>
+              </NavLink>
             )
           })}
         </nav>
