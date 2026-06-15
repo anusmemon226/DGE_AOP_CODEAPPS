@@ -1,6 +1,7 @@
 import './ui.css'
 
 type RadioOption<TValue extends string> = {
+  className?: string
   description?: string
   label: string
   value: TValue
@@ -35,7 +36,7 @@ export function RadioGroup<TValue extends string>({
       </legend>
       <div className="radio-group__options">
         {options.map((option) => (
-          <label className="choice choice--radio" key={option.value}>
+          <label className={`choice choice--radio ${option.className || ''}`.trim()} key={option.value}>
             <input checked={option.value === value} name={name} onChange={() => onChange(option.value)} type="radio" />
             <span className="choice__box" aria-hidden="true" />
             <span className="choice__copy">

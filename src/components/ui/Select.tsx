@@ -5,6 +5,7 @@ import './ui.css'
 export type SelectOption<TValue extends string> = {
   label: string
   value: TValue
+  className?: string
   description?: string
   meta?: string
   badge?: string
