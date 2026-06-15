@@ -1,32 +1,16 @@
 import { PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
-import { AOP_ROLES, type AopRole } from '../../constants/app'
+import { AOP_ROLE_DISPLAY } from '../../constants/app'
 import { getNavigationForRole } from '../../utils/permissions'
-import { closeMobileSidebar, setSelectedRole, toggleSidebarCollapsed } from '../../store/appSlice'
+import { closeMobileSidebar, toggleSidebarCollapsed } from '../../store/appSlice'
 import { useAppDispatch, useAppSelector } from '../../store/hooks'
 import { IconButton } from '../ui/IconButton'
-import { Select } from '../ui/Select'
-
-const roleDescriptions: Record<AopRole, string> = {
-  'AOP - Division Member': 'Division workspace access',
-  'AOP - Division Director': 'Division review access',
-  'AOP - Strategy Team': 'Strategy oversight access',
-  'AOP - PMO': 'Portfolio management access',
-  'AOP - Procurement Team': 'Procurement planning access',
-  'AOP - Executive Director': 'Sector approval access',
-  'AOP - Director General': 'Executive approval access',
-}
-
-const roleOptions = AOP_ROLES.map((role) => ({
-  value: role,
-  label: role.replace('AOP - ', ''),
-  description: roleDescriptions[role],
-}))
 
 export function Sidebar() {
   const dispatch = useAppDispatch()
   const { isMobileSidebarOpen, isSidebarCollapsed, selectedRole } = useAppSelector((state) => state.app)
   const navigationItems = getNavigationForRole(selectedRole)
+  const currentRole = AOP_ROLE_DISPLAY[selectedRole]
 
   return (
     <>
@@ -47,6 +31,13 @@ export function Sidebar() {
             <span>Digital Connect</span>
             <strong>Annual Operating Plan</strong>
           </div>
+          <IconButton
+            className="sidebar__collapse"
+            label={isSidebarCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+            onClick={() => dispatch(toggleSidebarCollapsed())}
+          >
+            {isSidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
+          </IconButton>
           <IconButton className="sidebar__mobile-close" label="Close navigation" onClick={() => dispatch(closeMobileSidebar())}>
             <X size={18} />
           </IconButton>
@@ -73,34 +64,22 @@ export function Sidebar() {
         </nav>
 
         <div className="sidebar__footer">
-          <Select<AopRole>
-            className="sidebar__role-select"
-            hideLabel
-            id="sidebar-role-selector"
-            label="Current role"
-            options={roleOptions}
-            value={selectedRole}
-            onChange={(value) => dispatch(setSelectedRole(value))}
-            renderValue={(option) => (
-              <span className="sidebar__role-value">
-                <span className="sidebar__role-full">{option.label}</span>
-                <span className="sidebar__role-initials">
-                  {option.label
-                    .split(' ')
-                    .map((part) => part[0])
-                    .join('')
-                    .slice(0, 2)}
-                </span>
+          <div className="sidebar__role-card" title={currentRole.label}>
+            <span className="sidebar__role-eyebrow">Current Role</span>
+            <span className="sidebar__role-content">
+              <span className="sidebar__role-initials">
+                {currentRole.label
+                  .split(' ')
+                  .map((part) => part[0])
+                  .join('')
+                  .slice(0, 2)}
               </span>
-            )}
-          />
-          <IconButton
-            className="sidebar__collapse"
-            label={isSidebarCollapsed ? 'Expand navigation' : 'Collapse navigation'}
-            onClick={() => dispatch(toggleSidebarCollapsed())}
-          >
-            {isSidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
-          </IconButton>
+              <span className="sidebar__role-copy">
+                <strong>{currentRole.label}</strong>
+                <small>{currentRole.description}</small>
+              </span>
+            </span>
+          </div>
         </div>
       </aside>
     </>

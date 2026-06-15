@@ -592,13 +592,13 @@ Red
 Font Family:
 
 ```text
-Inter
+Encode Sans
 ```
 
 Fallback:
 
 ```text
-Segoe UI
+sans-serif
 ```
 
 ---

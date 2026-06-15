@@ -16,6 +16,26 @@
         "users": {
           "entitySetName": "systemusers",
           "logicalName": "systemuser"
+        },
+        "aopprojects": {
+          "entitySetName": "dga_aop_projectses",
+          "logicalName": "dga_aop_projects"
+        },
+        "projectplanninginstances": {
+          "entitySetName": "dga_project_planning_instances",
+          "logicalName": "dga_project_planning_instance"
+        },
+        "cycles": {
+          "entitySetName": "dga_assessment_cycles",
+          "logicalName": "dga_assessment_cycle"
+        },
+        "aopprojectlogs": {
+          "entitySetName": "dga_aop_project_logses",
+          "logicalName": "dga_aop_project_logs"
+        },
+        "divisionalhierarchies": {
+          "entitySetName": "dga_divisional_hierarchies",
+          "logicalName": "dga_divisional_hierarchy"
         }
       },
       "environmentVariableName": ""

@@ -24,6 +24,37 @@ export const AOP_ROLES = [
 
 export type AopRole = (typeof AOP_ROLES)[number]
 
+export const AOP_ROLE_DISPLAY: Record<AopRole, { label: string; description: string }> = {
+  'AOP - Division Member': {
+    label: 'Division Member',
+    description: 'Submit budget items',
+  },
+  'AOP - Division Director': {
+    label: 'Division Director',
+    description: 'Review division submissions',
+  },
+  'AOP - Strategy Team': {
+    label: 'Strategy Team',
+    description: 'Oversee AOP planning',
+  },
+  'AOP - PMO': {
+    label: 'PMO',
+    description: 'Manage portfolio progress',
+  },
+  'AOP - Procurement Team': {
+    label: 'Procurement Team',
+    description: 'Review procurement plans',
+  },
+  'AOP - Executive Director': {
+    label: 'Executive Director',
+    description: 'Approve sector activities',
+  },
+  'AOP - Director General': {
+    label: 'Director General',
+    description: 'Executive approval access',
+  },
+}
+
 export type ThemeMode = 'light' | 'dark'
 
 export const LANGUAGES = [
