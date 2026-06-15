@@ -512,6 +512,10 @@
   text-align: left;
 }
 
+.date-picker__control-wrap {
+  position: relative;
+}
+
 .date-picker__popover,
 .multi-select__menu {
   background: var(--color-surface);
@@ -519,7 +523,6 @@
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-xl);
   left: 0;
-  margin-top: 0.45rem;
   padding: 0.55rem;
   position: absolute;
   top: 100%;

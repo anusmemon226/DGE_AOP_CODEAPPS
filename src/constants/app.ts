@@ -4,6 +4,7 @@ import {
   BarChart3,
   BriefcaseBusiness,
   ClipboardCheck,
+  Edit,
   Gauge,
   Landmark,
   LayoutDashboard,
@@ -96,6 +97,7 @@ export type CycleId = (typeof AOP_CYCLES)[number]['id']
 export type NavigationItemId =
   | 'dashboard'
   | 'createActivity'
+  | 'editActivity'
   | 'overview'
   | 'activityLeads'
   | 'activitiesList'
@@ -114,6 +116,7 @@ export type NavigationItem = {
 export const NAVIGATION_ITEMS: NavigationItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: getNavigationPath('dashboard') },
   { id: 'createActivity', label: 'Create Activity', icon: Activity, path: getNavigationPath('createActivity') },
+  { id: 'editActivity', label: 'Edit Activity', icon: Edit, path: getNavigationPath('editActivity') },
   { id: 'overview', label: 'Sector / Division Overview', icon: Landmark, path: getNavigationPath('overview') },
   { id: 'activityLeads', label: 'Activity Leads', icon: UsersRound, path: getNavigationPath('activityLeads') },
   { id: 'activitiesList', label: 'Activities List', icon: ClipboardCheck, path: getNavigationPath('activitiesList') },

@@ -4,6 +4,7 @@ import { AppLayout } from './components/layout/AppLayout'
 import { NAVIGATION_ITEMS } from './constants/app'
 import { DEFAULT_APP_ROUTE, APP_ROUTE_PATHS, UI_SHOWCASE_ROUTE } from './routes/appRoutes'
 import { CreateActivity } from './pages/CreateActivity'
+import { EditActivity } from './pages/EditActivity'
 import { UiShowcase } from './pages/UiShowcase'
 import { useAppSelector } from './store/hooks'
 import { canViewNavigationItem } from './utils/permissions'
@@ -40,6 +41,7 @@ function App() {
         <Routes>
           <Route element={<EmptyScreen />} path={APP_ROUTE_PATHS.dashboard} />
           <Route element={<CreateActivity />} path={APP_ROUTE_PATHS.createActivity} />
+          <Route element={<EditActivity />} path={APP_ROUTE_PATHS.editActivity} />
           <Route element={<EmptyScreen />} path={APP_ROUTE_PATHS.overview} />
           <Route element={<EmptyScreen />} path={APP_ROUTE_PATHS.activityLeads} />
           <Route element={<EmptyScreen />} path={APP_ROUTE_PATHS.activitiesList} />

@@ -3,6 +3,7 @@ import type { NavigationItemId } from '../constants/app'
 export const APP_ROUTE_PATHS = {
   dashboard: '/dashboard',
   createActivity: '/create-activity',
+  editActivity: '/edit-activity',
   overview: '/overview',
   activityLeads: '/activity-leads',
   activitiesList: '/activities',
@@ -20,6 +21,7 @@ export const UI_SHOWCASE_ROUTE = '/ui-showcase'
 export const APP_ROUTE_TITLES: Record<NavigationItemId, string> = {
   dashboard: 'Dashboard',
   createActivity: 'Create Activity',
+  editActivity: 'Edit Activity',
   overview: 'Overview',
   activityLeads: 'Activity Leads',
   activitiesList: 'Activities List',
