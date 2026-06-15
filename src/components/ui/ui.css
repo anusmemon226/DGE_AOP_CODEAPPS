@@ -509,6 +509,8 @@
   cursor: pointer;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 2rem;
+  padding: 0 0.55rem;
   text-align: left;
 }
 
@@ -523,10 +525,10 @@
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-xl);
   left: 0;
-  padding: 0.55rem;
+  padding: 0.35rem;
   position: absolute;
   top: 100%;
-  width: min(20rem, calc(100vw - 2rem));
+  width: min(16rem, calc(100vw - 2rem));
   z-index: 80;
 }
 
@@ -534,7 +536,7 @@
   align-items: center;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.25rem;
 }
 
 .date-picker__header button {
@@ -545,14 +547,14 @@
   color: var(--color-text-secondary);
   cursor: pointer;
   display: inline-flex;
-  height: 2rem;
+  height: 1.6rem;
   justify-content: center;
-  width: 2rem;
+  width: 1.6rem;
 }
 
 .date-picker__header strong {
   color: var(--color-text-primary);
-  font-size: 0.84rem;
+  font-size: 0.78rem;
   text-align: center;
 }
 
@@ -564,9 +566,9 @@
 
 .date-picker__weekdays span {
   color: var(--color-text-tertiary);
-  font-size: 0.68rem;
+  font-size: 0.64rem;
   font-weight: 700;
-  padding: 0.35rem 0;
+  padding: 0.2rem 0;
   text-align: center;
 }
 
@@ -576,8 +578,8 @@
   border-radius: 999px;
   color: var(--color-text-primary);
   cursor: pointer;
-  font-size: 0.78rem;
-  height: 2rem;
+  font-size: 0.72rem;
+  height: 1.7rem;
 }
 
 .date-picker__grid button:hover:not(:disabled),
