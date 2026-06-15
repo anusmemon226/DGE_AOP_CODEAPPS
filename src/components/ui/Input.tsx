@@ -1,30 +1,36 @@
-import type { InputHTMLAttributes } from 'react'
+import type { InputHTMLAttributes, ReactNode } from 'react'
 import './ui.css'
 
 type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   error?: string
   hint?: string
   label: string
+  rightIcon?: ReactNode
 }
 
-export function Input({ className = '', error, hint, id, label, required, ...props }: InputProps) {
+export function Input({ className = '', error, hint, id, label, required, rightIcon, ...props }: InputProps) {
   const inputId = id ?? label.toLowerCase().replace(/\s+/g, '-')
+  const isDisabled = Boolean(props.disabled)
 
   return (
-    <label className={`field ${className}`.trim()} htmlFor={inputId}>
+    <label className={`field ${isDisabled ? 'field--disabled' : ''} ${className}`.trim()} htmlFor={inputId}>
       <span className="field__label">
         {label}
-        {required ? <span aria-hidden="true"> *</span> : null}
+        {required ? <span aria-hidden="true" className="field__required"> *</span> : null}
       </span>
-      <input
-        aria-invalid={Boolean(error)}
-        className="field__control"
-        id={inputId}
-        required={required}
-        {...props}
-      />
-      {hint ? <span className="field__hint">{hint}</span> : null}
-      {error ? <span className="field__error">{error}</span> : null}
+      <span className={rightIcon ? 'field__input-wrap' : undefined}>
+        <input
+          aria-invalid={Boolean(error)}
+          className="field__control"
+          id={inputId}
+          required={required}
+          {...props}
+        />
+        {rightIcon ? <span className="field__right-icon">{rightIcon}</span> : null}
+      </span>
+      <span className={error ? 'field__error' : hint ? 'field__hint' : 'field__message-placeholder'}>
+        {error || hint || ''}
+      </span>
     </label>
   )
 }

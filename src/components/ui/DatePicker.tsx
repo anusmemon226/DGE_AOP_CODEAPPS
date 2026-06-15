@@ -99,7 +99,7 @@ export function DatePicker({
     <div className={`field date-picker ${className}`.trim()} ref={rootRef}>
       <span className="field__label" id={`${id}-label`}>
         {label}
-        {required ? <span aria-hidden="true"> *</span> : null}
+        {required ? <span aria-hidden="true" className="field__required"> *</span> : null}
       </span>
       <button
         aria-expanded={isOpen}
@@ -119,8 +119,9 @@ export function DatePicker({
         <span>{formatDateDisplay(value) || 'DD/MM/YYYY'}</span>
         <Calendar aria-hidden="true" size={16} />
       </button>
-      {hint ? <span className="field__hint">{hint}</span> : null}
-      {error ? <span className="field__error">{error}</span> : null}
+      <span className={error ? 'field__error' : hint ? 'field__hint' : 'field__message-placeholder'}>
+        {error || hint || ''}
+      </span>
 
       {isOpen ? (
         <div className="date-picker__popover" role="dialog">

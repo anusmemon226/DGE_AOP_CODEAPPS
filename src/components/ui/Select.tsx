@@ -20,14 +20,17 @@ type SelectProps<TValue extends string> = {
   value: TValue
   onChange: (value: TValue) => void
   className?: string
+  error?: string
   hideLabel?: boolean
   menuHeader?: ReactNode
   renderOption?: (option: SelectOption<TValue>, isSelected: boolean) => ReactNode
   renderValue?: (option: SelectOption<TValue>) => ReactNode
+  required?: boolean
 }
 
 export function Select<TValue extends string>({
   className = '',
+  error,
   hideLabel = false,
   id,
   label,
@@ -36,6 +39,7 @@ export function Select<TValue extends string>({
   options,
   renderOption,
   renderValue,
+  required = false,
   value,
 }: SelectProps<TValue>) {
   const [isOpen, setIsOpen] = useState(false)
@@ -105,11 +109,13 @@ export function Select<TValue extends string>({
     <div className={`select-field ${className}`.trim()} ref={rootRef}>
       <span className={`select-field__label ${hideLabel ? 'select-field__label--hidden' : ''}`} id={`${id}-label`}>
         {label}
+        {required ? <span aria-hidden="true" className="field__required"> *</span> : null}
       </span>
       <button
         aria-controls={listboxId}
         aria-expanded={isOpen}
         aria-haspopup="listbox"
+        aria-invalid={Boolean(error)}
         aria-labelledby={`${id}-label ${id}-value`}
         className="select-field__control"
         id={id}
@@ -121,6 +127,7 @@ export function Select<TValue extends string>({
         </span>
         <ChevronDown aria-hidden="true" className={isOpen ? 'select-field__chevron--open' : ''} size={15} />
       </button>
+      <span className={error ? 'field__error' : 'field__message-placeholder'}>{error || ''}</span>
 
       {isOpen ? (
         <div aria-labelledby={`${id}-label`} className="select-menu" id={listboxId} role="listbox">

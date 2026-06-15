@@ -14,7 +14,7 @@ export function Textarea({ className = '', error, hint, id, label, required, row
     <label className={`field ${className}`.trim()} htmlFor={textareaId}>
       <span className="field__label">
         {label}
-        {required ? <span aria-hidden="true"> *</span> : null}
+        {required ? <span aria-hidden="true" className="field__required"> *</span> : null}
       </span>
       <textarea
         aria-invalid={Boolean(error)}
@@ -24,8 +24,9 @@ export function Textarea({ className = '', error, hint, id, label, required, row
         rows={rows}
         {...props}
       />
-      {hint ? <span className="field__hint">{hint}</span> : null}
-      {error ? <span className="field__error">{error}</span> : null}
+      <span className={error ? 'field__error' : hint ? 'field__hint' : 'field__message-placeholder'}>
+        {error || hint || ''}
+      </span>
     </label>
   )
 }

@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
-import { Bot, CheckCircle2, FileText, Paperclip, RefreshCcw, Save, Send, Sparkles, Trash2, UserRound, WandSparkles } from 'lucide-react'
+import { Bot, CheckCircle2, FileText, LockKeyhole, Paperclip, RefreshCcw, Save, Send, Sparkles, Trash2, UserRound, WandSparkles } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import {
   Badge,
   Button,
   Card,
+  Checkbox,
   DatePicker,
   EmptyState,
   Input,
   LoadingState,
-  MultiSelect,
+  RadioGroup,
   Select,
   Textarea,
   type SelectOption,
@@ -65,6 +66,30 @@ type CreateActivityForm = {
 }
 
 type FieldErrors = Partial<Record<keyof CreateActivityForm | 'submit' | 'context', string>>
+
+const FIELD_LABELS: Partial<Record<keyof CreateActivityForm, string>> = {
+  activityName: 'Activity / Initiative Name',
+  activityType: 'Activity Type',
+  sectorName: 'Sector',
+  divisionName: 'Division',
+  activityScope: 'Activity Scope',
+  activityClassification: 'Activity Classification',
+  budgetRequired: 'Budget requirement',
+  procurementRequired: 'Procurement requirement',
+  adeoReported: 'ADEO reporting',
+  activityLeadId: 'Activity Lead / PM Name',
+  plannedStartDate: 'Planned Start Date',
+  plannedEndDate: 'Planned End Date',
+  scopeDescription: 'Activity Scope Description',
+  summary: 'Summary',
+  adeoProjectName: 'Project Name',
+  adeoProjectDescription: 'Project Description',
+  longTermImpact: 'Long Term Impact',
+  overallLongTermImpact: 'Long Term / Overall Project Objectives',
+  stakeholder: 'Stakeholder',
+  activityKpi: 'Activity KPI',
+  risks: 'Risks',
+}
 
 type ActivityContext = {
   currentUserId: string
@@ -262,17 +287,83 @@ function validateForm(form: CreateActivityForm) {
     )
   }
 
+  function requiredMessage(field: keyof CreateActivityForm) {
+    if (field === 'activityType') {
+      return 'Select an Activity Type.'
+    }
+
+    if (field === 'activityScope') {
+      return 'Choose Strategic or Operational Activity Scope.'
+    }
+
+    if (field === 'activityClassification') {
+      return 'Choose an Activity Classification.'
+    }
+
+    if (field === 'budgetRequired') {
+      return 'Select whether this project requires a budget.'
+    }
+
+    if (field === 'procurementRequired') {
+      return 'Select whether this project requires procurement.'
+    }
+
+    if (field === 'adeoReported') {
+      return 'Select whether this project is reported in ADEO.'
+    }
+
+    if (field === 'activityLeadId') {
+      return 'Select an Activity Lead / PM Name.'
+    }
+
+    if (field === 'plannedStartDate') {
+      return 'Select a Planned Start Date.'
+    }
+
+    if (field === 'plannedEndDate') {
+      return 'Select a Planned End Date.'
+    }
+
+    return `Enter ${FIELD_LABELS[field] ?? 'this field'}.`
+  }
+
   requiredFields.forEach((field) => {
     if (!String(form[field] ?? '').trim()) {
-      errors[field] = 'This field is required.'
+      errors[field] = requiredMessage(field)
     }
   })
 
-  if (form.plannedStartDate && form.plannedEndDate && form.plannedEndDate <= form.plannedStartDate) {
-    errors.plannedEndDate = 'Planned End Date must be greater than Planned Start Date.'
+  if (form.plannedStartDate && form.plannedEndDate) {
+    if (form.plannedStartDate >= form.plannedEndDate) {
+      errors.plannedStartDate = 'Planned Start Date must be earlier than Planned End Date.'
+      errors.plannedEndDate = 'Planned End Date must be later than Planned Start Date.'
+    }
   }
 
   return errors
+}
+
+function getRuntimeErrors(form: CreateActivityForm, fields: Array<keyof CreateActivityForm>) {
+  const formErrors = validateForm(form)
+  const nextErrors: FieldErrors = {}
+
+  fields.forEach((field) => {
+    if (formErrors[field]) {
+      nextErrors[field] = formErrors[field]
+    }
+  })
+
+  if (fields.includes('plannedStartDate') || fields.includes('plannedEndDate')) {
+    if (formErrors.plannedStartDate) {
+      nextErrors.plannedStartDate = formErrors.plannedStartDate
+    }
+
+    if (formErrors.plannedEndDate) {
+      nextErrors.plannedEndDate = formErrors.plannedEndDate
+    }
+  }
+
+  return nextErrors
 }
 
 function buildProjectType(activityType: ActivityTypeValue) {
@@ -444,7 +535,7 @@ function getDraftWarnings(draft: CreateActivityForm) {
 export function CreateActivity() {
   const navigate = useNavigate()
   const selectedCycle = useAppSelector((state) => state.app.selectedCycle)
-  const [activeTab, setActiveTab] = useState<TabValue>('manual')
+  const [activeTab, setActiveTab] = useState<TabValue>('copilot')
   const [form, setForm] = useState<CreateActivityForm>(INITIAL_FORM)
   const [errors, setErrors] = useState<FieldErrors>({})
   const [context, setContext] = useState<ActivityContext | null>(null)
@@ -589,18 +680,57 @@ export function CreateActivity() {
 
   function updateForm(nextFields: Partial<CreateActivityForm>) {
     setSuccessMessage('')
-    setForm((currentForm) => normalizeControlledRules({ ...currentForm, ...nextFields }))
+    const changedFields = Object.keys(nextFields) as Array<keyof CreateActivityForm>
+    const normalizedForm = normalizeControlledRules({ ...form, ...nextFields })
+
+    setForm(normalizedForm)
     setErrors((currentErrors) => {
       const nextErrors = { ...currentErrors }
+      const allRuntimeErrors = validateForm(normalizedForm)
+      const runtimeErrors = getRuntimeErrors(normalizedForm, changedFields)
 
-      Object.keys(nextFields).forEach((key) => {
-        delete nextErrors[key as keyof CreateActivityForm]
+      Object.keys(nextErrors).forEach((key) => {
+        const field = key as keyof CreateActivityForm
+
+        if (field in INITIAL_FORM && !allRuntimeErrors[field]) {
+          delete nextErrors[field]
+        }
       })
+
+      changedFields.forEach((key) => {
+        if (runtimeErrors[key]) {
+          nextErrors[key] = runtimeErrors[key]
+        } else {
+          delete nextErrors[key]
+        }
+      })
+
+      if (changedFields.includes('plannedStartDate') || changedFields.includes('plannedEndDate')) {
+        if (runtimeErrors.plannedStartDate) {
+          nextErrors.plannedStartDate = runtimeErrors.plannedStartDate
+        } else {
+          delete nextErrors.plannedStartDate
+        }
+
+        if (runtimeErrors.plannedEndDate) {
+          nextErrors.plannedEndDate = runtimeErrors.plannedEndDate
+        } else {
+          delete nextErrors.plannedEndDate
+        }
+      }
 
       delete nextErrors.submit
 
       return nextErrors
     })
+  }
+
+  function toggleStrategy(strategy: StrategyValue) {
+    const nextStrategies = form.strategies.includes(strategy)
+      ? form.strategies.filter((item) => item !== strategy)
+      : [...form.strategies, strategy]
+
+    updateForm({ strategies: nextStrategies })
   }
 
   function addAttachments(files: FileList | File[]) {
@@ -830,120 +960,166 @@ export function CreateActivity() {
                 <span>Activity Information</span>
                 <h2>Core planning details</h2>
               </div>
-              <Badge tone="warning">Required</Badge>
             </div>
 
-            <div className="create-activity__form-grid">
-              <Input
-                error={errors.activityName}
-                label="Activity / Initiative Name"
-                onChange={(event) => updateForm({ activityName: event.target.value })}
-                placeholder="Enter activity name"
-                required
-                value={form.activityName}
-              />
-              <Select
-                id="activity-type"
-                label="Activity Type"
-                onChange={(value) => updateForm({ activityType: value })}
-                options={ACTIVITY_TYPE_OPTIONS}
-                value={form.activityType}
-              />
-              {errors.activityType ? <span className="create-activity__field-error">{errors.activityType}</span> : null}
-              <Input label="Sector" readOnly required value={form.sectorName} />
-              <Input label="Division" readOnly required value={form.divisionName} />
-              <Select
-                id="activity-scope"
-                label="Activity Scope"
-                onChange={(value) => updateForm({ activityScope: value })}
-                options={ACTIVITY_SCOPE_OPTIONS}
-                value={form.activityScope}
-              />
-              <Select
-                id="activity-classification"
-                label="Activity Classification"
-                onChange={(value) => updateForm({ activityClassification: value })}
-                options={CLASSIFICATION_OPTIONS}
-                value={form.activityClassification}
-              />
-              {isStrategic ? (
-                <MultiSelect
-                  id="strategy-categorization"
-                  label="What strategy is this project/activity categorized under?"
-                  onChange={(value) => updateForm({ strategies: value })}
-                  options={STRATEGY_OPTIONS}
-                  value={form.strategies}
-                />
-              ) : null}
-              {!isPaymentOnly ? (
+            <div className="create-activity__form-stack">
+              <div className="create-activity__form-row create-activity__form-row--two">
                 <Select
-                  id="budget-required"
-                  label="Does this project require Budget?"
-                  onChange={(value) => updateForm({ budgetRequired: value })}
-                  options={YES_NO_OPTIONS}
-                  value={form.budgetRequired}
+                  error={errors.activityType}
+                  id="activity-type"
+                  label="Activity Type"
+                  onChange={(value) => updateForm({ activityType: value })}
+                  options={ACTIVITY_TYPE_OPTIONS}
+                  required
+                  value={form.activityType}
                 />
-              ) : (
-                <Input hint="Payment Only activities are considered budget required." label="Budget Required" readOnly value="Yes" />
-              )}
-              {isBudgetNo ? (
-                <Input hint="Procurement is automatically No when budget is not required." label="Does this project require procurement?" readOnly value="No" />
-              ) : (
+                <Input
+                  error={errors.activityName}
+                  label="Activity / Initiative Name"
+                  onChange={(event) => updateForm({ activityName: event.target.value })}
+                  placeholder="Enter activity name"
+                  required
+                  value={form.activityName}
+                />
+              </div>
+
+              <div className="create-activity__form-row create-activity__form-row--two">
+                <Input disabled error={errors.sectorName} label="Sector" required rightIcon={<LockKeyhole size={15} />} value={form.sectorName} />
+                <Input disabled error={errors.divisionName} label="Division" required rightIcon={<LockKeyhole size={15} />} value={form.divisionName} />
+              </div>
+
+              <div className={isStrategic ? 'create-activity__form-row create-activity__form-row--scope' : 'create-activity__form-row'}>
+                <RadioGroup
+                  className="create-activity__radio create-activity__radio--scope"
+                  error={errors.activityScope}
+                  label="Activity Scope"
+                  name="activity-scope"
+                  onChange={(value) => updateForm({ activityScope: value })}
+                  options={ACTIVITY_SCOPE_OPTIONS.filter((option) => option.value !== '')}
+                  required
+                  value={form.activityScope}
+                />
+                {isStrategic ? (
+                  <fieldset className="checkbox-group create-activity__strategy-group">
+                    <legend className="field__label">What strategy is this project/activity categorized under?</legend>
+                    <div className="checkbox-group__options">
+                      {STRATEGY_OPTIONS.map((option) => (
+                        <Checkbox
+                          checked={form.strategies.includes(option.value)}
+                          key={option.value}
+                          label={option.label}
+                          onChange={() => toggleStrategy(option.value)}
+                        />
+                      ))}
+                    </div>
+                  </fieldset>
+                ) : null}
+              </div>
+
+              <div className="create-activity__form-row">
+                <RadioGroup
+                  className="create-activity__radio create-activity__radio--classification"
+                  error={errors.activityClassification}
+                  label="Activity Classification"
+                  name="activity-classification"
+                  onChange={(value) => updateForm({ activityClassification: value })}
+                  options={CLASSIFICATION_OPTIONS.filter((option) => option.value !== '')}
+                  required
+                  value={form.activityClassification}
+                />
+              </div>
+
+              <div className="create-activity__form-row create-activity__form-row--three">
+                {!isPaymentOnly ? (
+                  <RadioGroup
+                    className="create-activity__radio create-activity__radio--yes-no"
+                    error={errors.budgetRequired}
+                    label="Does this project require Budget?"
+                    name="budget-required"
+                    onChange={(value) => updateForm({ budgetRequired: value })}
+                    options={YES_NO_OPTIONS.filter((option) => option.value !== '')}
+                    required
+                    value={form.budgetRequired}
+                  />
+                ) : (
+                  <Input disabled hint="Payment Only activities are considered budget required." label="Budget Required" required rightIcon={<LockKeyhole size={15} />} value="Yes" />
+                )}
+                {isBudgetNo ? (
+                  <Input disabled hint="Procurement is automatically No when budget is not required." label="Does this project require procurement?" required rightIcon={<LockKeyhole size={15} />} value="No" />
+                ) : (
+                  <RadioGroup
+                    className="create-activity__radio create-activity__radio--yes-no"
+                    error={errors.procurementRequired}
+                    label="Does this project require procurement?"
+                    name="procurement-required"
+                    onChange={(value) => updateForm({ procurementRequired: value })}
+                    options={YES_NO_OPTIONS.filter((option) => option.value !== '')}
+                    required
+                    value={form.procurementRequired}
+                  />
+                )}
+                <RadioGroup
+                  className="create-activity__radio create-activity__radio--yes-no"
+                  error={errors.adeoReported}
+                  label="Execution plan project reported in ADEO"
+                  name="adeo-reported"
+                  onChange={(value) => updateForm({ adeoReported: value })}
+                  options={YES_NO_OPTIONS.filter((option) => option.value !== '')}
+                  required
+                  value={form.adeoReported}
+                />
+              </div>
+
+              <div className="create-activity__form-row">
                 <Select
-                  id="procurement-required"
-                  label="Does this project require procurement?"
-                  onChange={(value) => updateForm({ procurementRequired: value })}
-                  options={YES_NO_OPTIONS}
-                  value={form.procurementRequired}
+                  error={errors.activityLeadId}
+                  id="activity-lead"
+                  label="Activity Lead / PM Name"
+                  onChange={(value) => updateForm({ activityLeadId: value })}
+                  options={activityLeadOptions.length > 0 ? activityLeadOptions : [{ label: 'No users available', value: '' }]}
+                  required
+                  value={form.activityLeadId || activityLeadOptions[0]?.value || ''}
                 />
-              )}
-              <Select
-                id="adeo-reported"
-                label="Execution plan project reported in ADEO"
-                onChange={(value) => updateForm({ adeoReported: value })}
-                options={YES_NO_OPTIONS}
-                value={form.adeoReported}
-              />
-              <Select
-                id="activity-lead"
-                label="Activity Lead / PM Name"
-                onChange={(value) => updateForm({ activityLeadId: value })}
-                options={activityLeadOptions.length > 0 ? activityLeadOptions : [{ label: 'No users available', value: '' }]}
-                value={form.activityLeadId || activityLeadOptions[0]?.value || ''}
-              />
-              <DatePicker
-                error={errors.plannedStartDate}
-                id="planned-start-date"
-                label="Planned Start Date"
-                onChange={(value) => updateForm({ plannedStartDate: value })}
-                required
-                value={form.plannedStartDate}
-              />
-              <DatePicker
-                error={errors.plannedEndDate}
-                id="planned-end-date"
-                label="Planned End Date"
-                min={form.plannedStartDate}
-                onChange={(value) => updateForm({ plannedEndDate: value })}
-                required
-                value={form.plannedEndDate}
-              />
-              <Textarea
-                error={errors.scopeDescription}
-                label="Activity Scope Description"
-                onChange={(event) => updateForm({ scopeDescription: event.target.value })}
-                placeholder="Describe in-scope and out-of-scope boundaries"
-                required
-                value={form.scopeDescription}
-              />
-              <Textarea
-                error={errors.summary}
-                label="Summary"
-                onChange={(event) => updateForm({ summary: event.target.value })}
-                placeholder="Summarize the expected outcome"
-                required
-                value={form.summary}
-              />
+              </div>
+
+              <div className="create-activity__form-row create-activity__form-row--two">
+                <DatePicker
+                  error={errors.plannedStartDate}
+                  id="planned-start-date"
+                  label="Planned Start Date"
+                  onChange={(value) => updateForm({ plannedStartDate: value })}
+                  required
+                  value={form.plannedStartDate}
+                />
+                <DatePicker
+                  error={errors.plannedEndDate}
+                  id="planned-end-date"
+                  label="Planned End Date"
+                  min={form.plannedStartDate}
+                  onChange={(value) => updateForm({ plannedEndDate: value })}
+                  required
+                  value={form.plannedEndDate}
+                />
+              </div>
+
+              <div className="create-activity__form-row create-activity__form-row--two">
+                <Textarea
+                  error={errors.scopeDescription}
+                  label="Activity Scope Description"
+                  onChange={(event) => updateForm({ scopeDescription: event.target.value })}
+                  placeholder="Describe in-scope and out-of-scope boundaries"
+                  required
+                  value={form.scopeDescription}
+                />
+                <Textarea
+                  error={errors.summary}
+                  label="Summary"
+                  onChange={(event) => updateForm({ summary: event.target.value })}
+                  placeholder="Summarize the expected outcome"
+                  required
+                  value={form.summary}
+                />
+              </div>
             </div>
           </Card>
 
