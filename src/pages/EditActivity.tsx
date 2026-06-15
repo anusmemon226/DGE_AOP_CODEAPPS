@@ -6,6 +6,8 @@ import {
   Briefcase,
   Check,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   ClipboardList,
   Edit3,
   FileText,
@@ -13,10 +15,12 @@ import {
   GitBranch,
   HelpCircle,
   History,
+  LayoutList,
   Lightbulb,
   LockKeyhole,
   Mail,
-
+  Rows,
+  Search,
   Send,
   Sparkles,
   Trash2,
@@ -27,9 +31,9 @@ import {
   Wallet,
   X,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Badge, Button, Card, Checkbox, DatePicker, Input, Modal, RadioGroup, SearchInput, Select, Textarea, type SelectOption } from '../components/ui'
+import { Badge, Button, Card, Checkbox, ConfirmationDialog, DatePicker, Input, Modal, RadioGroup, SearchInput, Select, Textarea, type SelectOption } from '../components/ui'
 import { type AopRole } from '../constants/app'
 import { Dga_divisional_hierarchiesService } from '../generated/services/Dga_divisional_hierarchiesService'
 import { Dga_project_planning_instancesService } from '../generated/services/Dga_project_planning_instancesService'
@@ -438,13 +442,73 @@ const MOCK_USERS: MockUser[] = [
   { id: 'user-10', name: 'Hessa Al Suwaidi', email: 'hessa.suwaidi@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
   { id: 'user-11', name: 'Rashid Al Ghafri', email: 'rashid.ghafri@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
   { id: 'user-12', name: 'Layla Al Shehhi', email: 'layla.shehhi@dge.gov.ae', avatarUrl: null, isDivisionMember: false },
+  { id: 'user-13', name: 'Zayed Al Nahyan', email: 'zayed.nahyan@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
+  { id: 'user-14', name: 'Noura Al Suwaidi', email: 'noura.suwaidi@dge.gov.ae', avatarUrl: null, isDivisionMember: false },
+  { id: 'user-15', name: 'Majid Al Falasi', email: 'majid.falasi@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
+  { id: 'user-16', name: 'Reem Al Hashemi', email: 'reem.hashemi@dge.gov.ae', avatarUrl: null, isDivisionMember: false },
+  { id: 'user-17', name: 'Saif Al Mansoori', email: 'saif.mansoori@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
+  { id: 'user-18', name: 'Dana Al Marzouqi', email: 'dana.marzouqi@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
+  { id: 'user-19', name: 'Yasser Al Qubaisi', email: 'yasser.qubaisi@dge.gov.ae', avatarUrl: null, isDivisionMember: false },
+  { id: 'user-20', name: 'Amal Al Shamsi', email: 'amal.shamsi@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
+  { id: 'user-21', name: 'Hazza Al Mazrouei', email: 'hazza.mazrouei@dge.gov.ae', avatarUrl: null, isDivisionMember: false },
+  { id: 'user-22', name: 'Shaikha Al Ketbi', email: 'shaikha.ketbi@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
+  { id: 'user-23', name: 'Mohsin Al Darmaki', email: 'mohsin.darmaki@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
+  { id: 'user-24', name: 'Salama Al Ameri', email: 'salama.ameri@dge.gov.ae', avatarUrl: null, isDivisionMember: false },
+  { id: 'user-25', name: 'Eisa Al Mazroui', email: 'eisa.mazroui@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
+  { id: 'user-26', name: 'Mira Al Teneiji', email: 'mira.teneiji@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
+  { id: 'user-27', name: 'Suhail Al Owais', email: 'suhail.owais@dge.gov.ae', avatarUrl: null, isDivisionMember: false },
+  { id: 'user-28', name: 'Buthaina Al Nuaimi', email: 'buthaina.nuaimi@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
+  { id: 'user-29', name: 'Jassim Al Zaffin', email: 'jassim.zaffin@dge.gov.ae', avatarUrl: null, isDivisionMember: false },
+  { id: 'user-30', name: 'Rawdha Al Kaabi', email: 'rawdha.kaabi@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
+  { id: 'user-31', name: 'Khamis Al Shamsi', email: 'khamis.shamsi@dge.gov.ae', avatarUrl: null, isDivisionMember: false },
+  { id: 'user-32', name: 'Alya Al Moosa', email: 'alya.moosa@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
+  { id: 'user-33', name: 'Rashid Al Qasimi', email: 'rashid.qasimi@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
+  { id: 'user-34', name: 'Nawaf Al Awadi', email: 'nawaf.awadi@dge.gov.ae', avatarUrl: null, isDivisionMember: false },
+  { id: 'user-35', name: 'Hind Al Falasi', email: 'hind.falasi@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
+  { id: 'user-36', name: 'Talal Al Mahmoud', email: 'talal.mahmoud@dge.gov.ae', avatarUrl: null, isDivisionMember: false },
+  { id: 'user-37', name: 'Lamia Al Hammadi', email: 'lamia.hammadi@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
+  { id: 'user-38', name: 'Abdul Rahman Al Shehhi', email: 'abdul.shehhi@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
+  { id: 'user-39', name: 'Nasser Al Naboodah', email: 'nasser.naboodah@dge.gov.ae', avatarUrl: null, isDivisionMember: false },
+  { id: 'user-40', name: 'Obaid Al Muhairi', email: 'obaid.muhairi@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
 ]
 
 const INITIAL_MEMBERS: ActivityMember[] = [
-  { ...MOCK_USERS[0]!, addedAt: '2026-01-15' },
-  { ...MOCK_USERS[1]!, addedAt: '2026-01-15' },
-  { ...MOCK_USERS[3]!, addedAt: '2026-02-20' },
-  { ...MOCK_USERS[4]!, addedAt: '2026-03-01' },
+  { id: 'init-1', name: 'Ahmed Al Mansouri', email: 'ahmed.mansouri@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-01-15' },
+  { id: 'init-2', name: 'Sara Al Ketbi', email: 'sara.ketbi@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-01-15' },
+  { id: 'init-3', name: 'Mohammed Al Zaabi', email: 'mohammed.zaabi@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-01-20' },
+  { id: 'init-4', name: 'Noora Al Falasi', email: 'noora.falasi@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-02-20' },
+  { id: 'init-5', name: 'Khalid Al Shamsi', email: 'khalid.shamsi@dge.gov.ae', avatarUrl: null, isDivisionMember: false, addedAt: '2026-03-01' },
+  { id: 'init-6', name: 'Mona Al Muhairi', email: 'mona.muhairi@dge.gov.ae', avatarUrl: null, isDivisionMember: false, addedAt: '2026-03-10' },
+  { id: 'init-7', name: 'Sultan Al Neyadi', email: 'sultan.neyadi@dge.gov.ae', avatarUrl: null, isDivisionMember: false, addedAt: '2026-03-15' },
+  { id: 'init-8', name: 'Fatima Al Hashimi', email: 'fatima.hashimi@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-04-01' },
+  { id: 'init-9', name: 'Omar Al Blooshi', email: 'omar.blooshi@dge.gov.ae', avatarUrl: null, isDivisionMember: false, addedAt: '2026-04-05' },
+  { id: 'init-10', name: 'Hessa Al Suwaidi', email: 'hessa.suwaidi@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-04-10' },
+  { id: 'init-11', name: 'Rashid Al Ghafri', email: 'rashid.ghafri@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-04-15' },
+  { id: 'init-12', name: 'Layla Al Shehhi', email: 'layla.shehhi@dge.gov.ae', avatarUrl: null, isDivisionMember: false, addedAt: '2026-05-01' },
+  { id: 'init-13', name: 'Abdulla Al Mazrouei', email: 'abdulla.mazrouei@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-05-05' },
+  { id: 'init-14', name: 'Mariam Al Qubaisi', email: 'mariam.qubaisi@dge.gov.ae', avatarUrl: null, isDivisionMember: false, addedAt: '2026-05-10' },
+  { id: 'init-15', name: 'Hamad Al Ameri', email: 'hamad.ameri@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-05-15' },
+  { id: 'init-16', name: 'Noura Al Kaabi', email: 'noura.kaabi@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-05-18' },
+  { id: 'init-17', name: 'Saeed Al Tayer', email: 'saeed.tayer@dge.gov.ae', avatarUrl: null, isDivisionMember: false, addedAt: '2026-05-20' },
+  { id: 'init-18', name: 'Aisha Al Bishr', email: 'aisha.bishr@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-05-22' },
+  { id: 'init-19', name: 'Salem Al Mazroui', email: 'salem.mazroui@dge.gov.ae', avatarUrl: null, isDivisionMember: false, addedAt: '2026-05-25' },
+  { id: 'init-20', name: 'Latifa Al Maktoum', email: 'latifa.maktoum@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-05-28' },
+  { id: 'init-21', name: 'Butti Al Qubaisi', email: 'butti.qubaisi@dge.gov.ae', avatarUrl: null, isDivisionMember: false, addedAt: '2026-06-01' },
+  { id: 'init-22', name: 'Amna Al Dahak', email: 'amna.dahak@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-06-03' },
+  { id: 'init-23', name: 'Faisal Al Bannai', email: 'faisal.bannai@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-06-05' },
+  { id: 'init-24', name: 'Shamma Al Suwaidi', email: 'shamma.suwaidi@dge.gov.ae', avatarUrl: null, isDivisionMember: false, addedAt: '2026-06-07' },
+  { id: 'init-25', name: 'Mansoor Al Dhaheri', email: 'mansoor.dhaheri@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-06-09' },
+  { id: 'init-26', name: 'Afra Al Shamsi', email: 'afra.shamsi@dge.gov.ae', avatarUrl: null, isDivisionMember: false, addedAt: '2026-06-10' },
+  { id: 'init-27', name: 'Jamal Al Hosani', email: 'jamal.hosani@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-06-11' },
+  { id: 'init-28', name: 'Hind Al Balushi', email: 'hind.balushi@dge.gov.ae', avatarUrl: null, isDivisionMember: false, addedAt: '2026-06-12' },
+  { id: 'init-29', name: 'Tariq Al Falahi', email: 'tariq.falahi@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-06-13' },
+  { id: 'init-30', name: 'Nawal Al Khouri', email: 'nawal.khouri@dge.gov.ae', avatarUrl: null, isDivisionMember: false, addedAt: '2026-06-14' },
+  { id: 'init-31', name: 'Rashed Al Nuaimi', email: 'rashed.nuaimi@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-06-15' },
+  { id: 'init-32', name: 'Maha Al Barrak', email: 'maha.barrak@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-06-15' },
+  { id: 'init-33', name: 'Sultan Al Qasimi', email: 'sultan.qasimi@dge.gov.ae', avatarUrl: null, isDivisionMember: false, addedAt: '2026-06-15' },
+  { id: 'init-34', name: 'Nadia Al Hamadi', email: 'nadia.hamadi@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-06-15' },
+  { id: 'init-35', name: 'Khalifa Al Shams', email: 'khalifa.shams@dge.gov.ae', avatarUrl: null, isDivisionMember: false, addedAt: '2026-06-15' },
+  { id: 'init-36', name: 'Mouza Al Saboosi', email: 'mouza.saboosi@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-06-15' },
 ]
 
 // ── Component ──
@@ -461,11 +525,64 @@ export function EditActivity() {
 
   // ── Activity Members state ──
   const [members, setMembers] = useState<ActivityMember[]>(INITIAL_MEMBERS)
+  const [memberToDelete, setMemberToDelete] = useState<ActivityMember | null>(null)
   const [isAddMembersModalOpen, setIsAddMembersModalOpen] = useState(false)
   const [memberFilter, setMemberFilter] = useState<MemberFilter>('all')
   const [memberSearchQuery, setMemberSearchQuery] = useState('')
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set())
   const [memberSelectionError, setMemberSelectionError] = useState('')
+
+  // ── Member list view state (search, pagination, lazy) ──
+  const [memberListSearch, setMemberListSearch] = useState('')
+  const [memberViewMode, setMemberViewMode] = useState<'pagination' | 'lazy'>('pagination')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [lazyVisibleCount, setLazyVisibleCount] = useState(12)
+  const ITEMS_PER_PAGE = 12
+  const LAZY_BATCH = 12
+  const sentinelRef = useRef<HTMLDivElement>(null)
+
+  const filteredMembers = useMemo(() => {
+    if (!memberListSearch.trim()) return members
+    const q = memberListSearch.toLowerCase()
+    return members.filter((m) => m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q))
+  }, [members, memberListSearch])
+
+  // Auto-load more on scroll via IntersectionObserver
+  useEffect(() => {
+    if (memberViewMode !== 'lazy') return undefined
+    const sentinel = sentinelRef.current
+    if (!sentinel) return undefined
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setLazyVisibleCount((prev) => {
+            const next = prev + LAZY_BATCH
+            return next >= filteredMembers.length ? filteredMembers.length : next
+          })
+        }
+      },
+      { rootMargin: '100px' },
+    )
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [memberViewMode, filteredMembers.length, LAZY_BATCH])
+
+  const totalPages = Math.max(1, Math.ceil(filteredMembers.length / ITEMS_PER_PAGE))
+
+  const visibleMembers = useMemo(() => {
+    if (memberViewMode === 'pagination') {
+      return filteredMembers.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
+    }
+    return filteredMembers.slice(0, lazyVisibleCount)
+  }, [filteredMembers, memberViewMode, currentPage, lazyVisibleCount])
+
+  // Reset to first page / lazy count when search changes or members change
+  useEffect(() => {
+    setCurrentPage(1)
+    setLazyVisibleCount(12)
+  }, [memberListSearch, members.length])
 
   // ── Placeholder activity data ──
   const activityName = 'Digital Infrastructure Upgrade'
@@ -642,8 +759,18 @@ export function EditActivity() {
     setIsAddMembersModalOpen(false)
   }, [selectedMemberIds])
 
-  const handleRemoveMember = useCallback((memberId: string) => {
-    setMembers((prev) => prev.filter((m) => m.id !== memberId))
+  const handleRemoveMember = useCallback((member: ActivityMember) => {
+    setMemberToDelete(member)
+  }, [])
+
+  const handleConfirmDeleteMember = useCallback(() => {
+    if (!memberToDelete) return
+    setMembers((prev) => prev.filter((m) => m.id !== memberToDelete.id))
+    setMemberToDelete(null)
+  }, [memberToDelete])
+
+  const handleCancelDeleteMember = useCallback(() => {
+    setMemberToDelete(null)
   }, [])
 
   const handleToggleUserSelection = useCallback((userId: string) => {
@@ -1147,6 +1274,15 @@ export function EditActivity() {
 
   function renderMembersTab() {
     const memberCount = members.length
+    const filteredCount = filteredMembers.length
+    const hasFilter = memberListSearch.trim().length > 0
+    const showingText = hasFilter
+      ? `${filteredCount} of ${memberCount} member${memberCount !== 1 ? 's' : ''}`
+      : `${memberCount} member${memberCount !== 1 ? 's' : ''}`
+    const showPagination = memberViewMode === 'pagination' && filteredCount > ITEMS_PER_PAGE
+    const showLoadMore = memberViewMode === 'lazy' && lazyVisibleCount < filteredCount
+    const rangeStart = filteredCount > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0
+    const rangeEnd = Math.min(currentPage * ITEMS_PER_PAGE, filteredCount)
 
     return (
       <div className="edit-activity__members">
@@ -1155,7 +1291,7 @@ export function EditActivity() {
           <div className="edit-activity__members-header-text">
             <h2>
               Activity Members
-              <span className="edit-activity__members-count-badge">{memberCount} member{memberCount !== 1 ? 's' : ''}</span>
+              <span className="edit-activity__members-count-badge">{showingText}</span>
             </h2>
             <p>Manage users assigned to this activity.</p>
           </div>
@@ -1164,16 +1300,71 @@ export function EditActivity() {
           </Button>
         </div>
 
-        {/* Member cards grid */}
-        {memberCount === 0 ? (
+        {/* Toolbar: search + view toggle */}
+        {memberCount > 0 ? (
+          <div className="edit-activity__members-toolbar">
+            <div className="edit-activity__members-search">
+              <Search size={15} />
+              <input
+                className="edit-activity__members-search-input"
+                onChange={(e) => setMemberListSearch(e.target.value)}
+                placeholder="Search members by name or email..."
+                type="text"
+                value={memberListSearch}
+              />
+              {memberListSearch ? (
+                <button
+                  className="edit-activity__members-search-clear"
+                  onClick={() => setMemberListSearch('')}
+                  type="button"
+                >
+                  <X size={14} />
+                </button>
+              ) : null}
+            </div>
+            <div className="edit-activity__members-view-toggle" role="group" aria-label="View mode">
+              <button
+                className={`edit-activity__members-view-btn${memberViewMode === 'pagination' ? ' edit-activity__members-view-btn--active' : ''}`}
+                onClick={() => { setMemberViewMode('pagination'); setCurrentPage(1) }}
+                title="Paginated view"
+                type="button"
+              >
+                <LayoutList size={14} />
+                <span>Pages</span>
+              </button>
+              <button
+                className={`edit-activity__members-view-btn${memberViewMode === 'lazy' ? ' edit-activity__members-view-btn--active' : ''}`}
+                onClick={() => { setMemberViewMode('lazy'); setLazyVisibleCount(12) }}
+                title="Scroll-to-load view"
+                type="button"
+              >
+                <Rows size={14} />
+                <span>Scroll</span>
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Cards grid */}
+        {filteredCount === 0 ? (
           <div className="edit-activity__members-empty">
-            <UsersRound size={40} strokeWidth={1.2} />
-            <h3>No members assigned</h3>
-            <p>Click <strong>Add Members</strong> to assign users to this activity.</p>
+            {hasFilter ? (
+              <>
+                <Search size={36} strokeWidth={1.2} />
+                <h3>No members match your search</h3>
+                <p>Try a different name or email.</p>
+              </>
+            ) : (
+              <>
+                <UsersRound size={40} strokeWidth={1.2} />
+                <h3>No members assigned</h3>
+                <p>Click <strong>Add Members</strong> to assign users to this activity.</p>
+              </>
+            )}
           </div>
         ) : (
           <div className="edit-activity__members-grid">
-            {members.map((member) => (
+            {visibleMembers.map((member) => (
               <div className="edit-activity__member-card" key={member.id}>
                 <div className="edit-activity__member-card-avatar">
                   {member.avatarUrl ? (
@@ -1197,7 +1388,7 @@ export function EditActivity() {
                 <button
                   aria-label={`Remove ${member.name}`}
                   className="edit-activity__member-card-remove"
-                  onClick={() => handleRemoveMember(member.id)}
+                  onClick={() => handleRemoveMember(member)}
                   title="Remove member"
                   type="button"
                 >
@@ -1208,8 +1399,101 @@ export function EditActivity() {
           </div>
         )}
 
+        {/* Pagination */}
+        {showPagination ? (
+          <div className="edit-activity__members-pagination">
+            <span className="edit-activity__members-pagination-info">
+              Showing <strong>{rangeStart}–{rangeEnd}</strong> of <strong>{filteredCount}</strong> member{filteredCount !== 1 ? 's' : ''}
+            </span>
+            <div className="edit-activity__members-pagination-controls">
+              <button
+                className="edit-activity__members-page-btn"
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                type="button"
+                aria-label="Previous page"
+              >
+                <ChevronLeft size={15} />
+              </button>
+              <div className="edit-activity__members-page-numbers">
+                {(() => {
+                  const pages: (number | 'ellipsis')[] = []
+                  const total = totalPages
+                  const current = currentPage
+                  const siblingCount = 1
+
+                  if (total <= 7) {
+                    for (let i = 1; i <= total; i++) pages.push(i)
+                  } else {
+                    pages.push(1)
+                    if (current > siblingCount + 2) pages.push('ellipsis')
+                    const start = Math.max(2, current - siblingCount)
+                    const end = Math.min(total - 1, current + siblingCount)
+                    for (let i = start; i <= end; i++) pages.push(i)
+                    if (current < total - siblingCount - 1) pages.push('ellipsis')
+                    if (total > 1) pages.push(total)
+                  }
+
+                  return pages.map((page, idx) =>
+                    page === 'ellipsis' ? (
+                      <span className="edit-activity__members-page-ellipsis" key={`ellipsis-${idx}`}>...</span>
+                    ) : (
+                      <button
+                        key={page}
+                        className={`edit-activity__members-page-num${page === current ? ' edit-activity__members-page-num--active' : ''}`}
+                        onClick={() => setCurrentPage(page)}
+                        type="button"
+                      >
+                        {page}
+                      </button>
+                    ),
+                  )
+                })()}
+              </div>
+              <button
+                className="edit-activity__members-page-btn"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                type="button"
+                aria-label="Next page"
+              >
+                <ChevronRight size={15} />
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Load More (lazy mode — auto-triggered on scroll) */}
+        {showLoadMore ? (
+          <div
+            className="edit-activity__members-sentinel"
+            ref={sentinelRef}
+            aria-hidden="true"
+          >
+            <span className="edit-activity__members-sentinel-dot" />
+            <span className="edit-activity__members-sentinel-dot" />
+            <span className="edit-activity__members-sentinel-dot" />
+          </div>
+        ) : memberViewMode === 'lazy' && filteredCount > 0 ? (
+          <div className="edit-activity__members-sentinel--done" aria-hidden="true">
+            <Check size={13} />
+            <span>All {filteredCount} member{filteredCount !== 1 ? 's' : ''} loaded</span>
+          </div>
+        ) : null}
+
         {/* Add Members Modal */}
         {renderAddMembersModal()}
+
+        {/* Confirm Delete Member */}
+        <ConfirmationDialog
+          confirmLabel="Remove Member"
+          danger
+          description={memberToDelete ? `Are you sure you want to remove <strong>${memberToDelete.name}</strong> from this activity? This action cannot be undone.` : ''}
+          isOpen={memberToDelete !== null}
+          onCancel={handleCancelDeleteMember}
+          onConfirm={handleConfirmDeleteMember}
+          title="Remove Member"
+        />
       </div>
     )
   }
@@ -1327,7 +1611,7 @@ export function EditActivity() {
                 <span>{selectedCount} user{selectedCount > 1 ? 's' : ''} selected</span>
               </div>
               <div className="edit-activity__members-modal-selected-tags">
-                {selectedUsers.map((user) => (
+                {selectedUsers.slice(0, 5).map((user) => (
                   <button
                     className={`edit-activity__members-modal-selected-tag ${user.isDivisionMember ? 'edit-activity__members-modal-selected-tag--division' : 'edit-activity__members-modal-selected-tag--external'}`}
                     key={user.id}
@@ -1338,6 +1622,9 @@ export function EditActivity() {
                     <X size={11} strokeWidth={2.5} />
                   </button>
                 ))}
+                {selectedCount > 5 ? (
+                  <span className="edit-activity__members-modal-selected-more">+{selectedCount - 5} more</span>
+                ) : null}
               </div>
             </div>
           ) : null}

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useEffect } from 'react'
-import { X } from 'lucide-react'
+import { AlertTriangle, X } from 'lucide-react'
 import { Button } from './Button'
 import './ui.css'
 
@@ -13,6 +13,8 @@ type ModalProps = {
 }
 
 type ConfirmationDialogProps = {
+  confirmLabel?: string
+  danger?: boolean
   description: string
   isOpen: boolean
   onCancel: () => void
@@ -60,7 +62,15 @@ export function Modal({ actions, children, isOpen, onClose, title }: ModalProps)
   )
 }
 
-export function ConfirmationDialog({ description, isOpen, onCancel, onConfirm, title }: ConfirmationDialogProps) {
+export function ConfirmationDialog({
+  confirmLabel = 'Confirm',
+  danger = false,
+  description,
+  isOpen,
+  onCancel,
+  onConfirm,
+  title,
+}: ConfirmationDialogProps) {
   return (
     <Modal
       actions={
@@ -68,14 +78,23 @@ export function ConfirmationDialog({ description, isOpen, onCancel, onConfirm, t
           <Button onClick={onCancel} variant="secondary">
             Cancel
           </Button>
-          <Button onClick={onConfirm}>Confirm</Button>
+          <Button className={danger ? 'button--danger' : ''} onClick={onConfirm}>
+            {confirmLabel}
+          </Button>
         </>
       }
       isOpen={isOpen}
       onClose={onCancel}
       title={title}
     >
-      <p className="modal__description">{description}</p>
+      <div className={`modal__confirm-body${danger ? ' modal__confirm-body--danger' : ''}`}>
+        {danger ? (
+          <div className="modal__confirm-icon">
+            <AlertTriangle size={22} />
+          </div>
+        ) : null}
+        <p className="modal__description" dangerouslySetInnerHTML={{ __html: description }} />
+      </div>
     </Modal>
   )
 }
