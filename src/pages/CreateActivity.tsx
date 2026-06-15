@@ -82,10 +82,10 @@ const FIELD_LABELS: Partial<Record<keyof CreateActivityForm, string>> = {
   plannedEndDate: 'Planned End Date',
   scopeDescription: 'Activity Scope Description',
   summary: 'Summary',
-  adeoProjectName: 'Project Name',
-  adeoProjectDescription: 'Project Description',
+  adeoProjectName: 'اسم المشروع',
+  adeoProjectDescription: 'وصف المشروع',
   longTermImpact: 'Long Term Impact',
-  overallLongTermImpact: 'Long Term / Overall Project Objectives',
+  overallLongTermImpact: 'طويلة المدى / اهداف المشروع العامة',
   stakeholder: 'Stakeholder',
   activityKpi: 'Activity KPI',
   risks: 'Risks',
@@ -1130,63 +1130,81 @@ export function CreateActivity() {
                   <span>ADEO Activity Overview</span>
                   <h2>Execution plan reporting details</h2>
                 </div>
-                <Badge tone="info">ADEO</Badge>
               </div>
-              <div className="create-activity__form-grid">
-                <Input
-                  error={errors.adeoProjectName}
-                  label="Project Name"
-                  onChange={(event) => updateForm({ adeoProjectName: event.target.value })}
-                  required
-                  value={form.adeoProjectName}
-                />
-                <Input
-                  error={errors.adeoProjectDescription}
-                  label="Project Description"
-                  onChange={(event) => updateForm({ adeoProjectDescription: event.target.value })}
-                  required
-                  value={form.adeoProjectDescription}
-                />
-                <Textarea
-                  error={errors.longTermImpact}
-                  label="Long Term Impact"
-                  onChange={(event) => updateForm({ longTermImpact: event.target.value })}
-                  required
-                  value={form.longTermImpact}
-                />
-                <Textarea
-                  error={errors.overallLongTermImpact}
-                  label="Long Term / Overall Project Objectives"
-                  onChange={(event) => updateForm({ overallLongTermImpact: event.target.value })}
-                  required
-                  value={form.overallLongTermImpact}
-                />
-                <Input
-                  error={errors.stakeholder}
-                  label="Stakeholder"
-                  onChange={(event) => updateForm({ stakeholder: event.target.value })}
-                  required
-                  value={form.stakeholder}
-                />
-                <Input
-                  error={errors.activityKpi}
-                  label="Activity KPI"
-                  onChange={(event) => updateForm({ activityKpi: event.target.value })}
-                  required
-                  value={form.activityKpi}
-                />
-                <Input
-                  label="Activity Plan (If any)"
-                  onChange={(event) => updateForm({ activityPlan: event.target.value })}
-                  value={form.activityPlan}
-                />
-                <Textarea
-                  error={errors.risks}
-                  label="Risks"
-                  onChange={(event) => updateForm({ risks: event.target.value })}
-                  required
-                  value={form.risks}
-                />
+              <div className="create-activity__form-stack">
+                <div className="create-activity__form-row create-activity__form-row--two">
+                  <Input
+                    error={errors.adeoProjectName}
+                    label="اسم المشروع"
+                    onChange={(event) => updateForm({ adeoProjectName: event.target.value })}
+                    placeholder="أدخل اسم المشروع"
+                    required
+                    value={form.adeoProjectName}
+                  />
+                  <Input
+                    error={errors.adeoProjectDescription}
+                    label="وصف المشروع"
+                    onChange={(event) => updateForm({ adeoProjectDescription: event.target.value })}
+                    placeholder="أدخل وصفاً مختصراً للمشروع"
+                    required
+                    value={form.adeoProjectDescription}
+                  />
+                </div>
+
+                <div className="create-activity__form-row create-activity__form-row--two">
+                  <Textarea
+                    error={errors.longTermImpact}
+                    label="Long Term Impact"
+                    onChange={(event) => updateForm({ longTermImpact: event.target.value })}
+                    placeholder="Describe the expected long-term impact of this activity"
+                    required
+                    value={form.longTermImpact}
+                  />
+                  <Textarea
+                    error={errors.overallLongTermImpact}
+                    label="طويلة المدى / اهداف المشروع العامة"
+                    onChange={(event) => updateForm({ overallLongTermImpact: event.target.value })}
+                    placeholder="اكتب الأهداف العامة طويلة المدى للمشروع"
+                    required
+                    value={form.overallLongTermImpact}
+                  />
+                </div>
+
+                <div className="create-activity__form-row create-activity__form-row--two">
+                  <Input
+                    error={errors.stakeholder}
+                    label="Stakeholder"
+                    onChange={(event) => updateForm({ stakeholder: event.target.value })}
+                    placeholder="Enter the primary stakeholder or entity"
+                    required
+                    value={form.stakeholder}
+                  />
+                  <Input
+                    error={errors.activityKpi}
+                    label="Activity KPI"
+                    onChange={(event) => updateForm({ activityKpi: event.target.value })}
+                    placeholder="Enter the KPI used to measure success"
+                    required
+                    value={form.activityKpi}
+                  />
+                </div>
+
+                <div className="create-activity__form-row create-activity__form-row--two">
+                  <Input
+                    label="Activity Plan (If any)"
+                    onChange={(event) => updateForm({ activityPlan: event.target.value })}
+                    placeholder="Enter the activity plan reference, if available"
+                    value={form.activityPlan}
+                  />
+                  <Textarea
+                    error={errors.risks}
+                    label="Risks"
+                    onChange={(event) => updateForm({ risks: event.target.value })}
+                    placeholder="Describe key risks, dependencies, or mitigation needs"
+                    required
+                    value={form.risks}
+                  />
+                </div>
               </div>
             </Card>
           ) : null}
