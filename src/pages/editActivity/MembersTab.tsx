@@ -609,11 +609,11 @@ export function MembersTab() {
       <ConfirmationDialog
         confirmLabel="Remove Member"
         danger
-        description={memberToDelete ? `Are you sure you want to remove <strong>${memberToDelete.name}</strong> from this activity? This action cannot be undone.` : ''}
+        description="This member will be removed from this activity. This action cannot be undone."
         isOpen={memberToDelete !== null}
         onCancel={handleCancelDeleteMember}
         onConfirm={handleConfirmDeleteMember}
-        title="Remove Member"
+        title={memberToDelete ? `Are you sure you want to remove ${memberToDelete.name}?` : ''}
       />
     </div>
   )

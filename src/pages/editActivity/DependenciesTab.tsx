@@ -14,7 +14,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { Button, ConfirmationDialog, DatePicker, Input, Modal, RadioGroup, Select, Textarea } from '../../components/ui'
+import { Button, ConfirmationDialog, DatePicker, Input, RadioGroup, Select, SideDrawer, Textarea } from '../../components/ui'
 import type { SelectOption } from '../../components/ui'
 
 // ── Types ──
@@ -738,10 +738,10 @@ export function DependenciesTab() {
         </div>
       ) : null}
 
-      {/* Create / Edit dependency modal */}
-      <Modal
+      {/* Create / Edit dependency side drawer */}
+      <SideDrawer
         actions={
-          <div className="edit-activity__deps-modal-actions">
+          <div className="edit-activity__deps-drawer-actions">
             <Button onClick={handleCloseDepModal} variant="secondary">
               Cancel
             </Button>
@@ -752,71 +752,67 @@ export function DependenciesTab() {
         }
         isOpen={isDepModalOpen}
         onClose={handleCloseDepModal}
-        title={editingDep ? 'Edit External Dependency' : 'Create External Dependency'}
+        title={editingDep ? 'Edit Dependency' : 'Create Dependency'}
       >
-        <div className="edit-activity__deps-modal">
-          <div className="edit-activity__deps-modal-row">
-            <Textarea
-              error={depFormErrors.entityName}
-              label="External Entity Name"
-              onChange={(e) => handleDepFormChange('entityName', e.target.value)}
-              placeholder="Enter the external entity or organisation name"
-              required
-              rows={5}
-              value={depForm.entityName}
-            />
-            <Textarea
-              error={depFormErrors.typeOfSupport}
-              label="Type of Support"
-              onChange={(e) => handleDepFormChange('typeOfSupport', e.target.value)}
-              placeholder="Describe the type of support or arrangement"
-              required
-              rows={5}
-              value={depForm.typeOfSupport}
-            />
-          </div>
-          <div className="edit-activity__deps-modal-row">
-            <DatePicker
-              error={depFormErrors.dateOfSupport}
-              id="dep-date-of-support"
-              label="Date of Support"
-              onChange={(value) => handleDepFormChange('dateOfSupport', value)}
-              required
-              value={depForm.dateOfSupport}
-            />
-            <RadioGroup
-              error={depFormErrors.applicable}
-              label="Applicable"
-              name="dep-applicable"
-              onChange={(value) => handleDepFormChange('applicable', value)}
-              options={APPLICABLE_OPTIONS}
-              required
-              value={depForm.applicable}
-            />
-          </div>
+        <div className="edit-activity__deps-drawer">
+          <Textarea
+            error={depFormErrors.entityName}
+            label="External Entity Name"
+            onChange={(e) => handleDepFormChange('entityName', e.target.value)}
+            placeholder="Enter the external entity or organisation name"
+            required
+            rows={4}
+            value={depForm.entityName}
+          />
+          <DatePicker
+            error={depFormErrors.dateOfSupport}
+            id="dep-date-of-support"
+            label="Date of Support"
+            onChange={(value) => handleDepFormChange('dateOfSupport', value)}
+            required
+            value={depForm.dateOfSupport}
+          />
+          <Textarea
+            error={depFormErrors.typeOfSupport}
+            label="Type of Support"
+            onChange={(e) => handleDepFormChange('typeOfSupport', e.target.value)}
+            placeholder="Describe the type of support or arrangement"
+            required
+            rows={4}
+            value={depForm.typeOfSupport}
+          />
+          <RadioGroup
+            error={depFormErrors.applicable}
+            label="Applicable"
+            name="dep-applicable"
+            onChange={(value) => handleDepFormChange('applicable', value)}
+            options={APPLICABLE_OPTIONS}
+            required
+            value={depForm.applicable}
+          />
         </div>
-      </Modal>
+      </SideDrawer>
 
       {/* Single delete confirmation */}
       <ConfirmationDialog
         confirmLabel="Delete Dependency"
         danger
-        description={depToDelete ? `Are you sure you want to delete the dependency <strong>${depToDelete.entityName}</strong>? This action cannot be undone.` : ''}
+        description="This dependency will be permanently removed. This action cannot be undone."
         isOpen={depToDelete !== null}
         onCancel={() => setDepToDelete(null)}
         onConfirm={handleConfirmDeleteDep}
-        title="Delete Dependency"
+        title={depToDelete ? `Are you sure you want to delete the dependency ${depToDelete.entityName}?` : ''}
       />
 
       {/* Bulk delete confirmation */}
       <ConfirmationDialog
         confirmLabel={`Delete ${selectedCount} Dependenc${selectedCount !== 1 ? 'ies' : 'y'}`}
         danger
-        description={`Are you sure you want to delete <strong>${selectedCount}</strong> selected dependenc${selectedCount !== 1 ? 'ies' : 'y'}? This action cannot be undone.`}
+        description="These dependencies will be permanently removed. This action cannot be undone."
         isOpen={isBulkDeleteConfirm}
         onCancel={() => setIsBulkDeleteConfirm(false)}
         onConfirm={handleBulkDelete}
-        title="Delete Dependencies"
+        title={`Are you sure you want to delete ${selectedCount} selected ${selectedCount !== 1 ? 'dependencies' : 'dependency'}?`}
       />
     </div>
   )

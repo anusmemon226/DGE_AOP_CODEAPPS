@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
-import { useEffect } from 'react'
-import { AlertTriangle, X } from 'lucide-react'
+import { useEffect, useId } from 'react'
+import { AlertTriangle, ShieldCheck, X } from 'lucide-react'
 import { Button } from './Button'
 import './ui.css'
 
@@ -71,30 +71,58 @@ export function ConfirmationDialog({
   onConfirm,
   title,
 }: ConfirmationDialogProps) {
+  const titleId = useId()
+  const descriptionId = useId()
+  const Icon = danger ? AlertTriangle : ShieldCheck
+
+  useEffect(() => {
+    if (!isOpen) return undefined
+
+    const originalOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') onCancel()
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.body.style.overflow = originalOverflow
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen, onCancel])
+
+  if (!isOpen) return null
+
   return (
-    <Modal
-      actions={
-        <>
+    <div className="modal" role="presentation">
+      <button aria-label="Close dialog" className="modal__backdrop" onClick={onCancel} type="button" />
+      <section
+        aria-describedby={descriptionId}
+        aria-labelledby={titleId}
+        aria-modal="true"
+        className={`confirm-dialog${danger ? ' confirm-dialog--danger' : ''}`}
+        role="alertdialog"
+      >
+        <button aria-label="Close dialog" className="confirm-dialog__close" onClick={onCancel} type="button">
+          <X size={16} />
+        </button>
+        <div className={`confirm-dialog__icon${danger ? ' confirm-dialog__icon--danger' : ''}`}>
+          <Icon size={30} />
+        </div>
+        <div className="confirm-dialog__content">
+          <h2 className="confirm-dialog__title" id={titleId}>{title}</h2>
+          <p className="confirm-dialog__description" id={descriptionId}>{description}</p>
+        </div>
+        <div className="confirm-dialog__actions">
           <Button onClick={onCancel} variant="secondary">
             Cancel
           </Button>
           <Button className={danger ? 'button--danger' : ''} onClick={onConfirm}>
             {confirmLabel}
           </Button>
-        </>
-      }
-      isOpen={isOpen}
-      onClose={onCancel}
-      title={title}
-    >
-      <div className={`modal__confirm-body${danger ? ' modal__confirm-body--danger' : ''}`}>
-        {danger ? (
-          <div className="modal__confirm-icon">
-            <AlertTriangle size={22} />
-          </div>
-        ) : null}
-        <p className="modal__description" dangerouslySetInnerHTML={{ __html: description }} />
-      </div>
-    </Modal>
+        </div>
+      </section>
+    </div>
   )
 }

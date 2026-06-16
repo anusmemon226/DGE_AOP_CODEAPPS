@@ -213,11 +213,11 @@ export function UiShowcase() {
         <p className="modal__description">Use shared components for all Create Activity form sections.</p>
       </Modal>
       <ConfirmationDialog
-        description="This is a reusable confirmation pattern for high-impact actions."
+        description="This is a reusable confirmation pattern for high-impact actions. This action cannot be undone."
         isOpen={isConfirmOpen}
         onCancel={() => setIsConfirmOpen(false)}
         onConfirm={() => setIsConfirmOpen(false)}
-        title="Confirm sample action"
+        title="Are you sure you want to perform this action?"
       />
     </div>
   )
