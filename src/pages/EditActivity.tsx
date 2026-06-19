@@ -11,6 +11,7 @@ import {
   History,
   Send,
   Sparkles,
+  Target,
   UserRound,
   UsersRound,
   Wallet,
@@ -31,6 +32,7 @@ import { ActivityInfoTab } from './editActivity/ActivityInfoTab'
 import { MembersTab } from './editActivity/MembersTab'
 import { DependenciesTab } from './editActivity/DependenciesTab'
 import { MilestonesTab } from './editActivity/MilestonesTab'
+import { ObjectivesTab } from './editActivity/ObjectivesTab'
 import {
   normalizeControlledRules,
   validateForm,
@@ -47,6 +49,7 @@ type TabId =
   | 'activity-info'
   | 'members'
   | 'dependencies'
+  | 'objectives'
   | 'milestones'
   | 'procurements'
   | 'engagement-plans'
@@ -63,12 +66,13 @@ type TabConfig = {
 
 const TABS: TabConfig[] = [
   { id: 'activity-info', label: 'Activity Information', shortLabel: 'Info', icon: ClipboardList },
-  { id: 'members', label: 'Activity Members', shortLabel: 'Members', icon: UsersRound },
+  { id: 'members', label: 'Members', shortLabel: 'Members', icon: UsersRound },
   { id: 'dependencies', label: 'Dependencies', shortLabel: 'Dependencies', icon: GitBranch },
+  { id: 'objectives', label: 'Objectives', shortLabel: 'Objectives', icon: Target },
   { id: 'milestones', label: 'Milestones', shortLabel: 'Milestones', icon: Flag },
   { id: 'procurements', label: 'Procurements', shortLabel: 'Procurements', icon: Briefcase },
   { id: 'engagement-plans', label: 'Engagement Plans', shortLabel: 'Engagement', icon: BarChart3 },
-  { id: 'budget', label: 'Budget Information', shortLabel: 'Budget', icon: Wallet },
+  { id: 'budget', label: 'Budget', shortLabel: 'Budget', icon: Wallet },
   { id: 'clarifications', label: 'Clarifications', shortLabel: 'Clarifications', icon: HelpCircle },
   { id: 'logs', label: 'Logs', shortLabel: 'Logs', icon: History },
 ]
@@ -290,6 +294,8 @@ export function EditActivity() {
         return <MembersTab />
       case 'dependencies':
         return <DependenciesTab />
+      case 'objectives':
+        return <ObjectivesTab />
       case 'milestones':
         return <MilestonesTab isAdeoVisible={isAdeoVisible} />
       case 'procurements':

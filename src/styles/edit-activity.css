@@ -166,7 +166,7 @@
 :root[data-theme='dark'] .edit-activity__members-count-badge {
   background: rgba(129, 140, 248, 0.14);
   border-color: rgba(129, 140, 248, 0.25);
-  color: #a5b4fc;
+  color: var(--color-primary-hover);
 }
 
 .edit-activity__members-empty {
@@ -294,8 +294,8 @@
 }
 
 .edit-activity__member-card-badge--division {
-  background: rgba(79, 70, 229, 0.1);
-  color: #4f46e5;
+  background: rgba(55, 94, 251, 0.1);
+  color: var(--color-primary);
 }
 
 .edit-activity__member-card-badge--external {
@@ -305,7 +305,7 @@
 
 :root[data-theme='dark'] .edit-activity__member-card-badge--division {
   background: rgba(129, 140, 248, 0.15);
-  color: #a5b4fc;
+  color: var(--color-primary);
 }
 
 :root[data-theme='dark'] .edit-activity__member-card-badge--external {
@@ -484,6 +484,7 @@
 }
 
 .edit-activity__deps-table {
+  background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 0.75rem;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
@@ -730,7 +731,7 @@
 }
 
 .edit-activity__deps-table-row:nth-child(even):not(.edit-activity__deps-table-row--header) {
-  background: color-mix(in srgb, var(--color-surface-muted) 50%, transparent);
+  background: var(--color-surface);
 }
 
 .edit-activity__deps-table-row--header {
@@ -855,7 +856,7 @@
 .edit-activity__deps-check-input:checked + .edit-activity__deps-check-visual {
   background: var(--color-primary);
   border-color: var(--color-primary);
-  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);
+  box-shadow: 0 2px 6px rgba(55, 94, 251, 0.25);
   color: #fff;
 }
 
@@ -1190,20 +1191,20 @@
 :root[data-theme='dark'] .edit-activity__members-modal-filter--active {
   background: rgba(129, 140, 248, 0.14);
   border-color: rgba(129, 140, 248, 0.4);
-  color: #a5b4fc;
+  color: var(--color-primary-hover);
 }
 
 /* Filter tab color modifiers — match user badge colors */
 .edit-activity__members-modal-filter--division.edit-activity__members-modal-filter--active {
-  background: rgba(79, 70, 229, 0.1);
-  border-color: #4f46e5;
-  color: #4f46e5;
+  background: rgba(55, 94, 251, 0.1);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 :root[data-theme='dark'] .edit-activity__members-modal-filter--division.edit-activity__members-modal-filter--active {
   background: rgba(129, 140, 248, 0.15);
   border-color: rgba(129, 140, 248, 0.4);
-  color: #a5b4fc;
+  color: var(--color-primary);
 }
 
 .edit-activity__members-modal-filter--external.edit-activity__members-modal-filter--active {
@@ -1350,8 +1351,8 @@
 }
 
 :root[data-theme='dark'] .edit-activity__members-modal-user-check--checked {
-  background: #6366f1;
-  border-color: #6366f1;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
 }
 
 /* Hidden native checkbox */
@@ -1444,9 +1445,9 @@
 
 /* Selected tag color modifiers — match user badge colors */
 .edit-activity__members-modal-selected-tag--division {
-  background: rgba(79, 70, 229, 0.08);
-  border-color: rgba(79, 70, 229, 0.2);
-  color: #4f46e5;
+  background: rgba(55, 94, 251, 0.08);
+  border-color: rgba(55, 94, 251, 0.2);
+  color: var(--color-primary);
 }
 
 .edit-activity__members-modal-selected-tag--external {
@@ -1458,7 +1459,7 @@
 :root[data-theme='dark'] .edit-activity__members-modal-selected-tag--division {
   background: rgba(129, 140, 248, 0.12);
   border-color: rgba(129, 140, 248, 0.25);
-  color: #a5b4fc;
+  color: var(--color-primary);
 }
 
 :root[data-theme='dark'] .edit-activity__members-modal-selected-tag--external {
