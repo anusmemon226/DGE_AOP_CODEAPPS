@@ -395,36 +395,48 @@ Design Goals:
 * Consistent Components
 * Excellent Dark Mode Support
 
----
+# Color Palette
 
-## Color Palette
+## Brand Colors
 
-### Primary Color
-
-Indigo
+### Primary
 
 ```text
-#4F46E5
+#375EFB
 ```
 
 ### Primary Hover
 
 ```text
-#4338CA
+#2C4EE0
 ```
 
 ### Primary Light
 
 ```text
-#EEF2FF
+#EBEFFF
+```
+
+### Primary Lighter
+
+```text
+#F4F7FF
 ```
 
 ---
+
+## Semantic Colors
 
 ### Success
 
 ```text
 #16A34A
+```
+
+### Success Light
+
+```text
+#DCFCE7
 ```
 
 ---
@@ -435,12 +447,24 @@ Indigo
 #F59E0B
 ```
 
+### Warning Light
+
+```text
+#FEF3C7
+```
+
 ---
 
 ### Error
 
 ```text
 #DC2626
+```
+
+### Error Light
+
+```text
+#FEE2E2
 ```
 
 ---
@@ -451,14 +475,20 @@ Indigo
 #0284C7
 ```
 
+### Information Light
+
+```text
+#E0F2FE
+```
+
 ---
 
-## Light Theme
+# Light Theme
 
 Background
 
 ```text
-#F8FAFC
+#F0F2FA
 ```
 
 Surface
@@ -467,16 +497,28 @@ Surface
 #FFFFFF
 ```
 
+Surface Secondary
+
+```text
+#EBEFFF
+```
+
 Border
 
 ```text
-#E2E8F0
+#CFD7F8
+```
+
+Border Hover
+
+```text
+#B6C2F3
 ```
 
 Text Primary
 
 ```text
-#0F172A
+#111827
 ```
 
 Text Secondary
@@ -485,26 +527,38 @@ Text Secondary
 #64748B
 ```
 
+Text Muted
+
+```text
+#94A3B8
+```
+
 ---
 
-## Dark Theme
+# Dark Theme
 
 Background
 
 ```text
-#0F172A
+#0B1220
 ```
 
 Surface
 
 ```text
-#1E293B
+#16203B
+```
+
+Surface Secondary
+
+```text
+#1D2A4A
 ```
 
 Border
 
 ```text
-#334155
+#31446F
 ```
 
 Text Primary
@@ -519,7 +573,146 @@ Text Secondary
 #CBD5E1
 ```
 
+Text Muted
+
+```text
+#94A3B8
+```
+
 ---
+
+# Component Tokens
+
+## Sidebar
+
+Background
+
+```text
+#FFFFFF
+```
+
+Active Item Background
+
+```text
+#EBEFFF
+```
+
+Active Item Text
+
+```text
+#375EFB
+```
+
+Hover Background
+
+```text
+#F4F7FF
+```
+
+---
+
+## Header
+
+Background
+
+```text
+#FFFFFF
+```
+
+Border Bottom
+
+```text
+#CFD7F8
+```
+
+---
+
+## Primary Button
+
+Background
+
+```text
+#375EFB
+```
+
+Text
+
+```text
+#FFFFFF
+```
+
+Hover
+
+```text
+#2C4EE0
+```
+
+---
+
+## Secondary Button
+
+Background
+
+```text
+#EBEFFF
+```
+
+Text
+
+```text
+#375EFB
+```
+
+Hover
+
+```text
+#CFD7F8
+```
+
+---
+
+## Cards
+
+Background
+
+```text
+#FFFFFF
+```
+
+Border
+
+```text
+#CFD7F8
+```
+
+---
+
+## Inputs
+
+Background
+
+```text
+#FFFFFF
+```
+
+Border
+
+```text
+#CFD7F8
+```
+
+Focus Border
+
+```text
+#375EFB
+```
+
+Focus Ring
+
+```text
+#EBEFFF
+```
+
 
 ## Component Styling
 

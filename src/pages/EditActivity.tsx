@@ -30,6 +30,7 @@ import { useAppSelector } from '../store/hooks'
 import { ActivityInfoTab } from './editActivity/ActivityInfoTab'
 import { MembersTab } from './editActivity/MembersTab'
 import { DependenciesTab } from './editActivity/DependenciesTab'
+import { MilestonesTab } from './editActivity/MilestonesTab'
 import {
   normalizeControlledRules,
   validateForm,
@@ -290,7 +291,7 @@ export function EditActivity() {
       case 'dependencies':
         return <DependenciesTab />
       case 'milestones':
-        return <div className="edit-activity__placeholder">Milestones management will appear here.</div>
+        return <MilestonesTab isAdeoVisible={isAdeoVisible} />
       case 'procurements':
         return <div className="edit-activity__placeholder">Procurements management will appear here.</div>
       case 'engagement-plans':
