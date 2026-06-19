@@ -28,9 +28,11 @@ export function Input({ className = '', error, hint, id, label, required, rightI
         />
         {rightIcon ? <span className="field__right-icon">{rightIcon}</span> : null}
       </span>
-      <span className={error ? 'field__error' : hint ? 'field__hint' : 'field__message-placeholder'}>
-        {error || hint || ''}
-      </span>
+      {error ? (
+        <span className="field__error">{error}</span>
+      ) : hint ? (
+        <span className="field__hint">{hint}</span>
+      ) : null}
     </label>
   )
 }

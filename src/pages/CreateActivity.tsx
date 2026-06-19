@@ -143,8 +143,8 @@ const ACTIVITY_TYPE_OPTIONS = [
 
 const ACTIVITY_SCOPE_OPTIONS = [
   { label: 'Select activity scope', value: '' },
-  { label: 'Strategic', value: '1', description: 'Aligned to strategic outcomes.', className: 'choice--strategic' },
-  { label: 'Operational', value: '2', description: 'Division operational activity.', className: 'choice--operational' },
+  { label: 'Strategic', value: '1', description: 'Aligned to strategic outcomes.' },
+  { label: 'Operational', value: '2', description: 'Division operational activity.' },
 ] as const satisfies SelectOption<ActivityScopeValue | ''>[]
 
 const STRATEGY_OPTIONS = [
@@ -155,9 +155,9 @@ const STRATEGY_OPTIONS = [
 
 const CLASSIFICATION_OPTIONS = [
   { label: 'Select classification', value: '' },
-  { label: 'EPM Registered Project', value: '576610000', className: 'choice--epm' },
-  { label: 'Operational Activity', value: '576610001', className: 'choice--non-epm' },
-  { label: 'Payment Only', value: '576610002', className: 'choice--payment-only' },
+  { label: 'EPM Registered Project', value: '576610000' },
+  { label: 'Operational Activity', value: '576610001' },
+  { label: 'Payment Only', value: '576610002' },
 ] as const satisfies SelectOption<ClassificationValue | ''>[]
 
 const YES_NO_OPTIONS = [

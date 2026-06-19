@@ -128,7 +128,7 @@ export function Select<TValue extends string>({
         </span>
         <ChevronDown aria-hidden="true" className={isOpen ? 'select-field__chevron--open' : ''} size={15} />
       </button>
-      <span className={error ? 'field__error' : 'field__message-placeholder'}>{error || ''}</span>
+      {error ? <span className="field__error">{error}</span> : null}
 
       {isOpen ? (
         <div aria-labelledby={`${id}-label`} className="select-menu" id={listboxId} role="listbox">

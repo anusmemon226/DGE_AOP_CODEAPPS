@@ -33,6 +33,7 @@ import { MembersTab } from './editActivity/MembersTab'
 import { DependenciesTab } from './editActivity/DependenciesTab'
 import { MilestonesTab } from './editActivity/MilestonesTab'
 import { ObjectivesTab } from './editActivity/ObjectivesTab'
+import { ProcurementTab } from './editActivity/ProcurementTab'
 import {
   normalizeControlledRules,
   validateForm,
@@ -299,7 +300,7 @@ export function EditActivity() {
       case 'milestones':
         return <MilestonesTab isAdeoVisible={isAdeoVisible} />
       case 'procurements':
-        return <div className="edit-activity__placeholder">Procurements management will appear here.</div>
+        return <ProcurementTab />
       case 'engagement-plans':
         return <div className="edit-activity__placeholder">Engagement Plans management will appear here.</div>
       case 'budget':

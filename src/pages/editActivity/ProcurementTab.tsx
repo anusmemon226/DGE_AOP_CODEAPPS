@@ -1,0 +1,930 @@
+import { useId, useMemo, useState } from 'react'
+import {
+  Badge,
+  Button,
+  ConfirmationDialog,
+  CurrencyInput,
+  DatePicker,
+  Input,
+  RadioGroup,
+  Select,
+  SideDrawer,
+  Textarea,
+} from '../../components/ui'
+import { LockKeyhole } from 'lucide-react'
+import { formatCurrencyAmount } from '../../utils/formatting'
+import { formatDate, getQuarter } from './sharedHelpers'
+
+// ── Types ──
+
+type TenderRequiredValue = '' | '1' | '0'
+type TenderTypeValue = '' | '1' | '2'
+type RequestTypeValue = '' | '1' | '2' | '3' | '4' | '5' | '6'
+type TenderingMethodValue = '' | '1' | '2' | '3' | '4' | '5' | '6'
+type SolicitationChannelValue = '' | '1' | '2' | '3' | '4' | '5'
+type OpexCapexValue = '' | '1' | '2'
+type StrategicPlanValue = '' | '1' | '0'
+type OutcomeValue = '' | '1' | '2'
+
+type Procurement = {
+  id: string
+  tenderRequired: TenderRequiredValue
+  tenderType: TenderTypeValue
+  procurementStatus: string
+  procurementName: string
+  requestType: RequestTypeValue
+  contractNumber: string
+  recommendedSuppliers: string
+  tenderingMethod: TenderingMethodValue
+  solicitationChannel: SolicitationChannelValue
+  costCenter: string
+  costCenterCode: string
+  opexCapex: OpexCapexValue
+  alignedStrategicPlan: StrategicPlanValue
+  outcome: OutcomeValue
+  categoryDescription: string
+  categoryCode: string
+  endUserComments: string
+  itemServiceDescription: string
+  totalEstimatedValue: string
+  prExpectedValue2026: string
+  expectedContractDuration: string
+  plannedPrCreationDate: string
+  purchaseRequestRaisingQuarter: string
+  expectedAwardingDate: string
+  expectedAwardingQuarter: string
+}
+
+type ProcurementFormData = Omit<Procurement, 'id'>
+type FormErrors = Partial<Record<keyof ProcurementFormData, string>>
+
+// ── Constants ──
+
+const EMPTY_FORM: ProcurementFormData = {
+  tenderRequired: '',
+  tenderType: '',
+  procurementStatus: '',
+  procurementName: '',
+  requestType: '',
+  contractNumber: '',
+  recommendedSuppliers: '',
+  tenderingMethod: '',
+  solicitationChannel: '',
+  costCenter: '',
+  costCenterCode: '',
+  opexCapex: '',
+  alignedStrategicPlan: '',
+  outcome: '',
+  categoryDescription: '',
+  categoryCode: '',
+  endUserComments: '',
+  itemServiceDescription: '',
+  totalEstimatedValue: '',
+  prExpectedValue2026: '',
+  expectedContractDuration: '',
+  plannedPrCreationDate: '',
+  purchaseRequestRaisingQuarter: '',
+  expectedAwardingDate: '',
+  expectedAwardingQuarter: '',
+}
+
+const TENDER_REQUIRED_OPTIONS = [
+  { label: 'Yes', value: '1' },
+  { label: 'No', value: '0' },
+] as const
+
+const TENDER_TYPE_OPTIONS = [
+  { label: 'Raised', value: '1' },
+  { label: 'Not Raised', value: '2' },
+] as const
+
+const PROCUREMENT_STATUS_YES_RAISED = [
+  { label: 'Not Floated', value: '17' },
+  { label: 'Floated', value: '1' },
+  { label: 'Technical Evaluation', value: '4' },
+  { label: 'Commercial Evaluation', value: '3' },
+  { label: 'Pending Approval', value: '6' },
+  { label: 'Awarded', value: '2' },
+  { label: 'Contracting', value: '7' },
+  { label: 'Execution Started', value: '8' },
+  { label: 'Postponed', value: '5' },
+] as const
+
+const PROCUREMENT_STATUS_NO = [
+  { label: 'Not Started', value: '9' },
+  { label: 'On Track', value: '14' },
+  { label: 'Under Renewal', value: '16' },
+  { label: 'Pending Approval', value: '6' },
+  { label: 'Completed', value: '15' },
+  { label: 'Postponed', value: '5' },
+] as const
+
+const PROCUREMENT_STATUS_YES_NOT_RAISED = [
+  { label: 'Not Started', value: '9' },
+  { label: 'Drafted', value: '11' },
+  { label: 'On Hold', value: '10' },
+  { label: 'Delayed', value: '13' },
+  { label: 'Cancelled', value: '12' },
+] as const
+
+const REQUEST_TYPE_OPTIONS = [
+  { label: 'Select request type', value: '' },
+  { label: 'New', value: '1' },
+  { label: 'Renewal', value: '2' },
+  { label: 'Amendment', value: '3' },
+  { label: 'Existing Contract', value: '4' },
+  { label: 'GWPL', value: '5' },
+  { label: 'NA', value: '6' },
+] as const
+
+const TENDERING_METHOD_OPTIONS = [
+  { label: 'Select tendering method', value: '' },
+  { label: 'Public Tender', value: '1' },
+  { label: 'Limited Tender', value: '2' },
+  { label: 'Sole Source Tender', value: '3' },
+  { label: 'Single Source Tender', value: '4' },
+  { label: 'NA', value: '5' },
+  { label: 'GWPL', value: '6' },
+] as const
+
+const SOLICITATION_CHANNEL_OPTIONS = [
+  { label: 'Select solicitation channel', value: '' },
+  { label: 'RFQ', value: '1' },
+  { label: 'RFP', value: '2' },
+  { label: 'RFI', value: '3' },
+  { label: 'NA', value: '4' },
+  { label: 'GWPL', value: '5' },
+] as const
+
+const COST_CENTER_OPTIONS = [
+  { label: 'Select cost center', value: '' },
+  { label: 'DGE - Information Security Risk Management & Compliance Division', value: '0e0fd34-8bc3-f011-bbd3-000d3ae0dcbf' },
+  { label: 'DGE - Cyber Threat Intelligence Division', value: '2e0fd34-8bc3-f011-bbd3-000d3ae0dcbf' },
+] as const
+
+const OPEX_CAPEX_OPTIONS = [
+  { label: 'Opex', value: '1' },
+  { label: 'Capex', value: '2' },
+] as const
+
+const STRATEGIC_PLAN_OPTIONS = [
+  { label: 'Yes', value: '1' },
+  { label: 'No', value: '0' },
+] as const
+
+const OUTCOME_OPTIONS = [
+  { label: 'Purchase Order', value: '1' },
+  { label: 'Contract Agreement', value: '2' },
+] as const
+
+const CATEGORY_DESCRIPTION_OPTIONS = [
+  { label: 'Select category', value: '' },
+  { label: 'Abrasive wheels (31191600)', value: '3c264a4e-85bf-f011-bbd3-000d3ae0d033' },
+  { label: 'Abrasives and abrasive media (31191500)', value: '3e264a4e-85bf-f011-bbd3-000d3ae0d033' },
+] as const
+
+const COST_CENTER_CODES: Record<string, string> = {
+  '0e0fd34-8bc3-f011-bbd3-000d3ae0dcbf': '2466001',
+  '2e0fd34-8bc3-f011-bbd3-000d3ae0dcbf': '2466001',
+}
+
+const CATEGORY_CODES: Record<string, string> = {
+  '3c264a4e-85bf-f011-bbd3-000d3ae0d033': '31191600',
+  '3e264a4e-85bf-f011-bbd3-000d3ae0d033': '31191500',
+}
+
+// ── Status capsule helpers ──
+
+const STATUS_TONES: Record<string, 'neutral' | 'info' | 'success' | 'warning'> = {
+  '17': 'neutral',  // Not Floated
+  '1': 'info',       // Floated
+  '4': 'info',       // Technical Evaluation
+  '3': 'info',       // Commercial Evaluation
+  '6': 'warning',    // Pending Approval
+  '2': 'success',    // Awarded
+  '7': 'success',    // Contracting
+  '8': 'success',    // Execution Started
+  '5': 'warning',    // Postponed
+  '9': 'neutral',    // Not Started
+  '14': 'success',   // On Track
+  '16': 'info',      // Under Renewal
+  '15': 'success',   // Completed
+  '11': 'neutral',   // Drafted
+  '10': 'warning',   // On Hold
+  '13': 'warning',   // Delayed
+  '12': 'neutral',   // Cancelled
+}
+
+function getStatusLabel(value: string): string {
+  const all = [...PROCUREMENT_STATUS_YES_RAISED, ...PROCUREMENT_STATUS_NO, ...PROCUREMENT_STATUS_YES_NOT_RAISED]
+  return all.find((s) => s.value === value)?.label ?? value
+}
+
+// ── Component ──
+
+export function ProcurementTab() {
+  const uid = useId()
+
+  // ── Data state ──
+  const [procurements, setProcurements] = useState<Procurement[]>([])
+
+  // ── CRUD state ──
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+  const [editingProcurement, setEditingProcurement] = useState<Procurement | null>(null)
+  const [form, setForm] = useState<ProcurementFormData>(EMPTY_FORM)
+  const [formErrors, setFormErrors] = useState<FormErrors>({})
+  const [procurementToDelete, setProcurementToDelete] = useState<Procurement | null>(null)
+
+  // ── Derived ──
+  const isTenderRequired = form.tenderRequired === '1'
+
+  const procurementStatusOptions = useMemo(() => {
+    if (isTenderRequired && form.tenderType === '1') return PROCUREMENT_STATUS_YES_RAISED
+    if (isTenderRequired && form.tenderType === '2') return PROCUREMENT_STATUS_YES_NOT_RAISED
+    if (form.tenderRequired === '0') return PROCUREMENT_STATUS_NO
+    return []
+  }, [form.tenderRequired, form.tenderType, isTenderRequired])
+
+  // ── DataGrid columns ──
+
+  const gridColumns = [
+    {
+      key: 'procurementName',
+      header: 'Procurement Name',
+      render: (row: Procurement) => <span className="edit-activity__procurement-name">{row.procurementName}</span>,
+    },
+    {
+      key: 'tenderRequired',
+      header: 'Tender Required',
+      render: (row: Procurement) => (
+        <Badge tone={row.tenderRequired === '1' ? 'success' : 'neutral'}>
+          {row.tenderRequired === '1' ? 'Yes' : 'No'}
+        </Badge>
+      ),
+    },
+    {
+      key: 'tenderType',
+      header: 'Tender Type',
+      render: (row: Procurement) => (
+        row.tenderType ? <Badge tone="info">{row.tenderType === '1' ? 'Raised' : 'Not Raised'}</Badge> : <span className="edit-activity__procurement-na">—</span>
+      ),
+    },
+    {
+      key: 'procurementStatus',
+      header: 'Procurement Status',
+      render: (row: Procurement) => (
+        <Badge tone={STATUS_TONES[row.procurementStatus] ?? 'neutral'}>
+          {getStatusLabel(row.procurementStatus)}
+        </Badge>
+      ),
+    },
+    {
+      key: 'requestType',
+      header: 'Request Type',
+      render: (row: Procurement) => (
+        <Badge tone="neutral">
+          {REQUEST_TYPE_OPTIONS.find((o) => o.value === row.requestType)?.label ?? row.requestType}
+        </Badge>
+      ),
+    },
+    {
+      key: 'tenderingMethod',
+      header: 'Tendering Method',
+      render: (row: Procurement) => (
+        <Badge tone="neutral">
+          {TENDERING_METHOD_OPTIONS.find((o) => o.value === row.tenderingMethod)?.label ?? row.tenderingMethod}
+        </Badge>
+      ),
+    },
+    {
+      key: 'totalEstimatedValue',
+      header: 'Total Activity Estimated Value',
+      render: (row: Procurement) => (
+        <span className="edit-activity__procurement-value">
+          {formatCurrencyAmount(row.totalEstimatedValue)}
+        </span>
+      ),
+    },
+    {
+      key: 'prExpectedValue2026',
+      header: 'PR Expected Value in 2026',
+      render: (row: Procurement) => (
+        <span className="edit-activity__procurement-value">
+          {formatCurrencyAmount(row.prExpectedValue2026)}
+        </span>
+      ),
+    },
+    {
+      key: 'plannedPrCreationDate',
+      header: 'Planned PR Creation Date',
+      render: (row: Procurement) => <span>{formatDate(row.plannedPrCreationDate)}</span>,
+    },
+    {
+      key: 'expectedAwardingDate',
+      header: 'Expected Awarding Date',
+      render: (row: Procurement) => <span>{formatDate(row.expectedAwardingDate)}</span>,
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      render: (row: Procurement) => (
+        <div className="edit-activity__procurement-actions">
+          <button
+            aria-label="Edit procurement"
+            className="edit-activity__procurement-action-btn"
+            onClick={() => handleOpenEdit(row)}
+            type="button"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+          </button>
+          <button
+            aria-label="Delete procurement"
+            className="edit-activity__procurement-action-btn edit-activity__procurement-action-btn--danger"
+            onClick={() => setProcurementToDelete(row)}
+            type="button"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+          </button>
+        </div>
+      ),
+    },
+  ] as const
+
+  // ── Helpers ──
+
+  function handleFieldChange(fields: Partial<ProcurementFormData>) {
+    const next = { ...form, ...fields }
+
+    // Reset dependent fields
+    if (fields.tenderRequired !== undefined) {
+      if (fields.tenderRequired === '0') {
+        next.tenderType = ''
+        next.procurementStatus = ''
+      } else if (fields.tenderRequired === '1') {
+        next.procurementStatus = ''
+      }
+    }
+
+    if (fields.tenderType !== undefined) {
+      next.procurementStatus = ''
+    }
+
+    // Auto-calculate quarter from PR creation date
+    if (fields.plannedPrCreationDate !== undefined) {
+      next.purchaseRequestRaisingQuarter = getQuarter(fields.plannedPrCreationDate)
+    }
+
+    // Auto-calculate quarter from awarding date
+    if (fields.expectedAwardingDate !== undefined) {
+      next.expectedAwardingQuarter = getQuarter(fields.expectedAwardingDate)
+    }
+
+    // Auto-fill cost center code
+    if (fields.costCenter !== undefined) {
+      next.costCenterCode = COST_CENTER_CODES[fields.costCenter] ?? ''
+    }
+
+    // Auto-fill category code
+    if (fields.categoryDescription !== undefined) {
+      next.categoryCode = CATEGORY_CODES[fields.categoryDescription] ?? ''
+    }
+
+    setForm(next)
+
+    // Clear error for changed field
+    const changedKey = Object.keys(fields)[0] as keyof ProcurementFormData
+    if (changedKey && formErrors[changedKey]) {
+      setFormErrors((prev) => {
+        const copy = { ...prev }
+        delete copy[changedKey]
+        return copy
+      })
+    }
+  }
+
+  function handleCurrencyBlur(field: 'totalEstimatedValue' | 'prExpectedValue2026') {
+    const raw = form[field].replace(/,/g, '')
+    if (raw && !Number.isNaN(Number(raw))) {
+      handleFieldChange({ [field]: formatCurrencyAmount(raw) })
+    }
+  }
+
+  function handleOpenCreate() {
+    setEditingProcurement(null)
+    setForm(EMPTY_FORM)
+    setFormErrors({})
+    setIsDrawerOpen(true)
+  }
+
+  function handleOpenEdit(procurement: Procurement) {
+    setEditingProcurement(procurement)
+    setForm({
+      tenderRequired: procurement.tenderRequired,
+      tenderType: procurement.tenderType,
+      procurementStatus: procurement.procurementStatus,
+      procurementName: procurement.procurementName,
+      requestType: procurement.requestType,
+      contractNumber: procurement.contractNumber,
+      recommendedSuppliers: procurement.recommendedSuppliers,
+      tenderingMethod: procurement.tenderingMethod,
+      solicitationChannel: procurement.solicitationChannel,
+      costCenter: procurement.costCenter,
+      costCenterCode: procurement.costCenterCode,
+      opexCapex: procurement.opexCapex,
+      alignedStrategicPlan: procurement.alignedStrategicPlan,
+      outcome: procurement.outcome,
+      categoryDescription: procurement.categoryDescription,
+      categoryCode: procurement.categoryCode,
+      endUserComments: procurement.endUserComments,
+      itemServiceDescription: procurement.itemServiceDescription,
+      totalEstimatedValue: procurement.totalEstimatedValue,
+      prExpectedValue2026: procurement.prExpectedValue2026,
+      expectedContractDuration: procurement.expectedContractDuration,
+      plannedPrCreationDate: procurement.plannedPrCreationDate,
+      purchaseRequestRaisingQuarter: procurement.purchaseRequestRaisingQuarter,
+      expectedAwardingDate: procurement.expectedAwardingDate,
+      expectedAwardingQuarter: procurement.expectedAwardingQuarter,
+    })
+    setFormErrors({})
+    setIsDrawerOpen(true)
+  }
+
+  function handleCloseDrawer() {
+    setIsDrawerOpen(false)
+    setEditingProcurement(null)
+    setForm(EMPTY_FORM)
+    setFormErrors({})
+  }
+
+  function validate(): boolean {
+    const errs: FormErrors = {}
+
+    if (!form.tenderRequired) errs.tenderRequired = 'Select whether tender is required'
+    if (isTenderRequired && !form.tenderType) errs.tenderType = 'Select tender type'
+    if (procurementStatusOptions.length > 0 && !form.procurementStatus) {
+      errs.procurementStatus = 'Select procurement status'
+    }
+    if (!form.procurementName.trim()) errs.procurementName = 'Procurement name is required'
+    if (!form.requestType) errs.requestType = 'Select request type'
+    if (!form.tenderingMethod) errs.tenderingMethod = 'Select tendering method'
+    if (!form.solicitationChannel) errs.solicitationChannel = 'Select solicitation channel'
+    if (!form.costCenter) errs.costCenter = 'Select cost center'
+    if (!form.opexCapex) errs.opexCapex = 'Select Opex or Capex'
+    if (!form.alignedStrategicPlan) errs.alignedStrategicPlan = 'Select alignment with strategic plan'
+    if (!form.outcome) errs.outcome = 'Select outcome'
+    if (!form.endUserComments.trim()) errs.endUserComments = 'End user comments are required'
+    if (!form.itemServiceDescription.trim()) errs.itemServiceDescription = 'Item/service description is required'
+    if (!form.totalEstimatedValue.trim()) errs.totalEstimatedValue = 'Total estimated value is required'
+    if (!form.prExpectedValue2026.trim()) errs.prExpectedValue2026 = 'PR expected value is required'
+    if (!form.expectedContractDuration.trim()) errs.expectedContractDuration = 'Expected contract duration is required'
+    if (!form.plannedPrCreationDate) errs.plannedPrCreationDate = 'Planned PR creation date is required'
+    if (!form.expectedAwardingDate) errs.expectedAwardingDate = 'Expected awarding date is required'
+
+    setFormErrors(errs)
+    return Object.keys(errs).length === 0
+  }
+
+  function handleSave() {
+    if (!validate()) return
+
+    if (editingProcurement) {
+      setProcurements((prev) =>
+        prev.map((p) =>
+          p.id === editingProcurement.id ? { ...p, ...form } : p,
+        ),
+      )
+    } else {
+      const newProcurement: Procurement = {
+        id: `proc-${Date.now()}`,
+        ...form,
+      }
+      setProcurements((prev) => [...prev, newProcurement])
+    }
+    handleCloseDrawer()
+  }
+
+  function handleConfirmDelete() {
+    if (!procurementToDelete) return
+    setProcurements((prev) => prev.filter((p) => p.id !== procurementToDelete.id))
+    setProcurementToDelete(null)
+  }
+
+  // ── Render helpers ──
+
+  function renderDrawerForm() {
+    const title = editingProcurement ? 'Edit Procurement' : 'Create Procurement'
+
+    return (
+      <SideDrawer
+        actions={
+          <div className="edit-activity__procurement-drawer-actions">
+            <Button onClick={handleCloseDrawer} variant="secondary">
+              Cancel
+            </Button>
+            <Button onClick={handleSave}>
+              {editingProcurement ? 'Update Procurement' : 'Create Procurement'}
+            </Button>
+          </div>
+        }
+        isOpen={isDrawerOpen}
+        onClose={handleCloseDrawer}
+        title={title}
+      >
+        <div className="edit-activity__procurement-drawer">
+          {/* ── Tender Information ── */}
+          <div className="edit-activity__procurement-section">
+            <div className="create-activity__section-header">
+              <div className="create-activity__section-header-inner">
+                <span className="create-activity__section-header-icon" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                  </svg>
+                </span>
+                <div>
+                  <span>Tender Information</span>
+                  <h2>Tender & Status</h2>
+                </div>
+              </div>
+            </div>
+
+            <div className="edit-activity__procurement-drawer-section">
+              <RadioGroup
+                className="radio-group--tender-required"
+                error={formErrors.tenderRequired}
+                label="Tender Required"
+                name={`${uid}-tender-required`}
+                onChange={(value) => handleFieldChange({ tenderRequired: value as TenderRequiredValue })}
+                options={TENDER_REQUIRED_OPTIONS}
+                required
+                value={form.tenderRequired}
+              />
+
+              {isTenderRequired && (
+                <RadioGroup
+                  className="radio-group--tender-type"
+                  error={formErrors.tenderType}
+                  label="Tender Type"
+                  name={`${uid}-tender-type`}
+                  onChange={(value) => handleFieldChange({ tenderType: value as TenderTypeValue })}
+                  options={TENDER_TYPE_OPTIONS}
+                  required
+                  value={form.tenderType}
+                />
+              )}
+
+              {procurementStatusOptions.length > 0 && (
+                <RadioGroup
+                  className="create-activity__radio--status"
+                  error={formErrors.procurementStatus}
+                  label="Procurement Status"
+                  name={`${uid}-procurement-status`}
+                  onChange={(value) => handleFieldChange({ procurementStatus: value })}
+                  options={procurementStatusOptions}
+                  required
+                  value={form.procurementStatus}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* ── Procurement Details ── */}
+          <div className="edit-activity__procurement-section">
+            <div className="create-activity__section-header">
+              <div className="create-activity__section-header-inner">
+                <span className="create-activity__section-header-icon" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                  </svg>
+                </span>
+                <div>
+                  <span>Procurement Details</span>
+                  <h2>Procurement Information</h2>
+                </div>
+              </div>
+            </div>
+
+            <div className="edit-activity__procurement-drawer-section">
+            <Input
+              error={formErrors.procurementName}
+              label="Procurement Name"
+              onChange={(e) => handleFieldChange({ procurementName: e.target.value })}
+              required
+              value={form.procurementName}
+            />
+
+            <Select
+              error={formErrors.requestType}
+              id={`${uid}-request-type`}
+              label="Request Type"
+              onChange={(value) => handleFieldChange({ requestType: value as RequestTypeValue })}
+              options={REQUEST_TYPE_OPTIONS}
+              required
+              value={form.requestType}
+            />
+
+            <div className="create-activity__form-row create-activity__form-row--two">
+              <Input
+                label="Contract Number (if applicable)"
+                onChange={(e) => handleFieldChange({ contractNumber: e.target.value })}
+                value={form.contractNumber}
+              />
+              <Input
+                label="Recommended Suppliers"
+                onChange={(e) => handleFieldChange({ recommendedSuppliers: e.target.value })}
+                value={form.recommendedSuppliers}
+              />
+            </div>
+
+            <div className="create-activity__form-row create-activity__form-row--two">
+              <Select
+                error={formErrors.tenderingMethod}
+                id={`${uid}-tendering-method`}
+                label="Tendering Method"
+                onChange={(value) => handleFieldChange({ tenderingMethod: value as TenderingMethodValue })}
+                options={TENDERING_METHOD_OPTIONS}
+                required
+                value={form.tenderingMethod}
+              />
+              <Select
+                error={formErrors.solicitationChannel}
+                id={`${uid}-solicitation-channel`}
+                label="Solicitation Channel"
+                onChange={(value) => handleFieldChange({ solicitationChannel: value as SolicitationChannelValue })}
+                options={SOLICITATION_CHANNEL_OPTIONS}
+                required
+                value={form.solicitationChannel}
+              />
+            </div>
+
+            <div className="create-activity__form-row create-activity__form-row--two">
+              <Select
+                error={formErrors.costCenter}
+                id={`${uid}-cost-center`}
+                label="Cost Center"
+                onChange={(value) => handleFieldChange({ costCenter: value })}
+                options={COST_CENTER_OPTIONS}
+                required
+                value={form.costCenter}
+              />
+              <Input
+                disabled
+                label="Cost Center Code"
+                rightIcon={<LockKeyhole size={15} />}
+                value={form.costCenterCode}
+              />
+            </div>
+
+            <div className="create-activity__form-row create-activity__form-row--two">
+              <RadioGroup
+                className="radio-group--opex-capex"
+                error={formErrors.opexCapex}
+                label="Opex/Capex"
+                name={`${uid}-opex-capex`}
+                onChange={(value) => handleFieldChange({ opexCapex: value as OpexCapexValue })}
+                options={OPEX_CAPEX_OPTIONS}
+                required
+                value={form.opexCapex}
+              />
+              <RadioGroup
+                className="radio-group--strategic-plan"
+                error={formErrors.alignedStrategicPlan}
+                label="Aligned with Strategic Plan"
+                name={`${uid}-strategic-plan`}
+                onChange={(value) => handleFieldChange({ alignedStrategicPlan: value as StrategicPlanValue })}
+                options={STRATEGIC_PLAN_OPTIONS}
+                required
+                value={form.alignedStrategicPlan}
+              />
+            </div>
+
+            <RadioGroup
+              className="radio-group--outcome"
+              error={formErrors.outcome}
+              label="Outcome"
+              name={`${uid}-outcome`}
+              onChange={(value) => handleFieldChange({ outcome: value as OutcomeValue })}
+              options={OUTCOME_OPTIONS}
+              required
+              value={form.outcome}
+            />
+
+            <div className="create-activity__form-row create-activity__form-row--two">
+              <Select
+                id={`${uid}-category-description`}
+                label="Category Description"
+                onChange={(value) => handleFieldChange({ categoryDescription: value })}
+                options={CATEGORY_DESCRIPTION_OPTIONS}
+                value={form.categoryDescription}
+              />
+              <Input
+                disabled
+                label="Category Code"
+                rightIcon={<LockKeyhole size={15} />}
+                value={form.categoryCode}
+              />
+            </div>
+          </div>
+          </div>
+
+          {/* ── Financial Details ── */}
+          <div className="edit-activity__procurement-section">
+            <div className="create-activity__section-header">
+              <div className="create-activity__section-header-inner">
+                <span className="create-activity__section-header-icon" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="1" x2="12" y2="23" />
+                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                  </svg>
+                </span>
+                <div>
+                  <span>Financial Details</span>
+                  <h2>Budget & Timeline</h2>
+                </div>
+              </div>
+            </div>
+
+            <div className="edit-activity__procurement-drawer-section">
+              <Textarea
+                error={formErrors.endUserComments}
+                label="End User Comments"
+                onChange={(e) => handleFieldChange({ endUserComments: e.target.value })}
+                required
+                rows={3}
+                value={form.endUserComments}
+              />
+
+              <Textarea
+                error={formErrors.itemServiceDescription}
+                label="Item/Service Description"
+                onChange={(e) => handleFieldChange({ itemServiceDescription: e.target.value })}
+                required
+                rows={3}
+                value={form.itemServiceDescription}
+              />
+
+              <div className="create-activity__form-row create-activity__form-row--two">
+                <CurrencyInput
+                  error={formErrors.totalEstimatedValue}
+                  label="Total Activity Estimated Value"
+                  onBlur={() => handleCurrencyBlur('totalEstimatedValue')}
+                  onChange={(e) => handleFieldChange({ totalEstimatedValue: e.target.value.replace(/,/g, '') })}
+                  required
+                  value={form.totalEstimatedValue}
+                />
+                <CurrencyInput
+                  error={formErrors.prExpectedValue2026}
+                  label="PR Expected Value in 2026"
+                  onBlur={() => handleCurrencyBlur('prExpectedValue2026')}
+                  onChange={(e) => handleFieldChange({ prExpectedValue2026: e.target.value.replace(/,/g, '') })}
+                  required
+                  value={form.prExpectedValue2026}
+                />
+              </div>
+
+              <Input
+                error={formErrors.expectedContractDuration}
+                hint="Duration in months"
+                label="Expected Contract Duration (in months)"
+                onBlur={() => {
+                  const raw = form.expectedContractDuration.replace(/\s*Month(s?)$/i, '').replace(/\D/g, '')
+                  if (raw && !Number.isNaN(Number(raw))) {
+                    const num = Number(raw)
+                    handleFieldChange({ expectedContractDuration: String(num) + (num === 1 ? ' Month' : ' Months') })
+                  }
+                }}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '')
+                  handleFieldChange({ expectedContractDuration: val })
+                }}
+                onFocus={() => {
+                  const raw = form.expectedContractDuration.replace(/\s*Month(s?)$/i, '').replace(/\D/g, '')
+                  if (raw !== form.expectedContractDuration) {
+                    handleFieldChange({ expectedContractDuration: raw })
+                  }
+                }}
+                required
+                value={form.expectedContractDuration}
+              />
+
+              <div className="create-activity__form-row create-activity__form-row--two">
+                <DatePicker
+                  error={formErrors.plannedPrCreationDate}
+                  id={`${uid}-pr-creation-date`}
+                  label="Planned PR Creation Date"
+                  onChange={(value) => handleFieldChange({ plannedPrCreationDate: value })}
+                  required
+                  value={form.plannedPrCreationDate}
+                />
+                <Input
+                  disabled
+                  label="Purchase Request Raising Quarter"
+                  rightIcon={<LockKeyhole size={15} />}
+                  value={form.purchaseRequestRaisingQuarter}
+                />
+              </div>
+
+              <div className="create-activity__form-row create-activity__form-row--two">
+                <DatePicker
+                  error={formErrors.expectedAwardingDate}
+                  id={`${uid}-awarding-date`}
+                  label="Expected Awarding Date"
+                  onChange={(value) => handleFieldChange({ expectedAwardingDate: value })}
+                  required
+                  value={form.expectedAwardingDate}
+                />
+                <Input
+                  disabled
+                  label="Expected Awarding Quarter"
+                  rightIcon={<LockKeyhole size={15} />}
+                  value={form.expectedAwardingQuarter}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </SideDrawer>
+    )
+  }
+
+  // ── Render ──
+
+  return (
+    <div className="edit-activity__procurement">
+      {/* Header */}
+      <div className="edit-activity__members-header">
+        <div className="edit-activity__members-header-text">
+          <h2>
+            Procurements
+            <span className="edit-activity__members-count-badge">{procurements.length} Records</span>
+          </h2>
+          <p>Manage procurement requests for this activity.</p>
+        </div>
+        <Button icon={
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+        } onClick={handleOpenCreate}>
+          Add Procurement
+        </Button>
+      </div>
+
+      {/* Table */}
+      <div className="data-grid">
+        <table>
+          <thead>
+            <tr>
+              {gridColumns.map((col) => (
+                <th key={col.key}>{col.header}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {procurements.length > 0 ? (
+              procurements.map((row) => (
+                <tr key={row.id}>
+                  {gridColumns.map((col) => (
+                    <td key={col.key}>{col.render(row)}</td>
+                  ))}
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={gridColumns.length} className="edit-activity__procurement-empty-cell">
+                  <div className="edit-activity__procurement-empty">
+                    No procurement records yet. Click "Add Procurement" to create one.
+                  </div>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Create/Edit Drawer */}
+      {renderDrawerForm()}
+
+      {/* Delete Confirmation */}
+      <ConfirmationDialog
+        confirmLabel="Delete Procurement"
+        danger
+        description="This procurement record will be permanently removed. This action cannot be undone."
+        isOpen={procurementToDelete !== null}
+        onCancel={() => setProcurementToDelete(null)}
+        onConfirm={handleConfirmDelete}
+        title={procurementToDelete ? `Delete "${procurementToDelete.procurementName}"?` : ''}
+      />
+    </div>
+  )
+}

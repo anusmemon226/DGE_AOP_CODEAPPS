@@ -30,7 +30,7 @@ export function CurrencyInput({ className = '', error, hint, id, label, required
     <label className={`field currency-input ${className}`.trim()} htmlFor={inputId}>
       <span className="field__label">
         {label}
-        {required ? <span aria-hidden="true"> *</span> : null}
+        {required ? <span aria-hidden="true" className="field__required"> *</span> : null}
       </span>
       <span className="currency-input__control">
         <DirhamIcon />

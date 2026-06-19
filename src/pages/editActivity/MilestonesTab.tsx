@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import {
-  Flag,
   ChevronLeft,
   ChevronRight,
   Edit3,
@@ -16,6 +15,7 @@ import {
   SideDrawer,
   Textarea,
 } from '../../components/ui'
+import { formatDate, getQuarter } from './sharedHelpers'
 
 // ── Types ──
 
@@ -47,21 +47,6 @@ const STATUS_CONFIG: Record<MilestoneStatus, { label: string; tone: 'neutral' | 
 }
 
 const ITEMS_PER_PAGE = 5
-
-function getQuarter(dateString: string): string {
-  if (!dateString) return ''
-  const month = new Date(dateString).getMonth() // 0-11
-  if (month <= 2) return 'Quarter 1'
-  if (month <= 5) return 'Quarter 2'
-  if (month <= 8) return 'Quarter 3'
-  return 'Quarter 4'
-}
-
-function formatDate(dateString: string): string {
-  if (!dateString) return ''
-  const d = new Date(dateString)
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
 
 function getStatusIcon(status: MilestoneStatus): string {
   switch (status) {
@@ -170,10 +155,18 @@ export function MilestonesTab({ isAdeoVisible }: MilestonesTabProps) {
   const progressPercent = milestones.length > 0 ? Math.round((completedCount / milestones.length) * 100) : 0
 
   // ── Weightage calculation ──
-  const usedWeightage = milestones
-    .filter((m) => m.id !== editingMilestone?.id)
-    .reduce((sum, m) => sum + m.weightage, 0)
+  const sumOtherMilestones = editingMilestone
+    ? milestones.filter((m) => m.id !== editingMilestone.id).reduce((s, m) => s + m.weightage, 0)
+    : 0
+
+  const usedWeightage = editingMilestone
+    ? sumOtherMilestones + form.weightage
+    : milestones.reduce((sum, m) => sum + m.weightage, 0)
+
   const remainingWeightage = Math.max(0, 100 - usedWeightage)
+  const maxAllowedWeightage = editingMilestone
+    ? Math.max(0, 100 - sumOtherMilestones)
+    : remainingWeightage
 
   // ── Helpers ──
 
@@ -236,8 +229,15 @@ export function MilestonesTab({ isAdeoVisible }: MilestonesTabProps) {
     if (!form.name.trim()) errors.name = 'Name is required'
     if (!form.plannedStartDate) errors.plannedStartDate = 'Start date is required'
     if (!form.plannedEndDate) errors.plannedEndDate = 'End date is required'
-    if (form.weightage > remainingWeightage) {
-      errors.weightage = `Only ${remainingWeightage}% remaining`
+    if (isAdeoVisible) {
+      if (!form.weightage || form.weightage <= 0) errors.weightage = 'Weightage is required'
+      if (!form.makhrajAlMarhala.trim()) errors.makhrajAlMarhala = 'مخرجات المرحلة مطلوب'
+      if (!form.marhalaAlMashroua.trim()) errors.marhalaAlMashroua = 'مرحلة المشروع مطلوبة'
+    }
+    if (form.weightage > maxAllowedWeightage) {
+      errors.weightage = editingMilestone
+        ? `Maximum for this milestone is ${maxAllowedWeightage}%`
+        : `Only ${remainingWeightage}% remaining`
     }
     setFormErrors(errors)
     return Object.keys(errors).length === 0
@@ -307,20 +307,29 @@ export function MilestonesTab({ isAdeoVisible }: MilestonesTabProps) {
         <div className="edit-activity__milestone-card">
           <div className="edit-activity__milestone-card-top">
             <div className="edit-activity__milestone-card-date">
-              {formatDate(milestone.plannedEndDate)}
+              {formatDate(milestone.plannedStartDate)} → {formatDate(milestone.plannedEndDate)}
             </div>
-            <Badge tone={statusCfg.tone}>{statusCfg.label}</Badge>
+            <div className="edit-activity__milestone-card-badges">
+              <Badge tone="neutral">{milestone.quarter}</Badge>
+              <Badge tone={statusCfg.tone}>{statusCfg.label}</Badge>
+            </div>
           </div>
-          <h3 className="edit-activity__milestone-card-title">{milestone.name}</h3>
+          <h3 className="edit-activity__milestone-card-title">
+            <button
+              className="edit-activity__milestone-card-name-btn"
+              onClick={() => handleOpenEdit(milestone)}
+              type="button"
+            >
+              {milestone.name}
+            </button>
+          </h3>
           {isAdeoVisible && milestone.weightage > 0 && (
             <div className="edit-activity__milestone-card-weightage">
               Weightage: {milestone.weightage}%
             </div>
           )}
           <div className="edit-activity__milestone-card-bottom">
-            <span className="edit-activity__milestone-card-assignee">
-              👤 {milestone.assignee}
-            </span>
+            <p className="edit-activity__milestone-card-desc">{milestone.description}</p>
             <div className="edit-activity__milestone-card-actions">
               <button
                 aria-label="Edit milestone"
@@ -372,7 +381,7 @@ export function MilestonesTab({ isAdeoVisible }: MilestonesTabProps) {
             value={form.name}
           />
 
-          <div className="edit-activity__milestones-drawer-row">
+          <div className="create-activity__date-range">
             <DatePicker
               error={formErrors.plannedStartDate}
               id="ms-planned-start-date"
@@ -381,6 +390,11 @@ export function MilestonesTab({ isAdeoVisible }: MilestonesTabProps) {
               required
               value={form.plannedStartDate}
             />
+            <span className="create-activity__date-connector" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 12h14M13 5l7 7-7 7"/>
+              </svg>
+            </span>
             <DatePicker
               error={formErrors.plannedEndDate}
               id="ms-planned-end-date"
@@ -400,13 +414,14 @@ export function MilestonesTab({ isAdeoVisible }: MilestonesTabProps) {
           {isAdeoVisible ? (
             <>
               <div className="edit-activity__milestones-drawer-adeo-section">
-                <div className="edit-activity__milestones-drawer-section-label">ADEO Fields</div>
+                <div className="edit-activity__milestones-drawer-section-label">ADEO Dependent Fields</div>
                 <Input
                   error={formErrors.weightage}
                   label="Weightage (%)"
-                  max={remainingWeightage}
+                  max={maxAllowedWeightage}
                   min={0}
                   onChange={(e) => handleFieldChange({ weightage: Number(e.target.value) || 0 })}
+                  required
                   type="number"
                   value={form.weightage > 0 ? String(form.weightage) : '0'}
                 />
@@ -418,19 +433,23 @@ export function MilestonesTab({ isAdeoVisible }: MilestonesTabProps) {
                     {remainingWeightage}%
                   </span>
                 </div>
+
+                <Input
+                  error={formErrors.makhrajAlMarhala}
+                  label="مخرجات المرحلة"
+                  onChange={(e) => handleFieldChange({ makhrajAlMarhala: e.target.value })}
+                  required
+                  value={form.makhrajAlMarhala}
+                />
+
+                <Input
+                  error={formErrors.marhalaAlMashroua}
+                  label="مرحلة المشروع"
+                  onChange={(e) => handleFieldChange({ marhalaAlMashroua: e.target.value })}
+                  required
+                  value={form.marhalaAlMashroua}
+                />
               </div>
-
-              <Input
-                label="مخرجات المرحلة"
-                onChange={(e) => handleFieldChange({ makhrajAlMarhala: e.target.value })}
-                value={form.makhrajAlMarhala}
-              />
-
-              <Input
-                label="مرحلة المشروع"
-                onChange={(e) => handleFieldChange({ marhalaAlMashroua: e.target.value })}
-                value={form.marhalaAlMashroua}
-              />
             </>
           ) : null}
 
@@ -490,10 +509,13 @@ export function MilestonesTab({ isAdeoVisible }: MilestonesTabProps) {
   return (
     <div className="edit-activity__milestones">
       {/* Header */}
-      <div className="edit-activity__milestones-header">
-        <div className="edit-activity__milestones-header-left">
-          <Flag size={18} />
-          <span>Milestones ({milestones.length})</span>
+      <div className="edit-activity__members-header">
+        <div className="edit-activity__members-header-text">
+          <h2>
+            Milestones
+            <span className="edit-activity__members-count-badge">{milestones.length} Milestones</span>
+          </h2>
+          <p>Track project milestones and key deliverables.</p>
         </div>
         <Button icon={<Plus size={15} />} onClick={handleOpenCreate}>
           Add Milestone

@@ -24,9 +24,11 @@ export function Textarea({ className = '', error, hint, id, label, required, row
         rows={rows}
         {...props}
       />
-      <span className={error ? 'field__error' : hint ? 'field__hint' : 'field__message-placeholder'}>
-        {error || hint || ''}
-      </span>
+      {error ? (
+        <span className="field__error">{error}</span>
+      ) : hint ? (
+        <span className="field__hint">{hint}</span>
+      ) : null}
     </label>
   )
 }

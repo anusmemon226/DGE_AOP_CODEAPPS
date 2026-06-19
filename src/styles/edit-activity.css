@@ -89,6 +89,7 @@
 .edit-activity__stage-content {
   border-radius: 0.85rem;
   min-height: 16rem;
+  min-width: 0;
 }
 
 /* Manual form inside stage content — uses same card layout as Create Activity */
@@ -507,7 +508,7 @@
   color: inherit;
   cursor: pointer;
   display: inline-flex;
-  font: inherit;
+  font-size: 0.72rem;
   gap: 0.2rem;
   letter-spacing: inherit;
   min-width: 0;
@@ -735,10 +736,10 @@
 }
 
 .edit-activity__deps-table-row--header {
-  background: color-mix(in srgb, var(--color-primary) 6%, transparent);
+  background: var(--color-surface-muted);
   border-bottom: 1.5px solid var(--color-border);
   color: var(--color-text-secondary);
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.03em;
   padding: 0.4rem 0.6rem;
@@ -1485,21 +1486,6 @@
   gap: 1rem;
 }
 
-.edit-activity__milestones-header {
-  align-items: center;
-  display: flex;
-  justify-content: space-between;
-}
-
-.edit-activity__milestones-header-left {
-  align-items: center;
-  color: var(--color-text-primary);
-  display: flex;
-  font-size: 0.95rem;
-  font-weight: 700;
-  gap: 0.45rem;
-}
-
 /* ── Progress Bar ── */
 
 .edit-activity__milestones-progress {
@@ -1527,7 +1513,7 @@
 }
 
 .edit-activity__milestones-progress-track {
-  background: var(--color-neutral-soft, rgba(148, 163, 184, 0.12));
+  background: var(--color-border);
   border-radius: 999px;
   height: 6px;
   overflow: hidden;
@@ -1604,19 +1590,21 @@
 .edit-activity__milestone-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 0.7rem;
+  border-radius: 0.75rem;
+  box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  margin-bottom: 0.75rem;
-  padding: 0.85rem 1rem;
+  margin-bottom: 0.85rem;
+  padding: 1rem 1.1rem;
   width: 100%;
-  transition: border-color 150ms ease, box-shadow 150ms ease;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
 }
 
 .edit-activity__milestone-card:hover {
-  border-color: var(--color-primary-border, rgba(99, 102, 241, 0.3));
-  box-shadow: 0 0 0 2px var(--focus-ring, rgba(99, 102, 241, 0.15));
+  border-color: var(--color-primary-border);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 
 .edit-activity__milestone-card-top {
@@ -1626,23 +1614,60 @@
 }
 
 .edit-activity__milestone-card-date {
-  color: var(--color-text-secondary);
-  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+  font-size: 0.73rem;
   font-weight: 600;
 }
 
+.edit-activity__milestone-card-badges {
+  align-items: center;
+  display: flex;
+  gap: 0.35rem;
+}
+
+.edit-activity__milestone-card-badges .badge--neutral:first-child {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
 .edit-activity__milestone-card-title {
-  color: var(--color-text-primary);
-  font-size: 0.88rem;
-  font-weight: 700;
-  line-height: 1.4;
   margin: 0;
 }
 
-.edit-activity__milestone-card-weightage {
+.edit-activity__milestone-card-name-btn {
+  background: transparent;
+  border: 0;
   color: var(--color-primary);
-  font-size: 0.72rem;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.88rem;
   font-weight: 700;
+  line-height: 1.4;
+  padding: 0;
+  text-align: left;
+  transition: color 150ms ease;
+  width: 100%;
+}
+
+.edit-activity__milestone-card-name-btn:hover {
+  color: var(--color-primary-hover);
+}
+
+.edit-activity__milestone-card-name-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.edit-activity__milestone-card-weightage {
+  background: var(--color-primary-soft);
+  border-radius: 100px;
+  color: var(--color-primary);
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.15rem 0.55rem;
+  width: fit-content;
 }
 
 .edit-activity__milestone-card-bottom {
@@ -1652,10 +1677,17 @@
   margin-top: 0.15rem;
 }
 
-.edit-activity__milestone-card-assignee {
-  color: var(--color-text-tertiary);
-  font-size: 0.74rem;
-  font-weight: 500;
+.edit-activity__milestone-card-desc {
+  color: var(--color-text-secondary);
+  display: -webkit-box;
+  font-size: 0.78rem;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  line-height: 1.4;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .edit-activity__milestone-card-actions {
@@ -1688,6 +1720,11 @@
   background: rgba(239, 68, 68, 0.08);
   border-color: rgba(239, 68, 68, 0.2);
   color: #ef4444;
+}
+
+:root[data-theme='dark'] .edit-activity__milestone-card-badges .badge--neutral:first-child {
+  background: rgba(129, 140, 248, 0.14);
+  color: var(--color-primary);
 }
 
 /* ── Milestone Drawer Form ── */
@@ -1743,4 +1780,227 @@
   color: var(--color-primary);
   font-size: 0.84rem;
   font-weight: 800;
+}
+
+.edit-activity__milestones-drawer input[type="number"]::-webkit-inner-spin-button,
+.edit-activity__milestones-drawer input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.edit-activity__milestones-drawer input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* ── Objectives tab ── */
+
+.edit-activity__objectives {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* ── Procurements tab ── */
+
+.edit-activity__procurement {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  max-width: 100%;
+}
+
+.edit-activity__procurement .data-grid {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.edit-activity__procurement .data-grid table {
+  border-collapse: collapse;
+  min-width: 100%;
+  white-space: nowrap;
+}
+
+.edit-activity__procurement-name {
+  font-weight: 600;
+}
+
+.edit-activity__procurement-value {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.edit-activity__procurement-na {
+  color: var(--color-text-tertiary);
+}
+
+.edit-activity__procurement-actions {
+  align-items: center;
+  display: flex;
+  gap: 0.3rem;
+}
+
+.edit-activity__procurement-action-btn {
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.35rem;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  display: inline-flex;
+  height: 1.75rem;
+  justify-content: center;
+  padding: 0;
+  transition: all 140ms ease;
+  width: 1.75rem;
+}
+
+.edit-activity__procurement-action-btn:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.edit-activity__procurement-action-btn--danger:hover {
+  background: var(--color-error-soft);
+  border-color: var(--color-error-border);
+  color: var(--color-error);
+}
+
+/* Procurement drawer form */
+
+.edit-activity__procurement-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+/* Section card wrapper — matches Activity Info <Card className="create-activity__section"> */
+.edit-activity__procurement-section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Section header inside card — top corners clip to parent, so no radius needed */
+.edit-activity__procurement-section .create-activity__section-header {
+  border-radius: 0;
+}
+
+/* Drawer section fields — matches create-activity__form-stack padding/gap */
+.edit-activity__procurement-drawer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.9rem 1.15rem 1.15rem;
+}
+
+.edit-activity__procurement-drawer-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Theme-matched label styling — matches create-activity__form-stack exactly */
+.edit-activity__procurement-drawer-section .field__label,
+.edit-activity__procurement-drawer-section .select-field__label,
+.edit-activity__procurement-drawer-section .radio-group > .field__label {
+  color: #334155;
+  font-size: 0.7rem;
+  font-weight: 750;
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+
+:root[data-theme='dark'] .edit-activity__procurement-drawer-section .field__label,
+:root[data-theme='dark'] .edit-activity__procurement-drawer-section .select-field__label,
+:root[data-theme='dark'] .edit-activity__procurement-drawer-section .radio-group > .field__label {
+  color: var(--color-text-secondary);
+}
+
+/* Slightly larger control fonts inside drawer for readability */
+.edit-activity__procurement-drawer-section .field__control,
+.edit-activity__procurement-drawer-section .select-field__control,
+.edit-activity__procurement-drawer-section .date-picker__trigger {
+  font-size: 0.82rem;
+}
+
+/* Subtle group-color tint on unchecked choices (matches form-stack pattern) */
+.edit-activity__procurement-drawer-section .radio-group .choice {
+  border-color: var(--choice-accent-border, var(--control-border));
+  background: color-mix(in srgb, var(--choice-accent, transparent) 4%, var(--control-bg));
+}
+
+/* Override to show validation error border (higher specificity than group-color rules) */
+.edit-activity__procurement-drawer-section .radio-group--invalid .choice {
+  border-color: var(--color-error);
+  background: rgba(220, 38, 38, 0.035);
+}
+
+.edit-activity__procurement-drawer-section .radio-group--invalid .choice:not(:has(input:checked)):hover {
+  border-color: var(--color-error);
+  background: rgba(220, 38, 38, 0.055);
+}
+
+.edit-activity__procurement-drawer-section .radio-group .choice:not(:has(input:checked)):hover {
+  border-color: var(--choice-accent, var(--control-border-hover));
+  background: var(--choice-accent-soft, var(--control-bg-hover));
+  box-shadow: 0 0 0 3px var(--choice-focus-ring, transparent);
+}
+
+/* Per-option choice labels in side drawer */
+.edit-activity__procurement-drawer-section .choice__copy span {
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* Currency input inside drawer */
+.edit-activity__procurement-drawer-section .currency-input .field__control {
+  font-size: 0.82rem;
+  min-height: 2.3rem;
+}
+
+/* 2-column layout for procurement status radios */
+.create-activity__radio--status .radio-group__options {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* DataGrid within procurement uses same styles as deps table */
+.edit-activity__procurement .data-grid th {
+  background: var(--color-surface-muted);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.7rem 0.8rem;
+  position: sticky;
+  text-align: left;
+  text-transform: uppercase;
+  top: 0;
+  white-space: nowrap;
+}
+
+.edit-activity__procurement .data-grid td {
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  font-size: 0.82rem;
+  padding: 0.7rem 0.8rem;
+}
+
+.edit-activity__procurement .data-grid tr:hover td {
+  background: var(--color-surface-hover);
+}
+
+.edit-activity__procurement-empty-cell {
+  padding: 2rem !important;
+  text-align: center;
+}
+
+.edit-activity__procurement-empty {
+  color: var(--color-text-tertiary);
+  font-size: 0.85rem;
 }

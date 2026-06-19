@@ -400,7 +400,7 @@ export function DependenciesTab() {
           <h2>
             Dependencies
             <span className="edit-activity__members-count-badge">
-              {depCount} dependenc{depCount !== 1 ? 'ies' : 'y'}
+              {depCount} Dependenc{depCount !== 1 ? 'ies' : 'y'}
             </span>
           </h2>
           <p>Manage external dependencies for this activity.</p>

@@ -46,7 +46,7 @@ export function RadioGroup<TValue extends string>({
           </label>
         ))}
       </div>
-      <span className={error ? 'field__error' : 'field__message-placeholder'}>{error || ''}</span>
+      {error ? <span className="field__error">{error}</span> : null}
     </fieldset>
   )
 }

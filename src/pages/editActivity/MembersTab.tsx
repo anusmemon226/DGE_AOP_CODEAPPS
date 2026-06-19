@@ -262,8 +262,8 @@ export function MembersTab() {
   const filteredCount = filteredMembers.length
   const hasFilter = memberListSearch.trim().length > 0
   const showingText = hasFilter
-    ? `${filteredCount} of ${memberCount} member${memberCount !== 1 ? 's' : ''}`
-    : `${memberCount} member${memberCount !== 1 ? 's' : ''}`
+    ? `${filteredCount} of ${memberCount} Member${memberCount !== 1 ? 's' : ''}`
+    : `${memberCount} Member${memberCount !== 1 ? 's' : ''}`
   const showPagination = memberViewMode === 'pagination' && filteredCount > ITEMS_PER_PAGE
   const showLoadMore = memberViewMode === 'lazy' && lazyVisibleCount < filteredCount
   const rangeStart = filteredCount > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0
