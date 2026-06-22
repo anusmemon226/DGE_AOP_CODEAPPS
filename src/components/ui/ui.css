@@ -234,9 +234,8 @@
 .select-menu__title {
   font-size: 0.82rem;
   font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  word-wrap: break-word;
 }
 
 .select-menu__description,

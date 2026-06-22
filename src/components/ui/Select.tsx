@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Check, ChevronDown, Search } from 'lucide-react'
 import './ui.css'
 
@@ -46,6 +47,8 @@ export function Select<TValue extends string>({
   const [isOpen, setIsOpen] = useState(false)
   const [searchValue, setSearchValue] = useState('')
   const rootRef = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null)
   const listboxId = useId()
   const selectedOption = options.find((option) => option.value === value) ?? options[0]
   const shouldSearch = options.length > 10
@@ -63,11 +66,12 @@ export function Select<TValue extends string>({
 
   useEffect(() => {
     if (!isOpen) {
-      return undefined
+      setMenuPos(null)
+      return
     }
 
     function handlePointerDown(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) {
+      if (!rootRef.current?.contains(event.target as Node) && !menuRef.current?.contains(event.target as Node)) {
         setIsOpen(false)
       }
     }
@@ -78,12 +82,34 @@ export function Select<TValue extends string>({
       }
     }
 
+    function reposition() {
+      const control = rootRef.current?.querySelector('.select-field__control') as HTMLElement | null
+      const menu = menuRef.current
+      if (!control || !menu) return
+
+      const rect = control.getBoundingClientRect()
+      const menuHeight = menu.offsetHeight
+      const spaceBelow = window.innerHeight - rect.bottom - 8
+      const openUp = menuHeight > spaceBelow && rect.top - 8 > spaceBelow
+
+      setMenuPos({
+        top: openUp ? Math.max(8, rect.top - menuHeight - 4) : rect.bottom + 4,
+        left: rect.left,
+        width: rect.width,
+      })
+    }
+
+    const rafId = requestAnimationFrame(reposition)
+
     document.addEventListener('pointerdown', handlePointerDown)
     document.addEventListener('keydown', handleKeyDown)
+    document.addEventListener('scroll', reposition, { capture: true })
 
     return () => {
+      cancelAnimationFrame(rafId)
       document.removeEventListener('pointerdown', handlePointerDown)
       document.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('scroll', reposition, { capture: true })
     }
   }, [isOpen])
 
@@ -120,7 +146,24 @@ export function Select<TValue extends string>({
         aria-labelledby={`${id}-label ${id}-value`}
         className="select-field__control"
         id={id}
-        onClick={() => setIsOpen((open) => !open)}
+        onClick={() => {
+          const nextOpen = !isOpen
+          if (nextOpen) {
+            const el = rootRef.current?.querySelector('.select-field__control') as HTMLElement | null
+            if (el) {
+              const rect = el.getBoundingClientRect()
+              const estHeight = 260
+              const spaceBelow = window.innerHeight - rect.bottom - 8
+              const openUp = estHeight > spaceBelow && rect.top - 8 > spaceBelow
+              setMenuPos({
+                top: openUp ? Math.max(8, rect.top - estHeight - 4) : rect.bottom + 4,
+                left: rect.left,
+                width: rect.width,
+              })
+            }
+          }
+          setIsOpen(nextOpen)
+        }}
         type="button"
       >
         <span className="select-field__value" id={`${id}-value`}>
@@ -130,8 +173,23 @@ export function Select<TValue extends string>({
       </button>
       {error ? <span className="field__error">{error}</span> : null}
 
-      {isOpen ? (
-        <div aria-labelledby={`${id}-label`} className="select-menu" id={listboxId} role="listbox">
+      {isOpen && menuPos
+        ? createPortal(
+            <div
+              aria-labelledby={`${id}-label`}
+              className="select-menu"
+              id={listboxId}
+              ref={menuRef}
+              role="listbox"
+              style={{
+                position: 'fixed',
+                top: menuPos.top,
+                left: menuPos.left,
+                minWidth: menuPos.width,
+                width: 'max-content',
+                zIndex: 99999,
+              }}
+            >
           {menuHeader ? <div className="select-menu__header">{menuHeader}</div> : null}
           {shouldSearch ? (
             <label className="select-menu__search">
@@ -194,7 +252,8 @@ export function Select<TValue extends string>({
               </div>
             )
           })}
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </div>
   )
