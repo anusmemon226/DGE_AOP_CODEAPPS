@@ -2004,3 +2004,553 @@
   color: var(--color-text-tertiary);
   font-size: 0.85rem;
 }
+
+/* ── Engagement Plans tab ── */
+
+.edit-activity__engagement {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  max-width: 100%;
+}
+
+.edit-activity__engagement .data-grid {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.edit-activity__engagement .data-grid table {
+  border-collapse: collapse;
+  min-width: 100%;
+  white-space: nowrap;
+}
+
+.edit-activity__engagement-name {
+  font-weight: 600;
+}
+
+.edit-activity__engagement-actions {
+  align-items: center;
+  display: flex;
+  gap: 0.3rem;
+}
+
+.edit-activity__engagement-action-btn {
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.35rem;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  display: inline-flex;
+  height: 1.75rem;
+  justify-content: center;
+  padding: 0;
+  transition: all 140ms ease;
+  width: 1.75rem;
+}
+
+.edit-activity__engagement-action-btn:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.edit-activity__engagement-action-btn--danger:hover {
+  background: var(--color-error-soft);
+  border-color: var(--color-error-border);
+  color: var(--color-error);
+}
+
+/* Engagement drawer form */
+
+.edit-activity__engagement-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.edit-activity__engagement-section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.edit-activity__engagement-section .create-activity__section-header {
+  border-radius: 0;
+}
+
+.edit-activity__engagement-drawer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.9rem 1.15rem 1.15rem;
+}
+
+.edit-activity__engagement-drawer-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Theme-matched label styling */
+.edit-activity__engagement-drawer-section .field__label,
+.edit-activity__engagement-drawer-section .select-field__label,
+.edit-activity__engagement-drawer-section .radio-group > .field__label {
+  color: #334155;
+  font-size: 0.7rem;
+  font-weight: 750;
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+
+:root[data-theme='dark'] .edit-activity__engagement-drawer-section .field__label,
+:root[data-theme='dark'] .edit-activity__engagement-drawer-section .select-field__label,
+:root[data-theme='dark'] .edit-activity__engagement-drawer-section .radio-group > .field__label {
+  color: var(--color-text-secondary);
+}
+
+/* Control fonts inside drawer */
+.edit-activity__engagement-drawer-section .field__control,
+.edit-activity__engagement-drawer-section .select-field__control,
+.edit-activity__engagement-drawer-section .date-picker__trigger {
+  font-size: 0.82rem;
+}
+
+/* Base (unselected) — accent-hinted background, very light (4%) vs checked (8%) */
+.edit-activity__engagement-drawer-section .radio-group .choice {
+  align-items: center;
+  background: var(--choice-accent-soft-subtle, var(--color-surface-muted));
+  border: 1px solid var(--control-border);
+  border-radius: 0.62rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.035);
+  min-height: 2.25rem;
+  padding: 0.5rem 0.6rem;
+}
+
+/* Checked state — soft accent background + border like Activity Information tab */
+.edit-activity__engagement-drawer-section .radio-group .choice:has(input:checked) {
+  background: var(--choice-accent-soft, var(--color-primary-soft));
+  border-color: var(--choice-accent, var(--color-primary));
+  box-shadow: 0 0 0 3px var(--choice-focus-ring, var(--focus-ring));
+}
+
+/* Hover state for unselected choices — same as procurement/activity tabs */
+.edit-activity__engagement-drawer-section .radio-group .choice:not(:has(input:checked)):hover {
+  border-color: var(--choice-accent, var(--control-border-hover));
+  background: var(--choice-accent-soft, var(--control-bg-hover));
+  box-shadow: 0 0 0 3px var(--choice-focus-ring, transparent);
+}
+
+/* Override to show validation error border */
+.edit-activity__engagement-drawer-section .radio-group--invalid .choice {
+  border-color: var(--color-error);
+  background: rgba(220, 38, 38, 0.035);
+}
+
+.edit-activity__engagement-drawer-section .radio-group--invalid .choice:not(:has(input:checked)):hover {
+  border-color: var(--color-error);
+  background: rgba(220, 38, 38, 0.055);
+}
+
+/* Per-option choice labels — match Activity Information tab */
+.edit-activity__engagement-drawer-section .choice__copy span {
+  font-size: 0.74rem;
+  font-weight: 750;
+  line-height: 1.25;
+}
+
+/* 2-column grid for Yes/No — match Activity Information tab */
+.edit-activity__engagement-drawer-section .radio-group__options {
+  gap: 0.42rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* Per-option radio accent colors — used by checked state above */
+.edit-activity__engagement-drawer-section .choice--yes {
+  --choice-accent: #059669;
+  --choice-accent-soft: rgba(5, 150, 105, 0.08);
+  --choice-accent-soft-subtle: rgba(5, 150, 105, 0.04);
+  --choice-accent-border: #059669;
+  --choice-focus-ring: rgba(5, 150, 105, 0.18);
+}
+
+.edit-activity__engagement-drawer-section .choice--no {
+  --choice-accent: #6b7280;
+  --choice-accent-soft: rgba(107, 114, 128, 0.08);
+  --choice-accent-soft-subtle: rgba(107, 114, 128, 0.04);
+  --choice-accent-border: #6b7280;
+  --choice-focus-ring: rgba(107, 114, 128, 0.18);
+}
+
+/* DataGrid styles */
+.edit-activity__engagement .data-grid th {
+  background: var(--color-surface-muted);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.7rem 0.8rem;
+  position: sticky;
+  text-align: left;
+  text-transform: uppercase;
+  top: 0;
+  white-space: nowrap;
+}
+
+.edit-activity__engagement .data-grid td {
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  font-size: 0.82rem;
+  padding: 0.7rem 0.8rem;
+}
+
+.edit-activity__engagement .data-grid tr:hover td {
+  background: var(--color-surface-hover);
+}
+
+.edit-activity__engagement-empty-cell {
+  padding: 2rem !important;
+  text-align: center;
+}
+
+.edit-activity__engagement-empty {
+  color: var(--color-text-tertiary);
+  font-size: 0.85rem;
+}
+
+/* ADGEs capsules below MultiSelect */
+.edit-activity__engagement-adges-capsules {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: -0.35rem;
+}
+
+.edit-activity__engagement-adges-capsule {
+  align-items: center;
+  background: var(--color-primary-soft);
+  border: 1px solid var(--color-primary-border);
+  border-radius: 999px;
+  color: var(--color-primary);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 600;
+  gap: 0.35rem;
+  padding: 0.25rem 0.45rem 0.25rem 0.65rem;
+  transition: all 120ms ease;
+  white-space: nowrap;
+}
+
+.edit-activity__engagement-adges-capsule:hover {
+  opacity: 0.8;
+}
+
+.edit-activity__engagement-adges-capsule-remove {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  color: var(--color-primary);
+  cursor: pointer;
+  display: inline-flex;
+  height: 1.15rem;
+  justify-content: center;
+  padding: 0;
+  transition: all 120ms ease;
+  width: 1.15rem;
+}
+
+.edit-activity__engagement-adges-capsule-remove:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: var(--color-error);
+}
+
+/* ── Engagement Visibility Picker ── */
+
+.engagement-visibility {
+  position: relative;
+}
+
+.engagement-visibility__trigger {
+  align-items: center;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 2.55rem;
+  text-align: left;
+}
+
+.engagement-visibility__trigger-text {
+  color: var(--color-text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.engagement-visibility--invalid .engagement-visibility__trigger {
+  border-color: var(--color-error);
+}
+
+.engagement-visibility--invalid .engagement-visibility__trigger:focus {
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
+}
+
+/* Popover (portal) */
+.engagement-visibility__popover {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xl);
+  max-height: min(24rem, calc(100vh - 4rem));
+  overflow-y: auto;
+  padding: 0.35rem;
+}
+
+/* Menu inside popover */
+.engagement-visibility__menu {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.engagement-visibility__divider {
+  border-top: 1px solid var(--color-border);
+  margin: 0.2rem 0;
+}
+
+/* Option rows */
+.engagement-visibility__option {
+  align-items: center;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-height: 2.15rem;
+  padding: 0 0.55rem;
+  transition: background-color 120ms ease;
+}
+
+.engagement-visibility__option:hover {
+  background: var(--color-surface-hover);
+}
+
+.engagement-visibility__option input {
+  height: 0;
+  opacity: 0;
+  position: absolute;
+  width: 0;
+}
+
+.engagement-visibility__check {
+  align-items: center;
+  border: 1px solid var(--control-border);
+  border-radius: 0.25rem;
+  display: inline-flex;
+  height: 1.1rem;
+  justify-content: center;
+  transition: all 140ms ease;
+  width: 1.1rem;
+  flex-shrink: 0;
+}
+
+.engagement-visibility__option input:checked + .engagement-visibility__check {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+
+.engagement-visibility__option input:indeterminate + .engagement-visibility__check {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary);
+}
+
+.engagement-visibility__option input:indeterminate + .engagement-visibility__check::after {
+  background: var(--color-primary);
+  border-radius: 1px;
+  content: '';
+  height: 2px;
+  width: 8px;
+}
+
+.engagement-visibility__option--select-all {
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+.engagement-visibility__option--sector {
+  font-weight: 600;
+  font-size: 0.82rem;
+  margin-top: 0.15rem;
+}
+
+.engagement-visibility__option--division {
+  font-size: 0.8rem;
+  padding-left: 2.2rem;
+}
+
+.engagement-visibility__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Selected chips — column layout, each sector group on its own row */
+.engagement-visibility__chips {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+}
+
+.engagement-visibility__chip-group {
+  border-left: 3px solid var(--color-border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+  padding-left: 0.5rem;
+}
+
+.engagement-visibility__chip {
+  align-items: center;
+  background: var(--color-primary-soft);
+  border: 1px solid var(--color-primary-border);
+  border-radius: 999px;
+  color: var(--color-primary);
+  display: inline-flex;
+  font-size: 0.73rem;
+  font-weight: 600;
+  gap: 0.35rem;
+  padding: 0.2rem 0.4rem 0.2rem 0.6rem;
+  white-space: nowrap;
+}
+
+.engagement-visibility__chip-remove {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  color: var(--color-primary);
+  cursor: pointer;
+  display: inline-flex;
+  height: 1.1rem;
+  justify-content: center;
+  padding: 0;
+  transition: all 120ms ease;
+  width: 1.1rem;
+}
+
+.engagement-visibility__chip-remove:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: var(--color-error);
+}
+
+/* Engagement grid cell helpers */
+.edit-activity__engagement-grid-cells {
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.edit-activity__engagement-cell-desc {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-clamp: 2;
+  max-width: 14rem;
+  overflow: hidden;
+}
+
+.edit-activity__engagement-na {
+  color: var(--color-text-tertiary);
+}
+
+/* Disabled textarea background in engagement drawer (Textarea component doesn't add field--disabled) */
+.edit-activity__engagement-drawer-section .field__control--textarea:disabled {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
+  cursor: not-allowed;
+  opacity: 0.82;
+}
+
+.edit-activity__engagement-drawer-section .field__control--textarea:disabled:hover {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+}
+
+/* ── MultiSelect in engagement drawer ── */
+
+.edit-activity__engagement-drawer-section .multi-select {
+  position: relative;
+}
+
+.edit-activity__engagement-drawer-section .multi-select__menu {
+  width: 100%;
+}
+
+.edit-activity__engagement-drawer-section .multi-select__menu .multi-select__option {
+  font-size: 0.8rem;
+}
+
+.edit-activity__engagement-drawer-section .multi-select__chips {
+  font-size: 0.78rem;
+}
+
+/* ── Clickable engagement visibility chips ── */
+
+.engagement-visibility__chip {
+  cursor: pointer;
+  font-size: 10px;
+  transition: all 120ms ease;
+}
+
+.engagement-visibility__chip:hover {
+  opacity: 0.8;
+}
+
+/* Sector chip — solid blue bg, white text */
+.engagement-visibility__chip--sector {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
+}
+
+.engagement-visibility__chip--sector:hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  opacity: 0.95;
+}
+
+.engagement-visibility__chip--sector .engagement-visibility__chip-remove {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.engagement-visibility__chip--sector .engagement-visibility__chip-remove:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+/* Division chip — light blue bg, #375EFB text (like previous sector capsule) */
+.engagement-visibility__chip--division {
+  background: rgba(55, 94, 251, 0.1);
+  border-color: rgba(55, 94, 251, 0.25);
+  color: #375efb;
+}
+
+.engagement-visibility__chip--division:hover {
+  background: rgba(55, 94, 251, 0.18);
+  border-color: rgba(55, 94, 251, 0.4);
+}

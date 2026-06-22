@@ -73,7 +73,7 @@ export function MultiSelect<TValue extends string>({
     <div className={`field multi-select ${className}`.trim()} ref={rootRef}>
       <span className="field__label" id={`${id}-label`}>
         {label}
-        {required ? <span aria-hidden="true"> *</span> : null}
+        {required ? <span aria-hidden="true" className="field__required"> *</span> : null}
       </span>
       <button
         aria-expanded={isOpen}

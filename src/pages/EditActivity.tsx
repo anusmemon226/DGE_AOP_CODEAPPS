@@ -34,6 +34,7 @@ import { DependenciesTab } from './editActivity/DependenciesTab'
 import { MilestonesTab } from './editActivity/MilestonesTab'
 import { ObjectivesTab } from './editActivity/ObjectivesTab'
 import { ProcurementTab } from './editActivity/ProcurementTab'
+import { EngagementPlanTab } from './editActivity/EngagementPlanTab'
 import {
   normalizeControlledRules,
   validateForm,
@@ -152,6 +153,7 @@ export function EditActivity() {
   const isBudgetNo = form.budgetRequired === '0'
   const isAdeoVisible = form.adeoReported === '1'
 
+  const activityLeadName = activityLeadOptions.find((o) => o.value === form.activityLeadId)?.label ?? ''
   const isDivisionMember = selectedRole === 'AOP - Division Member'
   const isDivisionDirector = selectedRole === 'AOP - Division Director'
 
@@ -302,7 +304,15 @@ export function EditActivity() {
       case 'procurements':
         return <ProcurementTab />
       case 'engagement-plans':
-        return <div className="edit-activity__placeholder">Engagement Plans management will appear here.</div>
+        return (
+          <EngagementPlanTab
+            activityLeadName={activityLeadName}
+            activityName={activityName}
+            activitySummary={form.summary}
+            divisionName={form.divisionName}
+            sectorName={form.sectorName}
+          />
+        )
       case 'budget':
         return <div className="edit-activity__placeholder">Budget Information form will appear here.</div>
       case 'clarifications':
