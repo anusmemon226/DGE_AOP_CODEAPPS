@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Wallet } from 'lucide-react'
+import { CalendarRange, CircleCheck, LockKeyhole, Wallet } from 'lucide-react'
 import {
   Card,
   CurrencyDisplay,
@@ -8,7 +8,6 @@ import {
   RadioGroup,
   Textarea,
 } from '../../components/ui'
-import { LockKeyhole } from 'lucide-react'
 import {
   BUDGET_SOURCE_OPTIONS,
   BUDGET_TYPE_OPTIONS,
@@ -35,7 +34,7 @@ function parseNum(value: string): number {
   return parseFloat(stripCommas(value)) || 0
 }
 
-function sumMonthly(months: BudgetFormData['monthlyBudgets']): number {
+function sumMonthly(months: readonly string[]): number {
   return months.reduce((sum, m) => sum + parseNum(m), 0)
 }
 
@@ -55,6 +54,7 @@ interface BudgetTabProps {
 export function BudgetTab({ plannedEndDate, plannedStartDate }: BudgetTabProps) {
   const [form, setForm] = useState<BudgetFormData>(INITIAL_BUDGET_FORM)
   const [errors, setErrors] = useState<BudgetFieldErrors>({})
+  const currentQuarterIndex = Math.floor(new Date().getMonth() / 3)
 
   // ── Conditional visibility ──
 
@@ -101,32 +101,53 @@ export function BudgetTab({ plannedEndDate, plannedStartDate }: BudgetTabProps) 
 
 // ── Render helpers ──
 
-  function renderMonthlyGrid() {
-    const rows: React.ReactNode[] = []
+  function renderQuarterGrid() {
+    return Array.from({ length: 4 }, (_, quarterIndex) => {
+      const startIndex = quarterIndex * 3
+      const quarterMonths = MONTH_LABELS.slice(startIndex, startIndex + 3)
+      const quarterTotal = sumMonthly(form.monthlyBudgets.slice(startIndex, startIndex + 3))
+      const isCurrentQuarter = quarterIndex === currentQuarterIndex
 
-    for (let row = 0; row < 3; row++) {
-      const rowMonths = MONTH_LABELS.slice(row * 4, row * 4 + 4)
+      return (
+        <section
+          aria-label={`Quarter ${quarterIndex + 1}${isCurrentQuarter ? ', current quarter' : ''}`}
+          className={`edit-activity__monthly-quarter${isCurrentQuarter ? ' edit-activity__monthly-quarter--current' : ''}`}
+          key={`quarter-${quarterIndex + 1}`}
+        >
+          <div className="edit-activity__monthly-quarter-header">
+            <div className="edit-activity__monthly-quarter-title">
+              <span className="edit-activity__monthly-quarter-number">Q{quarterIndex + 1}</span>
+              <span className="edit-activity__monthly-quarter-range">
+                {quarterMonths[0]} — {quarterMonths[quarterMonths.length - 1]}
+              </span>
+              {isCurrentQuarter ? <span className="edit-activity__monthly-current-badge">Current</span> : null}
+            </div>
+            <div className="edit-activity__monthly-quarter-total">
+              <span>Quarter total</span>
+              <strong><CurrencyDisplay value={quarterTotal} /></strong>
+            </div>
+          </div>
 
-      rows.push(
-        <div className="create-activity__form-row create-activity__form-row--four" key={`month-row-${row}`}>
-          {rowMonths.map((label, col) => {
-            const idx = row * 4 + col
-            return (
-              <CurrencyInput
-                key={label}
-                error={errors.monthlyBudgets && !form.monthlyBudgets[idx].trim() ? errors.monthlyBudgets : undefined}
-                label={label}
-                onChange={(e) => handleMonthlyChange(idx, stripCommas(e.target.value))}
-                required
-                value={addCommas(form.monthlyBudgets[idx])}
-              />
-            )
-          })}
-        </div>,
+          <div className="edit-activity__monthly-quarter-fields">
+            {quarterMonths.map((label, monthOffset) => {
+              const monthIndex = startIndex + monthOffset
+              return (
+                <CurrencyInput
+                  className="edit-activity__monthly-field"
+                  key={label}
+                  error={errors.monthlyBudgets && !form.monthlyBudgets[monthIndex].trim() ? errors.monthlyBudgets : undefined}
+                  label={label}
+                  onChange={(e) => handleMonthlyChange(monthIndex, stripCommas(e.target.value))}
+                  placeholder="0"
+                  required
+                  value={addCommas(form.monthlyBudgets[monthIndex])}
+                />
+              )
+            })}
+          </div>
+        </section>
       )
-    }
-
-    return rows
+    })
   }
 
   // ── Render ──
@@ -277,12 +298,42 @@ export function BudgetTab({ plannedEndDate, plannedStartDate }: BudgetTabProps) 
           </div>
         </div>
 
-        <div className="create-activity__form-stack">
-          <p className="edit-activity__budget-hint">
-            Enter budget amounts for each month of the fiscal year.
-          </p>
+        <div className="create-activity__form-stack edit-activity__monthly-body">
+          <div className="edit-activity__monthly-overview">
+            <div className="edit-activity__monthly-intro">
+              <span className="edit-activity__monthly-icon" aria-hidden="true">
+                <CalendarRange size={20} />
+              </span>
+              <div>
+                <strong>Fiscal year allocation</strong>
+                <span>Distribute the planned budget across all 12 monthly periods.</span>
+              </div>
+            </div>
+            <div className="edit-activity__monthly-metrics">
+              <div className="edit-activity__monthly-metric">
+                <span>Annual planned total</span>
+                <strong><CurrencyDisplay value={sumMonthly(form.monthlyBudgets)} /></strong>
+              </div>
+              <div className="edit-activity__monthly-metric edit-activity__monthly-metric--progress">
+                <span><CircleCheck size={13} /> Allocation progress</span>
+                <strong>{form.monthlyBudgets.filter((value) => value.trim()).length}/12 months</strong>
+              </div>
+            </div>
+            <div
+              aria-label={`${form.monthlyBudgets.filter((value) => value.trim()).length} of 12 months completed`}
+              aria-valuemax={12}
+              aria-valuemin={0}
+              aria-valuenow={form.monthlyBudgets.filter((value) => value.trim()).length}
+              className="edit-activity__monthly-progress-track"
+              role="progressbar"
+            >
+              <span style={{ width: `${(form.monthlyBudgets.filter((value) => value.trim()).length / 12) * 100}%` }} />
+            </div>
+          </div>
 
-          {renderMonthlyGrid()}
+          <div className="edit-activity__monthly-quarter-grid">
+            {renderQuarterGrid()}
+          </div>
         </div>
       </Card>
     </div>

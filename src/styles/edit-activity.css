@@ -2557,6 +2557,792 @@
 
 /* ── Budget tab ── */
 
+/* Budget planner banner — matches other section headers */
+.edit-activity__budget-planner-summary {
+  align-items: center;
+  background: linear-gradient(120deg, var(--color-primary-soft), transparent 68%), var(--color-surface-muted);
+  border: 1px solid var(--color-primary-border);
+  border-radius: var(--radius-lg);
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 0.9rem 1.15rem;
+}
+
+.edit-activity__budget-planner-intro {
+  align-items: center;
+  display: flex;
+  gap: 0.7rem;
+  min-width: 0;
+}
+
+.edit-activity__budget-planner-icon {
+  align-items: center;
+  background: var(--color-primary);
+  border-radius: 0.7rem;
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--color-primary) 24%, transparent);
+  color: var(--color-on-primary);
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 2.6rem;
+  justify-content: center;
+  width: 2.6rem;
+}
+
+.edit-activity__budget-planner-intro > div,
+.edit-activity__budget-planner-total {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.edit-activity__budget-planner-intro strong {
+  color: var(--color-text-primary);
+  font-size: 0.88rem;
+}
+
+.edit-activity__budget-planner-intro span,
+.edit-activity__budget-planner-total > span {
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+}
+
+.edit-activity__budget-planner-total {
+  border-left: 1px solid var(--color-primary-border);
+  min-width: 11rem;
+  padding-left: 1rem;
+  text-align: right;
+}
+
+.edit-activity__budget-planner-total strong,
+.edit-activity__budget-planner-total .currency-display {
+  color: var(--color-primary);
+  font-size: 1.2rem;
+  font-weight: 850;
+}
+
+/* Progress bar — compact, clean */
+.edit-activity__budget-progress {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.edit-activity__budget-progress-copy {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.edit-activity__budget-progress-copy span {
+  align-items: center;
+  color: var(--color-text-secondary);
+  display: inline-flex;
+  font-size: 0.72rem;
+  font-weight: 750;
+  gap: 0.35rem;
+}
+
+.edit-activity__budget-progress-copy span svg {
+  color: var(--color-success);
+}
+
+.edit-activity__budget-progress-copy strong {
+  color: var(--color-text-tertiary);
+  font-size: 0.68rem;
+}
+
+.edit-activity__budget-progress-track {
+  background: var(--color-surface-muted);
+  border-radius: 999px;
+  height: 0.38rem;
+  overflow: hidden;
+}
+
+.edit-activity__budget-progress-track > span {
+  background: linear-gradient(90deg, var(--color-primary), var(--color-info));
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+  min-width: 0;
+  transition: width 240ms ease;
+}
+
+/* ── Quarter grid ── */
+
+.edit-activity__budget-quarter-grid {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.edit-activity__budget-quarter {
+  --quarter-accent: var(--color-primary);
+  --quarter-soft: var(--color-primary-soft);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  transition: border-color 200ms ease, box-shadow 250ms ease, transform 250ms ease;
+}
+
+/* Accent top bar — thinner, sharper */
+.edit-activity__budget-quarter::before {
+  background: var(--quarter-accent);
+  content: '';
+  height: 3px;
+  inset: 0 0 auto;
+  position: absolute;
+}
+
+/* Quarter-specific accent colors */
+.edit-activity__budget-quarter:nth-child(2) {
+  --quarter-accent: var(--color-info);
+  --quarter-soft: var(--color-info-soft);
+}
+
+.edit-activity__budget-quarter:nth-child(3) {
+  --quarter-accent: var(--color-warning);
+  --quarter-soft: var(--color-warning-soft);
+}
+
+.edit-activity__budget-quarter:nth-child(4) {
+  --quarter-accent: var(--color-success);
+  --quarter-soft: var(--color-success-soft);
+}
+
+/* Elevate on hover / focus-within */
+.edit-activity__budget-quarter:hover,
+.edit-activity__budget-quarter:focus-within {
+  border-color: color-mix(in srgb, var(--quarter-accent) 45%, var(--color-border));
+  box-shadow:
+    0 12px 28px color-mix(in srgb, var(--quarter-accent) 10%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--quarter-accent) 8%, transparent);
+  transform: translateY(-2px);
+}
+
+/* ── Quarter header ── */
+
+.edit-activity__budget-quarter-header {
+  align-items: center;
+  background: linear-gradient(115deg, var(--quarter-soft), transparent 72%);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem 0.85rem 0.65rem;
+}
+
+.edit-activity__budget-quarter-header > div:first-child {
+  align-items: center;
+  display: flex;
+  gap: 0.55rem;
+}
+
+.edit-activity__budget-quarter-number {
+  align-items: center;
+  background: var(--quarter-accent);
+  border-radius: 0.4rem;
+  color: var(--color-on-primary);
+  display: inline-flex;
+  font-size: 0.65rem;
+  font-weight: 900;
+  height: 1.55rem;
+  justify-content: center;
+  letter-spacing: 0.02em;
+  width: 1.9rem;
+}
+
+.edit-activity__budget-quarter-range {
+  color: var(--color-text-secondary);
+  font-size: 0.73rem;
+  font-weight: 750;
+}
+
+.edit-activity__budget-quarter-total {
+  display: grid;
+  gap: 0.05rem;
+  text-align: right;
+}
+
+.edit-activity__budget-quarter-total > span {
+  color: var(--color-text-tertiary);
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.edit-activity__budget-quarter-total strong,
+.edit-activity__budget-quarter-total .currency-display {
+  color: var(--quarter-accent);
+  font-size: 0.85rem;
+  font-weight: 850;
+}
+
+.edit-activity__budget-quarter-total .dirham-icon {
+  height: 0.72rem;
+  width: 0.72rem;
+}
+
+/* ── Month fields grid inside a quarter ── */
+
+.edit-activity__budget-quarter-fields {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 0.85rem;
+}
+
+/* ── Individual month field ── */
+
+.edit-activity__budget-month-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.edit-activity__budget-month-field .field__label {
+  color: var(--color-text-tertiary);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.edit-activity__budget-month-field .currency-input__control {
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: none;
+  min-height: 2.65rem;
+  padding: 0 0.65rem;
+  transition: border-color 200ms ease, box-shadow 200ms ease, background-color 200ms ease;
+}
+
+.edit-activity__budget-month-field .currency-input__control:hover {
+  background: var(--color-surface);
+  border-color: color-mix(in srgb, var(--quarter-accent) 35%, var(--color-border));
+}
+
+.edit-activity__budget-month-field .currency-input__control:focus-within {
+  background: var(--color-surface);
+  border-color: var(--quarter-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--quarter-accent) 18%, transparent);
+}
+
+.edit-activity__budget-month-field .currency-input__control input {
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.edit-activity__budget-month-field .dirham-icon {
+  color: var(--quarter-accent);
+  height: 0.82rem;
+  opacity: 0.7;
+  width: 0.82rem;
+  transition: opacity 180ms ease;
+}
+
+.edit-activity__budget-month-field:focus-within .dirham-icon,
+.edit-activity__budget-month-field .currency-input__control:hover .dirham-icon {
+  opacity: 1;
+}
+
+/* Error state for month fields */
+.edit-activity__budget-month-field .field__error {
+  font-size: 0.6rem;
+  margin-top: 0.1rem;
+}
+
+/* ── Responsive ── */
+
+@media (max-width: 900px) {
+  .edit-activity__budget-quarter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .edit-activity__budget-quarter-fields {
+    gap: 0.5rem;
+    padding: 0.75rem;
+  }
+}
+
+@media (max-width: 620px) {
+  .edit-activity__budget-planner-summary,
+  .edit-activity__budget-progress-copy {
+    align-items: stretch;
+    display: grid;
+  }
+
+  .edit-activity__budget-planner-total {
+    border-left: 0;
+    border-top: 1px solid var(--color-primary-border);
+    min-width: 0;
+    padding-left: 0;
+    padding-top: 0.65rem;
+    text-align: left;
+  }
+
+  .edit-activity__budget-quarter-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Monthly planner — AOP theme alignment */
+.edit-activity__monthly-budget-section .edit-activity__budget-planner {
+  gap: 0.75rem;
+  padding: 0.9rem 1.15rem 1.15rem;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-planner-summary {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+  border-radius: var(--radius-md);
+  gap: 0.75rem;
+  padding: 0.75rem 0.85rem;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-planner-icon {
+  background: var(--color-primary-soft);
+  border-radius: 0.5rem;
+  box-shadow: none;
+  color: var(--color-primary);
+  height: 2rem;
+  width: 2rem;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-planner-icon svg {
+  color: var(--color-primary);
+  stroke: currentColor;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-planner-intro {
+  gap: 0.6rem;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-planner-intro strong {
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-planner-intro span,
+.edit-activity__monthly-budget-section .edit-activity__budget-planner-total > span {
+  font-size: 0.68rem;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-planner-total {
+  border-color: var(--color-border);
+  min-width: 10rem;
+  padding-left: 0.85rem;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-planner-total strong,
+.edit-activity__monthly-budget-section .edit-activity__budget-planner-total .currency-display {
+  color: var(--color-primary);
+  font-size: 1rem;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-planner-total .dirham-icon {
+  color: var(--color-primary);
+  height: 0.8rem;
+  width: 0.8rem;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-progress {
+  gap: 0.35rem;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-progress-copy span svg {
+  color: var(--color-primary);
+  stroke: currentColor;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-progress-track {
+  background: var(--color-surface-muted);
+  height: 0.3rem;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-progress-track > span {
+  background: var(--color-primary);
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-quarter-grid {
+  gap: 0.65rem;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-quarter,
+.edit-activity__monthly-budget-section .edit-activity__budget-quarter:nth-child(2),
+.edit-activity__monthly-budget-section .edit-activity__budget-quarter:nth-child(3),
+.edit-activity__monthly-budget-section .edit-activity__budget-quarter:nth-child(4) {
+  --quarter-accent: var(--color-primary);
+  --quarter-soft: var(--color-primary-soft);
+  border-radius: var(--radius-md);
+  box-shadow: none;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-quarter:hover,
+.edit-activity__monthly-budget-section .edit-activity__budget-quarter:focus-within {
+  border-color: var(--color-primary-border);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+  transform: none;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-quarter-header {
+  background: var(--color-primary-soft);
+  border-bottom-color: var(--color-border);
+  padding: 0.6rem 0.7rem;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-quarter-number {
+  background: var(--color-surface);
+  border: 1px solid var(--color-primary-border);
+  border-radius: 0.4rem;
+  color: var(--color-primary);
+  height: 1.5rem;
+  width: 1.85rem;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-quarter-range {
+  color: var(--color-text-secondary);
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-quarter-total strong,
+.edit-activity__monthly-budget-section .edit-activity__budget-quarter-total .currency-display,
+.edit-activity__monthly-budget-section .edit-activity__budget-quarter-total .dirham-icon {
+  color: var(--color-primary);
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-quarter-fields {
+  gap: 0.55rem;
+  padding: 0.7rem;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-month-field {
+  gap: 0.15rem;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-month-field .field__label {
+  color: var(--color-text-secondary);
+  font-size: 0.68rem;
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-month-field .currency-input__control {
+  background: var(--control-bg);
+  border-color: var(--control-border);
+  min-height: 2.4rem;
+  padding: 0 0.55rem;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-month-field .currency-input__control:hover {
+  background: var(--control-bg-hover);
+  border-color: var(--control-border-hover);
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-month-field .currency-input__control:focus-within {
+  background: var(--control-bg);
+  border-color: var(--color-primary);
+  box-shadow: var(--control-shadow-hover), 0 0 0 3px var(--focus-ring);
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-month-field .dirham-icon {
+  color: var(--color-primary);
+  opacity: 1;
+}
+
+@media (max-width: 620px) {
+  .edit-activity__monthly-budget-section .edit-activity__budget-planner {
+    padding: 0.8rem;
+  }
+}
+
+/* Monthly allocation — theme-native Budget tab component */
+.edit-activity__monthly-body {
+  gap: 0.75rem;
+}
+
+.edit-activity__monthly-overview {
+  align-items: center;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  display: grid;
+  gap: 0.65rem 1rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 0.75rem 0.85rem;
+}
+
+.edit-activity__monthly-intro {
+  align-items: center;
+  display: flex;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.edit-activity__monthly-icon {
+  align-items: center;
+  background: var(--color-primary-soft);
+  border-radius: 0.5rem;
+  color: var(--color-primary);
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 2rem;
+  justify-content: center;
+  width: 2rem;
+}
+
+.edit-activity__monthly-icon svg {
+  color: var(--color-primary);
+  stroke: currentColor;
+}
+
+.edit-activity__monthly-intro > div {
+  display: grid;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.edit-activity__monthly-intro strong {
+  color: var(--color-text-primary);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.edit-activity__monthly-intro div > span {
+  color: var(--color-text-secondary);
+  font-size: 0.7rem;
+}
+
+.edit-activity__monthly-metrics {
+  align-items: stretch;
+  display: flex;
+}
+
+.edit-activity__monthly-metric {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 9.5rem;
+  padding: 0 0.85rem;
+}
+
+.edit-activity__monthly-metric + .edit-activity__monthly-metric {
+  border-left: 1px solid var(--color-border);
+}
+
+.edit-activity__monthly-metric > span {
+  align-items: center;
+  color: var(--color-text-tertiary);
+  display: inline-flex;
+  font-size: 0.62rem;
+  font-weight: 750;
+  gap: 0.3rem;
+}
+
+.edit-activity__monthly-metric > span svg {
+  color: var(--color-primary);
+  stroke: currentColor;
+}
+
+.edit-activity__monthly-metric strong,
+.edit-activity__monthly-metric .currency-display {
+  color: var(--color-text-primary);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.edit-activity__monthly-metric .dirham-icon {
+  color: var(--color-primary);
+  height: 0.75rem;
+  width: 0.75rem;
+}
+
+.edit-activity__monthly-progress-track {
+  background: var(--color-border);
+  border-radius: 999px;
+  grid-column: 1 / -1;
+  height: 0.25rem;
+  overflow: hidden;
+}
+
+.edit-activity__monthly-progress-track > span {
+  background: var(--color-primary);
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+  transition: width 180ms ease;
+}
+
+.edit-activity__monthly-quarter-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.edit-activity__monthly-quarter {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.edit-activity__monthly-quarter:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.edit-activity__monthly-quarter--current {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+.edit-activity__monthly-quarter--current .edit-activity__monthly-quarter-header {
+  background: var(--color-primary-soft);
+  border-bottom-color: var(--color-primary-border);
+}
+
+.edit-activity__monthly-quarter--current .edit-activity__monthly-quarter-number {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.edit-activity__monthly-quarter-header {
+  align-items: center;
+  background: var(--color-surface-muted);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+  padding: 0.6rem 0.7rem;
+}
+
+.edit-activity__monthly-quarter-title {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.edit-activity__monthly-quarter-number {
+  align-items: center;
+  background: var(--color-primary-soft);
+  border: 1px solid var(--color-primary-border);
+  border-radius: 0.4rem;
+  color: var(--color-primary);
+  display: inline-flex;
+  font-size: 0.66rem;
+  font-weight: 900;
+  height: 1.5rem;
+  justify-content: center;
+  width: 1.85rem;
+}
+
+.edit-activity__monthly-quarter-range {
+  color: var(--color-text-secondary);
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
+.edit-activity__monthly-current-badge {
+  background: var(--color-primary);
+  border-radius: 999px;
+  color: var(--color-on-primary);
+  font-size: 0.56rem;
+  font-weight: 850;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  padding: 0.22rem 0.42rem;
+  text-transform: uppercase;
+}
+
+.edit-activity__monthly-quarter-total {
+  display: grid;
+  gap: 0.05rem;
+  text-align: right;
+}
+
+.edit-activity__monthly-quarter-total > span {
+  color: var(--color-text-tertiary);
+  font-size: 0.58rem;
+  font-weight: 750;
+}
+
+.edit-activity__monthly-quarter-total strong,
+.edit-activity__monthly-quarter-total .currency-display {
+  color: var(--color-text-primary);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.edit-activity__monthly-quarter-total .dirham-icon {
+  color: var(--color-primary);
+  height: 0.7rem;
+  width: 0.7rem;
+}
+
+.edit-activity__monthly-quarter-fields {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 0.7rem;
+}
+
+.edit-activity__monthly-field .field__label {
+  color: var(--color-text-secondary);
+  font-size: 0.68rem;
+  font-weight: 750;
+}
+
+.edit-activity__monthly-field .currency-input__control {
+  min-height: 2.4rem;
+}
+
+.edit-activity__monthly-field .dirham-icon {
+  color: var(--color-primary);
+}
+
+@media (max-width: 1050px) {
+  .edit-activity__monthly-overview {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .edit-activity__monthly-metric:first-child {
+    padding-left: 0;
+  }
+}
+
+@media (max-width: 900px) {
+  .edit-activity__monthly-quarter-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .edit-activity__monthly-metrics {
+    display: grid;
+    gap: 0.6rem;
+  }
+
+  .edit-activity__monthly-metric {
+    min-width: 0;
+    padding: 0;
+  }
+
+  .edit-activity__monthly-metric + .edit-activity__monthly-metric {
+    border-left: 0;
+    border-top: 1px solid var(--color-border);
+    padding-top: 0.6rem;
+  }
+
+  .edit-activity__monthly-quarter-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* 2-column stat card grid */
 .edit-activity__budget-stats {
   display: grid;
@@ -2731,21 +3517,444 @@
 /* Disabled currency input — match disabled field styling */
 .edit-activity__budget-disabled-currency .currency-input__control {
   background: var(--color-surface-muted) !important;
-  border: 0 !important;
-  box-shadow: none !important;
+  border: 1px solid var(--color-border) !important;
+  box-shadow: var(--control-shadow) !important;
   cursor: not-allowed;
   opacity: 0.82;
 }
 
 .edit-activity__budget-disabled-currency .currency-input__control:hover {
   background: var(--color-surface-muted) !important;
-  border: 0 !important;
-  box-shadow: none !important;
+  border-color: var(--color-border) !important;
 }
 
-/* Monthly section hint */
-.edit-activity__budget-hint {
+.edit-activity__budget-disabled-currency .currency-input__control .field__control {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  min-height: 0;
+  padding: 0;
+}
+
+/* Monthly budget planner */
+.edit-activity__monthly-budget-section {
+  overflow: hidden;
+}
+
+.edit-activity__budget-planner {
+  display: grid;
+  gap: 1rem;
+}
+
+.edit-activity__budget-planner-summary {
+  align-items: center;
+  background:
+    linear-gradient(120deg, var(--color-primary-soft), transparent 68%),
+    var(--color-surface-muted);
+  border: 1px solid var(--color-primary-border);
+  border-radius: var(--radius-lg);
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+}
+
+.edit-activity__budget-planner-intro {
+  align-items: center;
+  display: flex;
+  gap: 0.7rem;
+  min-width: 0;
+}
+
+.edit-activity__budget-planner-icon {
+  align-items: center;
+  background: var(--color-primary);
+  border-radius: 0.7rem;
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--color-primary) 24%, transparent);
+  color: var(--color-on-primary);
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 2.6rem;
+  justify-content: center;
+  width: 2.6rem;
+}
+
+.edit-activity__budget-planner-intro > div,
+.edit-activity__budget-planner-total {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.edit-activity__budget-planner-intro strong {
+  color: var(--color-text-primary);
+  font-size: 0.88rem;
+}
+
+.edit-activity__budget-planner-intro span,
+.edit-activity__budget-planner-total > span {
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+}
+
+.edit-activity__budget-planner-total {
+  border-left: 1px solid var(--color-primary-border);
+  min-width: 11rem;
+  padding-left: 1rem;
+  text-align: right;
+}
+
+.edit-activity__budget-planner-total strong,
+.edit-activity__budget-planner-total .currency-display {
+  color: var(--color-primary);
+  font-size: 1.2rem;
+  font-weight: 850;
+}
+
+.edit-activity__budget-progress {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.edit-activity__budget-progress-copy {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.edit-activity__budget-progress-copy span {
+  align-items: center;
+  color: var(--color-text-secondary);
+  display: inline-flex;
+  font-size: 0.72rem;
+  font-weight: 750;
+  gap: 0.35rem;
+}
+
+.edit-activity__budget-progress-copy span svg {
+  color: var(--color-success);
+}
+
+.edit-activity__budget-progress-copy strong {
   color: var(--color-text-tertiary);
-  font-size: 0.78rem;
-  margin: 0;
+  font-size: 0.68rem;
+}
+
+.edit-activity__budget-progress-track {
+  background: var(--color-surface-muted);
+  border-radius: 999px;
+  height: 0.38rem;
+  overflow: hidden;
+}
+
+.edit-activity__budget-progress-track > span {
+  background: linear-gradient(90deg, var(--color-primary), var(--color-info));
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+  min-width: 0;
+  transition: width 240ms ease;
+}
+
+.edit-activity__budget-quarter-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.edit-activity__budget-quarter {
+  --quarter-accent: var(--color-primary);
+  --quarter-soft: var(--color-primary-soft);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  position: relative;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.edit-activity__budget-quarter:nth-child(2) {
+  --quarter-accent: var(--color-info);
+  --quarter-soft: var(--color-info-soft);
+}
+
+.edit-activity__budget-quarter:nth-child(3) {
+  --quarter-accent: var(--color-warning);
+  --quarter-soft: var(--color-warning-soft);
+}
+
+.edit-activity__budget-quarter:nth-child(4) {
+  --quarter-accent: var(--color-success);
+  --quarter-soft: var(--color-success-soft);
+}
+
+.edit-activity__budget-quarter::before {
+  background: var(--quarter-accent);
+  content: '';
+  height: 3px;
+  inset: 0 0 auto;
+  position: absolute;
+}
+
+.edit-activity__budget-quarter:hover,
+.edit-activity__budget-quarter:focus-within {
+  border-color: color-mix(in srgb, var(--quarter-accent) 45%, var(--color-border));
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--quarter-accent) 10%, transparent);
+  transform: translateY(-2px);
+}
+
+.edit-activity__budget-quarter-header {
+  align-items: center;
+  background: linear-gradient(115deg, var(--quarter-soft), transparent 72%);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem 0.8rem 0.65rem;
+}
+
+.edit-activity__budget-quarter-header > div:first-child {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.edit-activity__budget-quarter-number {
+  align-items: center;
+  background: var(--quarter-accent);
+  border-radius: 0.45rem;
+  color: var(--color-on-primary);
+  display: inline-flex;
+  font-size: 0.7rem;
+  font-weight: 900;
+  height: 1.65rem;
+  justify-content: center;
+  width: 2rem;
+}
+
+.edit-activity__budget-quarter-range {
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.edit-activity__budget-quarter-total {
+  display: grid;
+  gap: 0.05rem;
+  text-align: right;
+}
+
+.edit-activity__budget-quarter-total > span {
+  color: var(--color-text-tertiary);
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.edit-activity__budget-quarter-total strong,
+.edit-activity__budget-quarter-total .currency-display {
+  color: var(--quarter-accent);
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.edit-activity__budget-quarter-fields {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 0.8rem;
+}
+
+.edit-activity__budget-month-field .field__label {
+  color: var(--color-text-secondary);
+  font-size: 0.66rem;
+  font-weight: 800;
+}
+
+.edit-activity__budget-month-field .currency-input__control {
+  background: var(--color-surface-muted);
+  box-shadow: none;
+  min-height: 2.35rem;
+  padding: 0 0.55rem;
+}
+
+.edit-activity__budget-month-field .currency-input__control:focus-within {
+  background: var(--color-surface);
+  border-color: var(--quarter-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--quarter-accent) 16%, transparent);
+}
+
+.edit-activity__budget-month-field .currency-input__control input {
+  font-size: 0.76rem;
+}
+
+.edit-activity__budget-month-field .dirham-icon {
+  color: var(--quarter-accent);
+  height: 0.72rem;
+  width: 0.72rem;
+}
+
+@media (max-width: 900px) {
+  .edit-activity__budget-quarter-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .edit-activity__budget-planner-summary,
+  .edit-activity__budget-progress-copy {
+    align-items: stretch;
+    display: grid;
+  }
+
+  .edit-activity__budget-planner-total {
+    border-left: 0;
+    border-top: 1px solid var(--color-primary-border);
+    min-width: 0;
+    padding-left: 0;
+    padding-top: 0.65rem;
+    text-align: left;
+  }
+
+  .edit-activity__budget-quarter-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Final monthly planner alignment with the shared AOP form theme */
+.edit-activity__monthly-budget-section .edit-activity__budget-planner {
+  gap: 0.75rem;
+  padding: 0.9rem 1.15rem 1.15rem;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-planner-summary {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+  border-radius: var(--radius-md);
+  gap: 0.75rem;
+  padding: 0.75rem 0.85rem;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-planner-icon {
+  background: var(--color-primary-soft);
+  border-radius: 0.5rem;
+  box-shadow: none;
+  color: var(--color-primary);
+  height: 2rem;
+  width: 2rem;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-planner-icon svg,
+.edit-activity__monthly-budget-section .edit-activity__budget-progress-copy svg {
+  color: var(--color-primary);
+  stroke: currentColor;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-planner-total {
+  border-color: var(--color-border);
+  min-width: 10rem;
+  padding-left: 0.85rem;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-planner-total strong,
+.edit-activity__monthly-budget-section .edit-activity__budget-planner-total .currency-display {
+  color: var(--color-primary);
+  font-size: 1rem;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-planner-total .dirham-icon,
+.edit-activity__monthly-budget-section .edit-activity__budget-quarter-total .dirham-icon,
+.edit-activity__monthly-budget-section .edit-activity__budget-month-field .dirham-icon {
+  color: var(--color-primary);
+  opacity: 1;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-progress-track {
+  height: 0.3rem;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-progress-track > span {
+  background: var(--color-primary);
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-quarter-grid {
+  gap: 0.65rem;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-quarter,
+.edit-activity__monthly-budget-section .edit-activity__budget-quarter:nth-child(2),
+.edit-activity__monthly-budget-section .edit-activity__budget-quarter:nth-child(3),
+.edit-activity__monthly-budget-section .edit-activity__budget-quarter:nth-child(4) {
+  --quarter-accent: var(--color-primary);
+  --quarter-soft: var(--color-primary-soft);
+  border-radius: var(--radius-md);
+  box-shadow: none;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-quarter:hover,
+.edit-activity__monthly-budget-section .edit-activity__budget-quarter:focus-within {
+  border-color: var(--color-primary-border);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+  transform: none;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-quarter-header {
+  background: var(--color-primary-soft);
+  padding: 0.6rem 0.7rem;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-quarter-number {
+  background: var(--color-surface);
+  border: 1px solid var(--color-primary-border);
+  border-radius: 0.4rem;
+  color: var(--color-primary);
+  height: 1.5rem;
+  width: 1.85rem;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-quarter-total strong,
+.edit-activity__monthly-budget-section .edit-activity__budget-quarter-total .currency-display {
+  color: var(--color-primary);
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-quarter-fields {
+  gap: 0.55rem;
+  padding: 0.7rem;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-month-field {
+  gap: 0.15rem;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-month-field .field__label {
+  color: var(--color-text-secondary);
+  font-size: 0.68rem;
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-month-field .currency-input__control {
+  background: var(--control-bg);
+  border-color: var(--control-border);
+  min-height: 2.4rem;
+  padding: 0 0.55rem;
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-month-field .currency-input__control:hover {
+  background: var(--control-bg-hover);
+  border-color: var(--control-border-hover);
+}
+
+.edit-activity__monthly-budget-section .edit-activity__budget-month-field .currency-input__control:focus-within {
+  background: var(--control-bg);
+  border-color: var(--color-primary);
+  box-shadow: var(--control-shadow-hover), 0 0 0 3px var(--focus-ring);
+}
+
+@media (max-width: 620px) {
+  .edit-activity__monthly-budget-section .edit-activity__budget-planner {
+    padding: 0.8rem;
+  }
 }
