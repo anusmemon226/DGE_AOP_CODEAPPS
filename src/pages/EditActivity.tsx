@@ -34,6 +34,7 @@ import { DependenciesTab } from './editActivity/DependenciesTab'
 import { MilestonesTab } from './editActivity/MilestonesTab'
 import { ObjectivesTab } from './editActivity/ObjectivesTab'
 import { ProcurementTab } from './editActivity/ProcurementTab'
+import { BudgetTab } from './editActivity/BudgetTab'
 import { EngagementPlanTab } from './editActivity/EngagementPlanTab'
 import {
   normalizeControlledRules,
@@ -314,7 +315,12 @@ export function EditActivity() {
           />
         )
       case 'budget':
-        return <div className="edit-activity__placeholder">Budget Information form will appear here.</div>
+        return (
+          <BudgetTab
+            plannedEndDate={form.plannedEndDate}
+            plannedStartDate={form.plannedStartDate}
+          />
+        )
       case 'clarifications':
         return <div className="edit-activity__placeholder">Clarifications will appear here.</div>
       case 'logs':

@@ -2554,3 +2554,198 @@
   background: rgba(55, 94, 251, 0.18);
   border-color: rgba(55, 94, 251, 0.4);
 }
+
+/* ── Budget tab ── */
+
+/* 2-column stat card grid */
+.edit-activity__budget-stats {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* Individual budget stat card */
+.edit-activity__budget-stat {
+  border-radius: var(--radius-md);
+  border-style: solid;
+  border-width: 1px;
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.85rem 1rem;
+}
+
+.edit-activity__budget-stat-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.edit-activity__budget-stat-value {
+  align-items: center;
+  display: flex;
+  font-size: 1.65rem;
+  font-weight: 850;
+  gap: 0.35rem;
+}
+
+.edit-activity__budget-stat-value .currency-display {
+  font-size: 1.65rem;
+  font-weight: 850;
+}
+
+.edit-activity__budget-stat-value .dirham-icon {
+  height: 1.1rem;
+  width: 1.1rem;
+}
+
+/* Total Actual Budget Spent — warm amber tones */
+.edit-activity__budget-stat--spent {
+  background: rgba(217, 119, 6, 0.06);
+  border-color: rgba(217, 119, 6, 0.2);
+}
+
+.edit-activity__budget-stat--spent .edit-activity__budget-stat-label {
+  color: #b45309;
+}
+
+.edit-activity__budget-stat--spent .edit-activity__budget-stat-value {
+  color: #92400e;
+}
+
+:root[data-theme='dark'] .edit-activity__budget-stat--spent {
+  background: rgba(217, 119, 6, 0.12);
+  border-color: rgba(217, 119, 6, 0.3);
+}
+
+:root[data-theme='dark'] .edit-activity__budget-stat--spent .edit-activity__budget-stat-label {
+  color: #f59e0b;
+}
+
+:root[data-theme='dark'] .edit-activity__budget-stat--spent .edit-activity__budget-stat-value {
+  color: #fbbf24;
+}
+
+/* Remaining Budget — positive green tones */
+.edit-activity__budget-stat--remaining {
+  background: rgba(5, 150, 105, 0.06);
+  border-color: rgba(5, 150, 105, 0.2);
+}
+
+.edit-activity__budget-stat--remaining .edit-activity__budget-stat-label {
+  color: #059669;
+}
+
+.edit-activity__budget-stat--remaining .edit-activity__budget-stat-value {
+  color: #047857;
+}
+
+:root[data-theme='dark'] .edit-activity__budget-stat--remaining {
+  background: rgba(5, 150, 105, 0.12);
+  border-color: rgba(5, 150, 105, 0.3);
+}
+
+:root[data-theme='dark'] .edit-activity__budget-stat--remaining .edit-activity__budget-stat-label {
+  color: #10b981;
+}
+
+:root[data-theme='dark'] .edit-activity__budget-stat--remaining .edit-activity__budget-stat-value {
+  color: #34d399;
+}
+
+/* Budget Source — uniform blue accent for both options */
+.edit-activity__budget-source .choice {
+  --choice-accent: #375EFB;
+  --choice-accent-soft: #EBEFFF;
+  --choice-accent-soft-subtle: rgba(55, 94, 251, 0.04);
+  --choice-accent-border: #CFD7F8;
+  --choice-focus-ring: rgba(55, 94, 251, 0.28);
+}
+
+.edit-activity__budget-source .choice:not(:has(input:checked)) {
+  background: var(--choice-accent-soft-subtle, var(--control-bg));
+  border-color: var(--choice-accent-border, var(--control-border));
+}
+
+.edit-activity__budget-source .choice:has(input:checked) {
+  background: var(--choice-accent-soft);
+  border-color: var(--choice-accent);
+  box-shadow: 0 0 0 3px var(--choice-focus-ring);
+}
+
+.edit-activity__budget-source .choice:not(:has(input:checked)):hover {
+  background: var(--choice-accent-soft);
+  border-color: var(--choice-accent);
+  box-shadow: 0 0 0 3px var(--choice-focus-ring);
+}
+
+/* Budget Type — 3 columns in one row */
+.edit-activity__budget-type {
+  /* container handles error display */
+}
+
+.edit-activity__budget-type .radio-group__options {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* Budget Type — uniform purple accent for all three options */
+.edit-activity__budget-type .choice {
+  --choice-accent: #7c3aed;
+  --choice-accent-soft: #f5f3ff;
+  --choice-accent-soft-subtle: rgba(124, 58, 237, 0.04);
+  --choice-accent-border: #ddd6fe;
+  --choice-focus-ring: rgba(124, 58, 237, 0.28);
+}
+
+.edit-activity__budget-type .choice:not(:has(input:checked)) {
+  background: var(--choice-accent-soft-subtle, var(--control-bg));
+  border-color: var(--choice-accent-border, var(--control-border));
+}
+
+.edit-activity__budget-type .choice:has(input:checked) {
+  background: var(--choice-accent-soft);
+  border-color: var(--choice-accent);
+  box-shadow: 0 0 0 3px var(--choice-focus-ring);
+}
+
+.edit-activity__budget-type .choice:not(:has(input:checked)):hover {
+  background: var(--choice-accent-soft);
+  border-color: var(--choice-accent);
+  box-shadow: 0 0 0 3px var(--choice-focus-ring);
+}
+
+/* Dark mode overrides */
+:root[data-theme='dark'] .edit-activity__budget-source .choice {
+  --choice-accent: #818cf8;
+  --choice-accent-soft: rgba(129, 140, 248, 0.18);
+  --choice-accent-border: rgba(129, 140, 248, 0.35);
+  --choice-focus-ring: rgba(129, 140, 248, 0.28);
+}
+
+:root[data-theme='dark'] .edit-activity__budget-type .choice {
+  --choice-accent: #a78bfa;
+  --choice-accent-soft: rgba(167, 139, 250, 0.14);
+  --choice-accent-border: rgba(167, 139, 250, 0.3);
+  --choice-focus-ring: rgba(167, 139, 250, 0.28);
+}
+
+/* Disabled currency input — match disabled field styling */
+.edit-activity__budget-disabled-currency .currency-input__control {
+  background: var(--color-surface-muted) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  cursor: not-allowed;
+  opacity: 0.82;
+}
+
+.edit-activity__budget-disabled-currency .currency-input__control:hover {
+  background: var(--color-surface-muted) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Monthly section hint */
+.edit-activity__budget-hint {
+  color: var(--color-text-tertiary);
+  font-size: 0.78rem;
+  margin: 0;
+}

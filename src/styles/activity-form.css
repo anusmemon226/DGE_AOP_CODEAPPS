@@ -369,6 +369,11 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.create-activity__form-row--four {
+  align-items: start;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .create-activity__form-stack .field__label,
 .create-activity__form-stack .select-field__label {
   color: #334155;
@@ -1935,6 +1940,7 @@
   .create-activity__form-grid,
   .create-activity__form-row--two,
   .create-activity__form-row--three,
+  .create-activity__form-row--four,
   .create-activity__date-range,
   .create-activity__radio--classification .radio-group__options,
   .copilot-summary-grid {
