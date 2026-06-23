@@ -3958,3 +3958,384 @@
     padding: 0.8rem;
   }
 }
+
+/* ── Clarifications Tab (chat-style) ── */
+
+.edit-activity__clar {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Header ── */
+
+.edit-activity__clar .create-activity__section-header {
+  flex-shrink: 0;
+}
+
+.edit-activity__clar-count-badge {
+  align-items: center;
+  background: var(--color-primary-soft);
+  border: 1px solid var(--color-primary-border);
+  border-radius: 2rem;
+  color: var(--color-primary);
+  display: flex;
+  font-size: 0.72rem;
+  font-weight: 800;
+  height: 1.6rem;
+  justify-content: center;
+  min-width: 1.6rem;
+  padding: 0 0.45rem;
+  white-space: nowrap;
+}
+
+/* ── Messages scrollable area ── */
+
+.edit-activity__clar-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  max-height: min(32rem, calc(100vh - 22rem));
+  min-height: 14rem;
+  overflow-y: auto;
+  padding: 0 1.15rem;
+  scroll-behavior: smooth;
+}
+
+.edit-activity__clar-messages::-webkit-scrollbar {
+  width: 5px;
+}
+
+.edit-activity__clar-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.edit-activity__clar-messages::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 999px;
+}
+
+/* ── Empty state ── */
+
+.edit-activity__clar-empty {
+  align-items: center;
+  color: var(--color-text-tertiary);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  justify-content: center;
+  min-height: 14rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.edit-activity__clar-empty h3 {
+  color: var(--color-text-secondary);
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.edit-activity__clar-empty p {
+  font-size: 0.82rem;
+  margin: 0;
+  max-width: 20rem;
+}
+
+.edit-activity__clar-empty svg {
+  color: var(--color-text-tertiary);
+  opacity: 0.5;
+  stroke-width: 1.5;
+}
+
+/* ── Date separator ── */
+
+.edit-activity__clar-date-sep {
+  align-items: center;
+  display: flex;
+  gap: 0.65rem;
+  padding: 1.2rem 0 0.65rem;
+}
+
+.edit-activity__clar-date-sep:first-child {
+  padding-top: 0.4rem;
+}
+
+.edit-activity__clar-date-sep-line {
+  border-bottom: 1px solid var(--color-border);
+  flex: 1;
+}
+
+.edit-activity__clar-date-sep-label {
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* ── Message bubble (shared) ── */
+
+.edit-activity__clar-bubble {
+  display: flex;
+  gap: 0.55rem;
+  padding: 0.35rem 0;
+}
+
+.edit-activity__clar-bubble:last-of-type {
+  padding-bottom: 0.75rem;
+}
+
+/* ── Avatar ── */
+
+.edit-activity__clar-avatar {
+  align-items: center;
+  border-radius: 50%;
+  color: #fff;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-weight: 800;
+  justify-content: center;
+  letter-spacing: 0.02em;
+  user-select: none;
+}
+
+.edit-activity__clar-avatar--sm {
+  font-size: 0.62rem;
+  height: 1.75rem;
+  margin-top: 0.15rem;
+  width: 1.75rem;
+}
+
+.edit-activity__clar-avatar--md {
+  font-size: 0.78rem;
+  height: 2.4rem;
+  width: 2.4rem;
+}
+
+/* Current user avatar — distinct gradient */
+.edit-activity__clar-bubble--right .edit-activity__clar-avatar {
+  background: linear-gradient(135deg, #375efb, #6366f1);
+}
+
+/* Other user avatars — variety of gradients */
+.edit-activity__clar-bubble--left .edit-activity__clar-avatar {
+  background: linear-gradient(135deg, #7c3aed, #a78bfa);
+}
+
+.edit-activity__clar-bubble--left:nth-child(3n+1) .edit-activity__clar-avatar {
+  background: linear-gradient(135deg, #059669, #34d399);
+}
+
+.edit-activity__clar-bubble--left:nth-child(5n+2) .edit-activity__clar-avatar {
+  background: linear-gradient(135deg, #d97706, #fbbf24);
+}
+
+.edit-activity__clar-bubble--left:nth-child(7n+4) .edit-activity__clar-avatar {
+  background: linear-gradient(135deg, #375efb, #06b6d4);
+}
+
+/* ── Bubble body ── */
+
+.edit-activity__clar-bubble-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  max-width: 70%;
+  min-width: 0;
+}
+
+.edit-activity__clar-bubble--right {
+  flex-direction: row-reverse;
+}
+
+.edit-activity__clar-bubble--right .edit-activity__clar-bubble-body {
+  align-items: flex-end;
+}
+
+.edit-activity__clar-bubble--right .edit-activity__clar-bubble-name {
+  text-align: right;
+}
+
+/* ── Sender name ── */
+
+.edit-activity__clar-bubble-name {
+  color: var(--color-text-secondary);
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 0 0.1rem;
+}
+
+/* ── Bubble content ── */
+
+.edit-activity__clar-bubble-content {
+  border-radius: 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 6rem;
+  padding: 0.6rem 0.75rem;
+  position: relative;
+}
+
+/* Other user (left) */
+.edit-activity__clar-bubble-content--other {
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-bottom-left-radius: 0.2rem;
+  color: var(--color-text-primary);
+}
+
+/* Current user (right) */
+.edit-activity__clar-bubble-content--self {
+  background: var(--color-primary);
+  border-bottom-right-radius: 0.2rem;
+  color: var(--color-on-primary);
+}
+
+/* ── Message text ── */
+
+.edit-activity__clar-bubble-text {
+  font-size: 0.82rem;
+  line-height: 1.55;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.edit-activity__clar-bubble-content--self .edit-activity__clar-bubble-text {
+  color: inherit;
+}
+
+/* ── Timestamp ── */
+
+.edit-activity__clar-bubble-time {
+  align-self: flex-end;
+  flex-shrink: 0;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  margin-top: 0.1rem;
+  white-space: nowrap;
+}
+
+.edit-activity__clar-bubble-content--other .edit-activity__clar-bubble-time {
+  color: var(--color-text-tertiary);
+}
+
+.edit-activity__clar-bubble-content--self .edit-activity__clar-bubble-time {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* ── Input area ── */
+
+.edit-activity__clar-input-wrap {
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: 0.3rem;
+  padding: 0.85rem 1.15rem;
+}
+
+.edit-activity__clar-input-card {
+  align-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.5rem 0.5rem 0.5rem 0.85rem;
+  position: relative;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.edit-activity__clar-input-card:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.edit-activity__clar-input {
+  background: transparent;
+  border: 0;
+  color: var(--color-text-primary);
+  flex: 1;
+  font-family: inherit;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  max-height: 6rem;
+  min-height: 1.5rem;
+  outline: none;
+  padding: 0;
+  resize: none;
+  width: 100%;
+}
+
+.edit-activity__clar-input::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+.edit-activity__clar-send-btn {
+  align-items: center;
+  background: var(--color-primary);
+  border: 0;
+  border-radius: 0.5rem;
+  color: var(--color-on-primary);
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 2.15rem;
+  justify-content: center;
+  transition: background-color 160ms ease, opacity 160ms ease, transform 120ms ease;
+  width: 2.15rem;
+}
+
+.edit-activity__clar-send-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-primary) 85%, #000);
+  transform: scale(1.05);
+}
+
+.edit-activity__clar-send-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.edit-activity__clar-send-btn:disabled {
+  background: var(--color-surface-muted);
+  color: var(--color-text-tertiary);
+  cursor: default;
+  opacity: 0.5;
+}
+
+.edit-activity__clar-input-hint {
+  color: var(--color-text-tertiary);
+  font-size: 0.62rem;
+  padding-left: 0.1rem;
+}
+
+/* ── Dark mode overrides ── */
+
+:root[data-theme='dark'] .edit-activity__clar-bubble-content--self {
+  background: linear-gradient(135deg, var(--color-primary), #6366f1);
+}
+
+:root[data-theme='dark'] .edit-activity__clar-bubble-content--other {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+:root[data-theme='dark'] .edit-activity__clar-count-badge {
+  background: rgba(129, 140, 248, 0.14);
+  border-color: rgba(129, 140, 248, 0.25);
+  color: var(--color-primary-hover);
+}
+
+:root[data-theme='dark'] .edit-activity__clar-input-card {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+}
+
+:root[data-theme='dark'] .edit-activity__clar-input-card:focus-within {
+  border-color: var(--color-primary);
+}

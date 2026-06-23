@@ -35,6 +35,7 @@ import { MilestonesTab } from './editActivity/MilestonesTab'
 import { ObjectivesTab } from './editActivity/ObjectivesTab'
 import { ProcurementTab } from './editActivity/ProcurementTab'
 import { BudgetTab } from './editActivity/BudgetTab'
+import { ClarificationTab } from './editActivity/ClarificationTab'
 import { EngagementPlanTab } from './editActivity/EngagementPlanTab'
 import {
   normalizeControlledRules,
@@ -322,7 +323,7 @@ export function EditActivity() {
           />
         )
       case 'clarifications':
-        return <div className="edit-activity__placeholder">Clarifications will appear here.</div>
+        return <ClarificationTab />
       case 'logs':
         return <div className="edit-activity__placeholder">Activity logs table will appear here.</div>
     }
