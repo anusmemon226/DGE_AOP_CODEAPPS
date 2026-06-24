@@ -20,9 +20,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Badge, Button, type SelectOption } from '../components/ui'
 import { type AopRole } from '../constants/app'
-import { Dga_divisional_hierarchiesService } from '../generated/services/Dga_divisional_hierarchiesService'
 import { SystemusersService } from '../generated/services/SystemusersService'
-import type { Dga_divisional_hierarchies } from '../generated/models/Dga_divisional_hierarchiesModel'
 import type { Systemusers } from '../generated/models/SystemusersModel'
 import { APP_ROUTE_PATHS } from '../routes/appRoutes'
 import { useAppSelector } from '../store/hooks'
@@ -146,8 +144,10 @@ function formatStatusCode(code: number): string {
 export function EditActivity() {
   const navigate = useNavigate()
   const selectedRole = useAppSelector((state) => state.app.selectedRole)
+  const currentUser = useAppSelector((state) => state.app.currentUser)
   const planningInstances = useAppSelector((state) => state.app.planningInstances)
   const selectedCycle = useAppSelector((state) => state.app.selectedCycle)
+  const { currentRoleDivisionalHierarchy, divisionalHierarchies: allHierarchies } = useAppSelector((state) => state.user)
   const [activeTab, setActiveTab] = useState<TabId>('activity-info')
   const [form, setForm] = useState<ActivityForm>(INITIAL_FORM)
   const [errors, setErrors] = useState<FieldErrors>({})
@@ -188,19 +188,15 @@ export function EditActivity() {
       setErrors((currentErrors) => ({ ...currentErrors, context: undefined }))
 
       try {
-        const [usersResult, hierarchyResult] = await Promise.all([
+        const [usersResult] = await Promise.all([
           SystemusersService.getAll({
             select: ['systemuserid', 'fullname', 'internalemailaddress']
-          }),
-          Dga_divisional_hierarchiesService.getAll({
-            select: ['dga_divisional_hierarchyid', 'dga_name', 'dga_type', '_dga_parent_divisional_hierarchy_value'],
           }),
         ])
 
         if (!isMounted) return
 
         const users = (usersResult?.data ?? []) as Systemusers[]
-        const hierarchy = (hierarchyResult?.data ?? []) as Dga_divisional_hierarchies[]
 
         const activityLeadUsers = (users ?? [])
           .filter((user) => user.fullname)
@@ -209,10 +205,13 @@ export function EditActivity() {
             value: user.systemuserid ?? '',
           }))
 
-        const divisions = (hierarchy ?? []).filter((item) => item.dga_type === 776140000)
-        const sectors = (hierarchy ?? []).filter((item) => item.dga_type === 776140001)
-        const sector = sectors[0]
-        const division = divisions[0]
+        // Use matched hierarchy from userSlice, fall back to first Division type
+        const division = currentRoleDivisionalHierarchy
+          ? allHierarchies.find((h) => h.dga_divisional_hierarchyid === currentRoleDivisionalHierarchy.hierarchyId)
+          : allHierarchies.filter((item) => item.dga_type === 776140002)[0] ?? allHierarchies[0]
+        const sector = division?._dga_parent_divisional_hierarchy_value
+          ? allHierarchies.find((h) => h.dga_divisional_hierarchyid === division._dga_parent_divisional_hierarchy_value)
+          : allHierarchies.filter((item) => item.dga_type === 776140001)[0]
         const matchedPlanningInstance = planningInstances.find((item) => {
           const matchesDivision = division ? item._dga_divisional_hierarchy_value === division.dga_divisional_hierarchyid : true
           const matchesCycle = selectedCycle ? item._dga_assessment_cycle_value === selectedCycle : true
@@ -221,8 +220,8 @@ export function EditActivity() {
 
         setActivityLeadOptions(activityLeadUsers)
         setContext({
-          currentUserId: users?.[0]?.systemuserid ?? '',
-          currentUserName: users?.[0]?.fullname ?? 'User',
+          currentUserId: currentUser?.systemuserid ?? users?.[0]?.systemuserid ?? '',
+          currentUserName: currentUser?.fullname ?? users?.[0]?.fullname ?? 'User',
           division,
           sector,
           planningInstance: matchedPlanningInstance,

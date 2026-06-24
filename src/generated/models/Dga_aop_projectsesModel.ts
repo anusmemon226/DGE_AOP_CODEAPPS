@@ -79,14 +79,15 @@ export const Dga_aop_projectsesstatecode = {
 export type Dga_aop_projectsesstatecode = keyof typeof Dga_aop_projectsesstatecode;
 export const Dga_aop_projectsesstatuscode = {
   1: 'Draft',
+  776140001: 'DivisionDirectorReview',
+  776140003: 'StrategyTeamReview',
   2: 'Inactive',
-  776140001: 'SubmittedtoDivisionDirector',
-  776140002: 'ApprovedByExecutiveDirector',
-  776140003: 'ApprovedByDivisionDirector',
-  776140004: 'ApprovedByStrategyTeam',
+  776140004: 'PendingExecutiveDirectorSubmission',
+  776140002: 'ExecutiveDirectorReview',
+  776140014: 'DirectorGeneralReview',
   776140011: 'Active',
-  776140012: 'ClarificationNeeded',
-  776140014: 'ApprovedByDirectorGeneral'
+  776140012: 'PendingClarification',
+  776140015: 'Deleted'
 } as const;
 export type Dga_aop_projectsesstatuscode = keyof typeof Dga_aop_projectsesstatuscode;
 
@@ -103,6 +104,8 @@ export interface Dga_aop_projectsesBase {
   dga_budget_source?: Dga_aop_projectsesdga_budget_source;
   dga_budget_type?: Dga_aop_projectsesdga_budget_type;
   dga_cancel_reason?: string;
+  dga_delete_request_comment?: string;
+  dga_delete_request_rejection_comment?: string;
   "dga_department@odata.bind": string;
   dga_description_summary?: string;
   "dga_dge_corporate_strategy_pillar@odata.bind"?: string;
@@ -132,6 +135,8 @@ export interface Dga_aop_projectsesBase {
   dga_project_plan_if_any?: string;
   "dga_project_planning_instance@odata.bind"?: string;
   dga_project_type: Dga_aop_projectsesdga_project_type;
+  "dga_record_creator@odata.bind"?: string;
+  "dga_record_creator_team_id@odata.bind"?: string;
   dga_registered_or_will_be_registered_in_epm?: boolean;
   dga_rejection_reason?: string;
   dga_request_type?: Dga_aop_projectsesdga_request_type;
@@ -186,6 +191,10 @@ export interface Dga_aop_projectses extends Dga_aop_projectsesBase {
   dga_project_phasename?: string;
   dga_project_planning_instancename?: string;
   dga_project_typename?: string;
+  dga_record_creator_team_idname?: string;
+  dga_record_creator_team_idyominame?: string;
+  dga_record_creatorname?: string;
+  dga_record_creatoryominame?: string;
   dga_registered_or_will_be_registered_in_epmname?: string;
   dga_request_typename?: string;
   dga_requested_budget_base?: number;
@@ -227,6 +236,10 @@ export interface Dga_aop_projectses extends Dga_aop_projectsesBase {
   _dga_project_kpi_value?: string;
   dga_project_planning_instance?: object;
   _dga_project_planning_instance_value?: string;
+  dga_record_creator?: object;
+  _dga_record_creator_value?: string;
+  dga_record_creator_team_id?: object;
+  _dga_record_creator_team_id_value?: string;
   dga_sector?: object;
   _dga_sector_value?: string;
   modifiedby?: object;

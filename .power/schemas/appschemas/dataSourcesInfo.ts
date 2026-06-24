@@ -40,6 +40,13 @@ export const dataSourcesInfo = {
     "dataSourceType": "Dataverse",
     "apis": {}
   },
+  "roles": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "roleid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
   "systemuserrolescollection": {
     "tableId": "",
     "version": "",
@@ -51,6 +58,13 @@ export const dataSourcesInfo = {
     "tableId": "",
     "version": "",
     "primaryKey": "teammembershipid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
+  "teamrolescollection": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "teamroleid",
     "dataSourceType": "Dataverse",
     "apis": {}
   },

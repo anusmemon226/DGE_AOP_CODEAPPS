@@ -6,10 +6,13 @@ import {
   type LanguageCode,
   type ThemeMode,
 } from '../constants/app'
+import { getContext } from '@microsoft/power-apps/app'
 import { Dga_assessment_cyclesService } from '../generated/services/Dga_assessment_cyclesService'
 import { Dga_project_planning_instancesService } from '../generated/services/Dga_project_planning_instancesService'
+import { SystemusersService } from '../generated/services/SystemusersService'
 import type { Dga_assessment_cycles } from '../generated/models/Dga_assessment_cyclesModel'
 import type { Dga_project_planning_instances } from '../generated/models/Dga_project_planning_instancesModel'
+import type { Systemusers } from '../generated/models/SystemusersModel'
 
 export const fetchAssessmentCycles = createAsyncThunk(
   'app/fetchAssessmentCycles',
@@ -49,6 +52,27 @@ export const fetchPlanningInstances = createAsyncThunk(
   },
 )
 
+export const fetchCurrentUser = createAsyncThunk(
+  'app/fetchCurrentUser',
+  async () => {
+    const ctx = await getContext()
+    const objectId = ctx.user.objectId
+    if (!objectId) return null
+
+    const usersResult = await SystemusersService.getAll({
+      filter: `azureactivedirectoryobjectid eq ${objectId}`,
+      select: [
+        'systemuserid',
+        'fullname',
+        'internalemailaddress',
+        'entityimage_url',
+      ],
+    })
+    console.log(usersResult)
+    return (usersResult.data?.[0] ?? null) as Systemusers | null
+  },
+)
+
 type AppState = {
   selectedRole: AopRole
   selectedCycle: string
@@ -57,6 +81,8 @@ type AppState = {
   assessmentCyclesLoading: boolean
   planningInstances: Dga_project_planning_instances[]
   planningInstancesLoading: boolean
+  currentUser: Systemusers | null
+  currentUserLoading: boolean
   themeMode: ThemeMode
   language: LanguageCode
   notifications: AppNotification[]
@@ -74,6 +100,8 @@ const initialState: AppState = {
   assessmentCyclesLoading: false,
   planningInstances: [],
   planningInstancesLoading: false,
+  currentUser: null,
+  currentUserLoading: false,
   themeMode: 'light',
   language: 'en',
   notifications: MOCK_NOTIFICATIONS,
@@ -153,6 +181,16 @@ export const appSlice = createSlice({
       })
       .addCase(fetchPlanningInstances.rejected, (state) => {
         state.planningInstancesLoading = false
+      })
+      .addCase(fetchCurrentUser.pending, (state) => {
+        state.currentUserLoading = true
+      })
+      .addCase(fetchCurrentUser.fulfilled, (state, action) => {
+        state.currentUser = action.payload
+        state.currentUserLoading = false
+      })
+      .addCase(fetchCurrentUser.rejected, (state) => {
+        state.currentUserLoading = false
       })
   },
 })

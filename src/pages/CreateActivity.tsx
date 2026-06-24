@@ -16,7 +16,6 @@ import {
 } from '../components/ui'
 import { Dga_aop_project_logsesService } from '../generated/services/Dga_aop_project_logsesService'
 import { Dga_aop_projectsesService } from '../generated/services/Dga_aop_projectsesService'
-import { Dga_divisional_hierarchiesService } from '../generated/services/Dga_divisional_hierarchiesService'
 import { SystemusersService } from '../generated/services/SystemusersService'
 import type { Dga_aop_projectsesBase, Dga_aop_projectses } from '../generated/models/Dga_aop_projectsesModel'
 import type { Dga_aop_project_logsesBase } from '../generated/models/Dga_aop_project_logsesModel'
@@ -567,7 +566,8 @@ function getDraftWarnings(draft: CreateActivityForm) {
 
 export function CreateActivity() {
   const navigate = useNavigate()
-  const { assessmentCycles, planningInstances, selectedCycle } = useAppSelector((state) => state.app)
+  const { assessmentCycles, currentUser, planningInstances, selectedCycle } = useAppSelector((state) => state.app)
+  const { currentRoleDivisionalHierarchy, divisionalHierarchies: allHierarchies } = useAppSelector((state) => state.user)
   const [activeTab, setActiveTab] = useState<TabValue>('copilot')
   const [form, setForm] = useState<CreateActivityForm>(INITIAL_FORM)
   const [errors, setErrors] = useState<FieldErrors>({})
@@ -615,33 +615,26 @@ export function CreateActivity() {
       setErrors((currentErrors) => ({ ...currentErrors, context: undefined }))
 
       try {
-        const [usersResult, hierarchyResult] = await Promise.all([
+        const [usersResult] = await Promise.all([
           SystemusersService.getAll({
             select: ['systemuserid', 'fullname', 'internalemailaddress']
           }),
-          Dga_divisional_hierarchiesService.getAll({
-            select: [
-              'dga_divisional_hierarchyid',
-              'dga_name',
-              'dga_type',
-              '_dga_parent_divisional_hierarchy_value'
-            ],
-          }),
         ])
-
 
         if (!isMounted) {
           return
         }
 
         const users = getResultArray<Systemusers>(usersResult.data).filter((user) => !user.isdisabled)
-        const hierarchies = getResultArray<Dga_divisional_hierarchies>(hierarchyResult.data)
 
-        const currentUser = users[0]
-        const division = hierarchies.find((item) => item.dga_type === 776140002) ?? hierarchies[0]
+        const activeUser = currentUser ?? users[0]
+        // Use matched hierarchy from userSlice, fall back to first Division type
+        const division = currentRoleDivisionalHierarchy
+          ? allHierarchies.find((h) => h.dga_divisional_hierarchyid === currentRoleDivisionalHierarchy.hierarchyId)
+          : allHierarchies.find((item) => item.dga_type === 776140002) ?? allHierarchies[0]
         const sector = division?._dga_parent_divisional_hierarchy_value
-          ? hierarchies.find((item) => item.dga_divisional_hierarchyid === division._dga_parent_divisional_hierarchy_value)
-          : hierarchies.find((item) => item.dga_type === 776140001)
+          ? allHierarchies.find((item) => item.dga_divisional_hierarchyid === division._dga_parent_divisional_hierarchy_value)
+          : allHierarchies.find((item) => item.dga_type === 776140001)
         const planningInstance = planningInstances.find((item) => {
           const matchesDivision = division ? item._dga_divisional_hierarchy_value === division.dga_divisional_hierarchyid : true
           const matchesCycle = selectedCycle ? item._dga_assessment_cycle_value === selectedCycle : true
@@ -649,13 +642,13 @@ export function CreateActivity() {
           return matchesDivision && matchesCycle
         }) ?? planningInstances.find((item) => division ? item._dga_divisional_hierarchy_value === division.dga_divisional_hierarchyid : true)
 
-        if (!currentUser || !division) {
+        if (!activeUser || !division) {
           throw new Error('Current user or divisional hierarchy could not be resolved from Dataverse.')
         }
 
         setContext({
-          currentUserId: currentUser.systemuserid,
-          currentUserName: currentUser.fullname ?? currentUser.internalemailaddress ?? 'AOP - Division Member',
+          currentUserId: activeUser.systemuserid,
+          currentUserName: activeUser.fullname ?? activeUser.internalemailaddress ?? 'AOP - Division Member',
           division,
           sector: sector ?? division,
           planningInstance,
@@ -1055,6 +1048,10 @@ export function CreateActivity() {
       }
 
       const projectResult = await Dga_aop_projectsesService.create(buildProjectPayload(form, context!))
+
+
+      console.log(projectResult)
+
       const createdProject = getResultValue<Dga_aop_projectses>(projectResult)
       const projectId = createdProject?.dga_aop_projectsid
 

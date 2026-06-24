@@ -244,7 +244,8 @@
 .sidebar__role-copy small {
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .sidebar__role-copy strong {
@@ -447,7 +448,7 @@
   font-size: 0.78rem;
   font-weight: 800;
   gap: 0.42rem;
-  height: 2.05rem;
+  height: 2.35rem;
   padding: 0 0.6rem 0 0.24rem;
   transition:
     background-color 180ms ease,
@@ -473,6 +474,31 @@
 
 .header__role-trigger > span:not(.header__avatar) {
   max-width: 11.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.header__user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  line-height: 1.2;
+  min-width: 0;
+}
+
+.header__user-name {
+  font-size: 0.78rem;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.header__role-name {
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -563,6 +589,13 @@
   gap: 0.35rem;
   max-height: 15.5rem;
   overflow: auto;
+}
+
+.role-popover__empty {
+  color: var(--color-text-tertiary);
+  font-size: 0.8125rem;
+  padding: 0.75rem 0.65rem;
+  text-align: center;
 }
 
 .role-popover__item {

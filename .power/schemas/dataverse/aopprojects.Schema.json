@@ -361,6 +361,22 @@
           "x-ms-schema-name": "dga_cancel_reason",
           "maxLength": 2000
         },
+        "dga_delete_request_comment": {
+          "type": "string",
+          "title": "Delete Request Comment",
+          "x-ms-dataverse-attribute": "dga_delete_request_comment",
+          "x-ms-dataverse-type": "MemoType",
+          "x-ms-schema-name": "dga_delete_request_comment",
+          "maxLength": 1048576
+        },
+        "dga_delete_request_rejection_comment": {
+          "type": "string",
+          "title": "Delete Request Rejection Comment",
+          "x-ms-dataverse-attribute": "dga_delete_request_rejection_comment",
+          "x-ms-dataverse-type": "MemoType",
+          "x-ms-schema-name": "dga_delete_request_rejection_comment",
+          "maxLength": 1048567
+        },
         "dga_department": {
           "type": "string",
           "title": "Department",
@@ -693,7 +709,7 @@
           "type": "string",
           "title": "Project Categorized Under",
           "x-ms-dataverse-attribute": "dga_project_categorized_under",
-          "x-ms-dataverse-type": "PicklistType",
+          "x-ms-dataverse-type": "MultiSelectPicklistType",
           "x-ms-schema-name": "dga_project_categorized_under",
           "enum": [
             "Government of the Future Strategy",
@@ -710,9 +726,9 @@
             null,
             null
           ],
-          "x-ms-optionsetmetadataid": "99ba5cbb-5765-f111-a826-002248d3a07d",
-          "x-ms-isGlobal": false,
-          "x-ms-optionsetdisplayname": "Project Categorized Under",
+          "x-ms-optionsetmetadataid": "a7d101f1-c46f-f111-ab0d-002248d3a07d",
+          "x-ms-isGlobal": true,
+          "x-ms-optionsetdisplayname": "Project Categorized",
           "x-ms-optionSetType": "Picklist"
         },
         "dga_project_categorized_undername": {
@@ -861,6 +877,56 @@
           "x-ms-dataverse-type": "VirtualType",
           "x-ms-schema-name": "dga_project_typeName",
           "x-ms-read-only": true
+        },
+        "dga_record_creator": {
+          "type": "string",
+          "title": "Record Creator",
+          "x-ms-dataverse-attribute": "dga_record_creator",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "dga_record_creator"
+        },
+        "dga_record_creator_team_id": {
+          "type": "string",
+          "title": "Record Creator Team",
+          "x-ms-dataverse-attribute": "dga_record_creator_team_id",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "dga_record_creator_team_id"
+        },
+        "dga_record_creator_team_idname": {
+          "type": "string",
+          "title": "dga_record_creator_team_idname",
+          "x-ms-dataverse-attribute": "dga_record_creator_team_idname",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "dga_record_creator_team_idName",
+          "x-ms-read-only": true,
+          "maxLength": 200
+        },
+        "dga_record_creator_team_idyominame": {
+          "type": "string",
+          "title": "dga_record_creator_team_idyominame",
+          "x-ms-dataverse-attribute": "dga_record_creator_team_idyominame",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "dga_record_creator_team_idYomiName",
+          "x-ms-read-only": true,
+          "maxLength": 200
+        },
+        "dga_record_creatorname": {
+          "type": "string",
+          "title": "dga_record_creatorname",
+          "x-ms-dataverse-attribute": "dga_record_creatorname",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "dga_record_creatorName",
+          "x-ms-read-only": true,
+          "maxLength": 200
+        },
+        "dga_record_creatoryominame": {
+          "type": "string",
+          "title": "dga_record_creatoryominame",
+          "x-ms-dataverse-attribute": "dga_record_creatoryominame",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "dga_record_creatorYomiName",
+          "x-ms-read-only": true,
+          "maxLength": 200
         },
         "dga_registered_or_will_be_registered_in_epm": {
           "type": "string",
@@ -1248,27 +1314,30 @@
           "x-ms-schema-name": "statuscode",
           "enum": [
             "Draft",
+            "Division Director Review",
+            "Strategy Team Review",
             "Inactive",
-            "Submitted to Division Director",
-            "Approved By Executive Director",
-            "Approved By Division Director",
-            "Approved By Strategy Team",
+            "Pending Executive Director Submission",
+            "Executive Director Review",
+            "Director General Review",
             "Active",
-            "Clarification Needed",
-            "Approved By Director General"
+            "Pending Clarification",
+            "Deleted"
           ],
           "x-ms-enum-values": [
             1,
-            2,
             776140001,
-            776140002,
             776140003,
+            2,
             776140004,
+            776140002,
+            776140014,
             776140011,
             776140012,
-            776140014
+            776140015
           ],
           "Color": [
+            null,
             null,
             null,
             null,

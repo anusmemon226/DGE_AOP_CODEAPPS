@@ -945,11 +945,6 @@
 
 /* ── Error state overrides for colored choices ── */
 
-.create-activity__form-stack .radio-group--invalid .field__label,
-.create-activity__form-stack .radio-group--invalid .select-field__label {
-  color: var(--color-error);
-}
-
 .create-activity__form-stack .radio-group--invalid .choice--strategic,
 .create-activity__form-stack .radio-group--invalid .choice--operational,
 .create-activity__form-stack .radio-group--invalid .choice--epm,
@@ -959,8 +954,8 @@
 .create-activity__form-stack .radio-group--invalid .choice--no,
 .create-activity__form-stack .radio-group--invalid .choice--discussed,
 .create-activity__form-stack .radio-group--invalid .choice--agreed,
-.create-activity__form-stack .radio-group--invalid .create-activity__radio--scope .choice,
-.create-activity__form-stack .radio-group--invalid .create-activity__radio--classification .choice,
+.create-activity__form-stack .radio-group--invalid.create-activity__radio--scope .choice,
+.create-activity__form-stack .radio-group--invalid.create-activity__radio--classification .choice,
 .create-activity__form-stack .radio-group--invalid .radio-group--corporate-strategy .choice,
 .create-activity__form-stack .radio-group--invalid .radio-group--digital-pillar .choice,
 .create-activity__form-stack .radio-group--invalid .radio-group--link-objective .choice,
@@ -978,8 +973,8 @@
 .create-activity__form-stack .radio-group--invalid .choice--no:not(:has(input:checked)):hover,
 .create-activity__form-stack .radio-group--invalid .choice--discussed:not(:has(input:checked)):hover,
 .create-activity__form-stack .radio-group--invalid .choice--agreed:not(:has(input:checked)):hover,
-.create-activity__form-stack .radio-group--invalid .create-activity__radio--scope .choice:not(:has(input:checked)):hover,
-.create-activity__form-stack .radio-group--invalid .create-activity__radio--classification .choice:not(:has(input:checked)):hover:not(:has(input:checked)):hover,
+.create-activity__form-stack .radio-group--invalid.create-activity__radio--scope .choice:not(:has(input:checked)):hover,
+.create-activity__form-stack .radio-group--invalid.create-activity__radio--classification .choice:not(:has(input:checked)):hover,
 .create-activity__form-stack .radio-group--invalid .radio-group--corporate-strategy .choice:not(:has(input:checked)):hover,
 .create-activity__form-stack .radio-group--invalid .radio-group--digital-pillar .choice:not(:has(input:checked)):hover,
 .create-activity__form-stack .radio-group--invalid .radio-group--link-objective .choice:not(:has(input:checked)):hover,

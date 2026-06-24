@@ -13,14 +13,14 @@ import {
   UserRound,
 } from 'lucide-react'
 import {
-  AOP_ROLE_DISPLAY,
-  AOP_ROLES,
   LANGUAGES,
+  type AopRole,
   type LanguageCode,
   type ThemeMode,
 } from '../../constants/app'
 import {
   fetchAssessmentCycles,
+  fetchCurrentUser,
   fetchPlanningInstances,
   setLanguage,
   setSelectedCycle,
@@ -29,9 +29,30 @@ import {
   toggleMobileSidebar,
   toggleNotificationPanel,
 } from '../../store/appSlice'
+import { initializeUserPipeline, setCurrentRole } from '../../store/userSlice'
 import { useAppDispatch, useAppSelector } from '../../store/hooks'
 import { IconButton } from '../ui/IconButton'
 import { NotificationPanel } from './NotificationPanel'
+import type { DivisionalHierarchyRef, UserRole } from '../../store/userSlice'
+
+/** Map new roleName back to old AopRole for backward compat */
+const REVERSE_ROLE_MAP: Record<string, AopRole> = {
+  'Division Member': 'AOP - Division Member',
+  'Division Director': 'AOP - Division Director',
+  'Strategy Team': 'AOP - Strategy Team',
+  'PMO': 'AOP - PMO',
+  'Procurement Team': 'AOP - Procurement Team',
+  'Executive Director': 'AOP - Executive Director',
+  'Director General': 'AOP - Director General',
+}
+
+function getRoleDisplayName(
+  role: UserRole,
+  hierarchies: DivisionalHierarchyRef[],
+): string {
+  const hierarchy = hierarchies.find((h) => h.roleId === role.roleId)
+  return hierarchy ? `${role.roleName} - ${hierarchy.shortName}` : role.roleName
+}
 
 function formatDisplayDate(value: string) {
   return new Intl.DateTimeFormat('en-US', {
@@ -50,10 +71,23 @@ function formatCompactMonthRange(startDate: string, endDate: string) {
   return `${formatter.format(new Date(startDate))} - ${formatter.format(new Date(endDate))}`
 }
 
+function getInitials(name: string | null | undefined): string {
+  if (!name) return '?'
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0].toUpperCase())
+    .slice(0, 2)
+    .join('')
+}
+
 export function Header() {
   const dispatch = useAppDispatch()
-  const { assessmentCycles, isNotificationPanelOpen, language, notifications, selectedCycle, selectedRole, themeMode } = useAppSelector(
+  const { assessmentCycles, assessmentCyclesLoading, currentUser, isNotificationPanelOpen, language, notifications, selectedCycle, selectedRole, themeMode } = useAppSelector(
     (state) => state.app,
+  )
+  const { currentUserRoles, currentRole, currentRolesDivisionalHierarchies, userLoading } = useAppSelector(
+    (state) => state.user,
   )
   const [isCycleOpen, setIsCycleOpen] = useState(false)
   const [isRoleOpen, setIsRoleOpen] = useState(false)
@@ -61,11 +95,20 @@ export function Header() {
   const roleSwitcherRef = useRef<HTMLDivElement>(null)
   const unreadCount = notifications.filter((notification) => notification.unread).length
   const activeCycle = assessmentCycles.find((c) => c.dga_assessment_cycleid === selectedCycle) ?? assessmentCycles[0]
-  const activeRole = AOP_ROLE_DISPLAY[selectedRole]
 
-  // Fetch cycles once on mount
+  const showCycleSkeleton = assessmentCyclesLoading && assessmentCycles.length === 0
+
+  // Dynamic role display
+  const showRoleSkeleton = userLoading && currentUserRoles.length === 0
+  const currentRoleDisplayName = currentRole
+    ? getRoleDisplayName(currentRole, currentRolesDivisionalHierarchies)
+    : currentUser?.fullname ?? 'Loading...'
+
+  // Fetch cycles, current user, and role pipeline once on mount
   useEffect(() => {
     dispatch(fetchAssessmentCycles())
+    dispatch(fetchCurrentUser())
+    dispatch(initializeUserPipeline())
   }, [dispatch])
 
   // Fetch planning instances whenever the selected cycle changes
@@ -74,6 +117,16 @@ export function Header() {
       dispatch(fetchPlanningInstances(selectedCycle))
     }
   }, [dispatch, selectedCycle])
+
+  // Sync selectedRole in appSlice with currentRole in userSlice after pipeline completes
+  useEffect(() => {
+    if (currentRole) {
+      const mapped = REVERSE_ROLE_MAP[currentRole.roleName]
+      if (mapped && mapped !== selectedRole) {
+        dispatch(setSelectedRole(mapped))
+      }
+    }
+  }, [currentRole, currentUserRoles, dispatch, selectedRole])
 
   useEffect(() => {
     if (!isCycleOpen) {
@@ -142,17 +195,31 @@ export function Header() {
             aria-expanded={isCycleOpen}
             aria-haspopup="dialog"
             className="header__cycle-trigger"
+            disabled={showCycleSkeleton}
             onClick={() => setIsCycleOpen((open) => !open)}
             type="button"
           >
-            <span className="header__cycle-trigger-icon">
-              <ShieldCheck size={15} />
-            </span>
-            <strong>{activeCycle?.dga_name ?? 'Select a cycle'}</strong>
-            <span className="header__cycle-trigger-divider" />
-            <CalendarDays size={15} />
-            <span>{activeCycle ? formatCompactMonthRange(activeCycle.dga_scheduled_start_date, activeCycle.dga_scheduled_end_date) : 'No cycle selected'}</span>
-            <ChevronDown className={isCycleOpen ? 'header__cycle-trigger-chevron--open' : ''} size={15} />
+            {showCycleSkeleton ? (
+              <>
+                <span className="skeleton-shimmer" style={{ borderRadius: '999px', flex: '0 0 auto', height: '1.35rem', width: '1.35rem' }} />
+                <span className="skeleton-shimmer" style={{ borderRadius: '4px', height: '0.7rem', width: '6rem' }} />
+                <span className="skeleton-shimmer" style={{ borderRadius: '999px', flex: '0 0 auto', height: '1.25rem', width: '1px' }} />
+                <span className="skeleton-shimmer" style={{ borderRadius: '4px', height: '0.7rem', width: '0.85rem', margin: '0 0.05rem' }} />
+                <span className="skeleton-shimmer" style={{ borderRadius: '4px', height: '0.7rem', width: '4.5rem' }} />
+                <span className="skeleton-shimmer" style={{ borderRadius: '4px', flex: '0 0 auto', height: '0.9rem', width: '0.9rem' }} />
+              </>
+            ) : (
+              <>
+                <span className="header__cycle-trigger-icon">
+                  <ShieldCheck size={15} />
+                </span>
+                <strong>{activeCycle?.dga_name ?? 'Select a cycle'}</strong>
+                <span className="header__cycle-trigger-divider" />
+                <CalendarDays size={15} />
+                <span>{activeCycle ? formatCompactMonthRange(activeCycle.dga_scheduled_start_date, activeCycle.dga_scheduled_end_date) : 'No cycle selected'}</span>
+                <ChevronDown className={isCycleOpen ? 'header__cycle-trigger-chevron--open' : ''} size={15} />
+              </>
+            )}
           </button>
 
           {isCycleOpen ? (
@@ -241,56 +308,84 @@ export function Header() {
         </div>
         <div className="header__role-switcher" ref={roleSwitcherRef}>
           <button
-            aria-label={`Current role: ${activeRole.label}`}
+            aria-label={`Current role: ${currentRoleDisplayName}`}
             aria-expanded={isRoleOpen}
             aria-haspopup="dialog"
             className="header__role-trigger"
+            disabled={showRoleSkeleton}
             onClick={() => setIsRoleOpen((open) => !open)}
-            title={`Current role: ${activeRole.label}`}
+            title={`Current role: ${currentRoleDisplayName}`}
             type="button"
           >
-            <span className="header__avatar">DC</span>
-            <span>Digital Connect - UAT01</span>
-            <ChevronDown className={isRoleOpen ? 'header__role-chevron--open' : ''} size={14} />
+            {showRoleSkeleton ? (
+              <>
+                <span className="skeleton-shimmer" style={{ borderRadius: '999px', flex: '0 0 auto', height: '1.55rem', width: '1.55rem' }} />
+                <span className="skeleton-shimmer" style={{ borderRadius: '4px', height: '0.7rem', width: '7rem' }} />
+                <span className="skeleton-shimmer" style={{ borderRadius: '4px', flex: '0 0 auto', height: '0.85rem', width: '0.85rem' }} />
+              </>
+            ) : (
+              <>
+                <span className="header__avatar">{getInitials(currentUser?.fullname)}</span>
+                <span className="header__user-info">
+                  <span className="header__user-name">{currentUser?.fullname ?? 'User'}</span>
+                  <span className="header__role-name">{currentRoleDisplayName}</span>
+                </span>
+                <ChevronDown className={isRoleOpen ? 'header__role-chevron--open' : ''} size={14} />
+              </>
+            )}
           </button>
 
           {isRoleOpen ? (
             <div className="role-popover" role="dialog" aria-label="Profile and role">
               <div className="role-popover__account">
-                <span className="header__avatar role-popover__avatar">DC</span>
+                <span className="header__avatar role-popover__avatar">
+                  {currentUser?.entityimage_url
+                    ? <img alt="Avatar" className="header__avatar-img" src={currentUser.entityimage_url} />
+                    : getInitials(currentUser?.fullname)}
+                </span>
                 <span>
-                  <strong>Digital Connect - UAT01</strong>
-                  <small>Digital Governance Unit</small>
+                  <strong>{currentUser?.fullname ?? 'User'}</strong>
+                  <small>{currentUser?.internalemailaddress ?? ''}</small>
                 </span>
               </div>
 
               <span className="role-popover__label">Current Role</span>
               <div className="role-popover__list">
-                {AOP_ROLES.map((role) => {
-                  const isSelected = role === selectedRole
-                  const roleCopy = AOP_ROLE_DISPLAY[role]
+                {currentUserRoles.length === 0 ? (
+                  <div className="role-popover__empty">No roles assigned</div>
+                ) : (
+                  currentUserRoles.map((role) => {
+                    const isSelected = currentRole?.roleId === role.roleId
+                    const displayName = getRoleDisplayName(role, currentRolesDivisionalHierarchies)
+                    const hierarchy = currentRolesDivisionalHierarchies.find((h) => h.roleId === role.roleId)
 
-                  return (
-                    <button
-                      className={`role-popover__item ${isSelected ? 'role-popover__item--selected' : ''}`}
-                      key={role}
-                      onClick={() => {
-                        dispatch(setSelectedRole(role))
-                        setIsRoleOpen(false)
-                      }}
-                      type="button"
-                    >
-                      <span className="role-popover__item-icon">
-                        <UserRound size={15} />
-                      </span>
-                      <span className="role-popover__item-copy">
-                        <strong>{roleCopy.label}</strong>
-                        <small>{roleCopy.description}</small>
-                      </span>
-                      {isSelected ? <Check size={16} /> : null}
-                    </button>
-                  )
-                })}
+                    return (
+                      <button
+                        className={`role-popover__item ${isSelected ? 'role-popover__item--selected' : ''}`}
+                        key={role.roleId}
+                        onClick={() => {
+                          dispatch(setCurrentRole(role))
+                          // Backward compat: set old-style selectedRole for other pages
+                          const mapped = REVERSE_ROLE_MAP[role.roleName]
+                          if (mapped) {
+                            dispatch(setSelectedRole(mapped))
+                          }
+                          setIsRoleOpen(false)
+                        }}
+                        type="button"
+                      >
+                        <span className="role-popover__item-icon">
+                          <UserRound size={15} />
+                        </span>
+                        <span className="role-popover__item-copy">
+                          <strong>{displayName}</strong>
+                          <small>{hierarchy?.hierarchyName ?? 'Org-wide role'}</small>
+                        </span>
+                        {isSelected ? <Check size={16} /> : null}
+                      </button>
+                    )
+                  })
+                )}
               </div>
 
               <button className="role-popover__profile" type="button">

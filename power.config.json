@@ -48,6 +48,14 @@
         "systemuserroles": {
           "entitySetName": "systemuserrolescollection",
           "logicalName": "systemuserroles"
+        },
+        "teamroles": {
+          "entitySetName": "teamrolescollection",
+          "logicalName": "teamroles"
+        },
+        "securityroles": {
+          "entitySetName": "roles",
+          "logicalName": "role"
         }
       },
       "environmentVariableName": ""

@@ -1,16 +1,36 @@
 import { PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
-import { AOP_ROLE_DISPLAY } from '../../constants/app'
 import { getNavigationForRole } from '../../utils/permissions'
 import { closeMobileSidebar, toggleSidebarCollapsed } from '../../store/appSlice'
 import { useAppDispatch, useAppSelector } from '../../store/hooks'
 import { IconButton } from '../ui/IconButton'
+import type { DivisionalHierarchyRef, UserRole } from '../../store/userSlice'
+
+function getRoleDisplayName(
+  role: UserRole,
+  hierarchies: DivisionalHierarchyRef[],
+): string {
+  const hierarchy = hierarchies.find((h) => h.roleId === role.roleId)
+  return hierarchy ? `${role.roleName} - ${hierarchy.shortName}` : role.roleName
+}
+
+function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0].toUpperCase())
+    .slice(0, 2)
+    .join('')
+}
 
 export function Sidebar() {
   const dispatch = useAppDispatch()
   const { isMobileSidebarOpen, isSidebarCollapsed, selectedRole } = useAppSelector((state) => state.app)
+  const { currentRole, currentRolesDivisionalHierarchies } = useAppSelector((state) => state.user)
   const navigationItems = getNavigationForRole(selectedRole)
-  const currentRole = AOP_ROLE_DISPLAY[selectedRole]
+  const displayName = currentRole
+    ? getRoleDisplayName(currentRole, currentRolesDivisionalHierarchies)
+    : 'No role assigned'
 
   return (
     <>
@@ -64,19 +84,13 @@ export function Sidebar() {
         </nav>
 
         <div className="sidebar__footer">
-          <div className="sidebar__role-card" title={currentRole.label}>
+          <div className="sidebar__role-card" title={displayName}>
             <span className="sidebar__role-eyebrow">Current Role</span>
             <span className="sidebar__role-content">
-              <span className="sidebar__role-initials">
-                {currentRole.label
-                  .split(' ')
-                  .map((part) => part[0])
-                  .join('')
-                  .slice(0, 2)}
-              </span>
+              <span className="sidebar__role-initials">{getInitials(displayName)}</span>
               <span className="sidebar__role-copy">
-                <strong>{currentRole.label}</strong>
-                <small>{currentRole.description}</small>
+                <strong>{displayName}</strong>
+                <small>{currentRolesDivisionalHierarchies.find((h) => h.roleId === currentRole?.roleId)?.hierarchyName ?? 'Org-wide role'}</small>
               </span>
             </span>
           </div>
