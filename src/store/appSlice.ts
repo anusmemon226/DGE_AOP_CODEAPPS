@@ -68,7 +68,6 @@ export const fetchCurrentUser = createAsyncThunk(
         'entityimage_url',
       ],
     })
-    console.log(usersResult)
     return (usersResult.data?.[0] ?? null) as Systemusers | null
   },
 )
