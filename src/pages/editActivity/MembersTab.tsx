@@ -32,89 +32,7 @@ type ActivityMember = MockUser & {
   addedAt: string
 }
 
-// ── Mock data ──
-
-const MOCK_USERS: MockUser[] = [
-  { id: 'user-1', name: 'Ahmed Al Mansouri', email: 'ahmed.mansouri@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
-  { id: 'user-2', name: 'Sara Al Ketbi', email: 'sara.ketbi@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
-  { id: 'user-3', name: 'Mohammed Al Zaabi', email: 'mohammed.zaabi@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
-  { id: 'user-4', name: 'Noora Al Falasi', email: 'noora.falasi@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
-  { id: 'user-5', name: 'Khalid Al Shamsi', email: 'khalid.shamsi@dge.gov.ae', avatarUrl: null, isDivisionMember: false },
-  { id: 'user-6', name: 'Mona Al Muhairi', email: 'mona.muhairi@dge.gov.ae', avatarUrl: null, isDivisionMember: false },
-  { id: 'user-7', name: 'Sultan Al Neyadi', email: 'sultan.neyadi@dge.gov.ae', avatarUrl: null, isDivisionMember: false },
-  { id: 'user-8', name: 'Fatima Al Hashimi', email: 'fatima.hashimi@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
-  { id: 'user-9', name: 'Omar Al Blooshi', email: 'omar.blooshi@dge.gov.ae', avatarUrl: null, isDivisionMember: false },
-  { id: 'user-10', name: 'Hessa Al Suwaidi', email: 'hessa.suwaidi@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
-  { id: 'user-11', name: 'Rashid Al Ghafri', email: 'rashid.ghafri@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
-  { id: 'user-12', name: 'Layla Al Shehhi', email: 'layla.shehhi@dge.gov.ae', avatarUrl: null, isDivisionMember: false },
-  { id: 'user-13', name: 'Zayed Al Nahyan', email: 'zayed.nahyan@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
-  { id: 'user-14', name: 'Noura Al Suwaidi', email: 'noura.suwaidi@dge.gov.ae', avatarUrl: null, isDivisionMember: false },
-  { id: 'user-15', name: 'Majid Al Falasi', email: 'majid.falasi@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
-  { id: 'user-16', name: 'Reem Al Hashemi', email: 'reem.hashemi@dge.gov.ae', avatarUrl: null, isDivisionMember: false },
-  { id: 'user-17', name: 'Saif Al Mansoori', email: 'saif.mansoori@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
-  { id: 'user-18', name: 'Dana Al Marzouqi', email: 'dana.marzouqi@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
-  { id: 'user-19', name: 'Yasser Al Qubaisi', email: 'yasser.qubaisi@dge.gov.ae', avatarUrl: null, isDivisionMember: false },
-  { id: 'user-20', name: 'Amal Al Shamsi', email: 'amal.shamsi@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
-  { id: 'user-21', name: 'Hazza Al Mazrouei', email: 'hazza.mazrouei@dge.gov.ae', avatarUrl: null, isDivisionMember: false },
-  { id: 'user-22', name: 'Shaikha Al Ketbi', email: 'shaikha.ketbi@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
-  { id: 'user-23', name: 'Mohsin Al Darmaki', email: 'mohsin.darmaki@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
-  { id: 'user-24', name: 'Salama Al Ameri', email: 'salama.ameri@dge.gov.ae', avatarUrl: null, isDivisionMember: false },
-  { id: 'user-25', name: 'Eisa Al Mazroui', email: 'eisa.mazroui@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
-  { id: 'user-26', name: 'Mira Al Teneiji', email: 'mira.teneiji@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
-  { id: 'user-27', name: 'Suhail Al Owais', email: 'suhail.owais@dge.gov.ae', avatarUrl: null, isDivisionMember: false },
-  { id: 'user-28', name: 'Buthaina Al Nuaimi', email: 'buthaina.nuaimi@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
-  { id: 'user-29', name: 'Jassim Al Zaffin', email: 'jassim.zaffin@dge.gov.ae', avatarUrl: null, isDivisionMember: false },
-  { id: 'user-30', name: 'Rawdha Al Kaabi', email: 'rawdha.kaabi@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
-  { id: 'user-31', name: 'Khamis Al Shamsi', email: 'khamis.shamsi@dge.gov.ae', avatarUrl: null, isDivisionMember: false },
-  { id: 'user-32', name: 'Alya Al Moosa', email: 'alya.moosa@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
-  { id: 'user-33', name: 'Rashid Al Qasimi', email: 'rashid.qasimi@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
-  { id: 'user-34', name: 'Nawaf Al Awadi', email: 'nawaf.awadi@dge.gov.ae', avatarUrl: null, isDivisionMember: false },
-  { id: 'user-35', name: 'Hind Al Falasi', email: 'hind.falasi@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
-  { id: 'user-36', name: 'Talal Al Mahmoud', email: 'talal.mahmoud@dge.gov.ae', avatarUrl: null, isDivisionMember: false },
-  { id: 'user-37', name: 'Lamia Al Hammadi', email: 'lamia.hammadi@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
-  { id: 'user-38', name: 'Abdul Rahman Al Shehhi', email: 'abdul.shehhi@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
-  { id: 'user-39', name: 'Nasser Al Naboodah', email: 'nasser.naboodah@dge.gov.ae', avatarUrl: null, isDivisionMember: false },
-  { id: 'user-40', name: 'Obaid Al Muhairi', email: 'obaid.muhairi@dge.gov.ae', avatarUrl: null, isDivisionMember: true },
-]
-
-const INITIAL_MEMBERS: ActivityMember[] = [
-  { id: 'init-1', name: 'Ahmed Al Mansouri', email: 'ahmed.mansouri@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-01-15' },
-  { id: 'init-2', name: 'Sara Al Ketbi', email: 'sara.ketbi@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-01-15' },
-  { id: 'init-3', name: 'Mohammed Al Zaabi', email: 'mohammed.zaabi@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-01-20' },
-  { id: 'init-4', name: 'Noora Al Falasi', email: 'noora.falasi@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-02-20' },
-  { id: 'init-5', name: 'Khalid Al Shamsi', email: 'khalid.shamsi@dge.gov.ae', avatarUrl: null, isDivisionMember: false, addedAt: '2026-03-01' },
-  { id: 'init-6', name: 'Mona Al Muhairi', email: 'mona.muhairi@dge.gov.ae', avatarUrl: null, isDivisionMember: false, addedAt: '2026-03-10' },
-  { id: 'init-7', name: 'Sultan Al Neyadi', email: 'sultan.neyadi@dge.gov.ae', avatarUrl: null, isDivisionMember: false, addedAt: '2026-03-15' },
-  { id: 'init-8', name: 'Fatima Al Hashimi', email: 'fatima.hashimi@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-04-01' },
-  { id: 'init-9', name: 'Omar Al Blooshi', email: 'omar.blooshi@dge.gov.ae', avatarUrl: null, isDivisionMember: false, addedAt: '2026-04-05' },
-  { id: 'init-10', name: 'Hessa Al Suwaidi', email: 'hessa.suwaidi@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-04-10' },
-  { id: 'init-11', name: 'Rashid Al Ghafri', email: 'rashid.ghafri@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-04-15' },
-  { id: 'init-12', name: 'Layla Al Shehhi', email: 'layla.shehhi@dge.gov.ae', avatarUrl: null, isDivisionMember: false, addedAt: '2026-05-01' },
-  { id: 'init-13', name: 'Abdulla Al Mazrouei', email: 'abdulla.mazrouei@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-05-05' },
-  { id: 'init-14', name: 'Mariam Al Qubaisi', email: 'mariam.qubaisi@dge.gov.ae', avatarUrl: null, isDivisionMember: false, addedAt: '2026-05-10' },
-  { id: 'init-15', name: 'Hamad Al Ameri', email: 'hamad.ameri@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-05-15' },
-  { id: 'init-16', name: 'Noura Al Kaabi', email: 'noura.kaabi@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-05-18' },
-  { id: 'init-17', name: 'Saeed Al Tayer', email: 'saeed.tayer@dge.gov.ae', avatarUrl: null, isDivisionMember: false, addedAt: '2026-05-20' },
-  { id: 'init-18', name: 'Aisha Al Bishr', email: 'aisha.bishr@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-05-22' },
-  { id: 'init-19', name: 'Salem Al Mazroui', email: 'salem.mazroui@dge.gov.ae', avatarUrl: null, isDivisionMember: false, addedAt: '2026-05-25' },
-  { id: 'init-20', name: 'Latifa Al Maktoum', email: 'latifa.maktoum@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-05-28' },
-  { id: 'init-21', name: 'Butti Al Qubaisi', email: 'butti.qubaisi@dge.gov.ae', avatarUrl: null, isDivisionMember: false, addedAt: '2026-06-01' },
-  { id: 'init-22', name: 'Amna Al Dahak', email: 'amna.dahak@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-06-03' },
-  { id: 'init-23', name: 'Faisal Al Bannai', email: 'faisal.bannai@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-06-05' },
-  { id: 'init-24', name: 'Shamma Al Suwaidi', email: 'shamma.suwaidi@dge.gov.ae', avatarUrl: null, isDivisionMember: false, addedAt: '2026-06-07' },
-  { id: 'init-25', name: 'Mansoor Al Dhaheri', email: 'mansoor.dhaheri@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-06-09' },
-  { id: 'init-26', name: 'Afra Al Shamsi', email: 'afra.shamsi@dge.gov.ae', avatarUrl: null, isDivisionMember: false, addedAt: '2026-06-10' },
-  { id: 'init-27', name: 'Jamal Al Hosani', email: 'jamal.hosani@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-06-11' },
-  { id: 'init-28', name: 'Hind Al Balushi', email: 'hind.balushi@dge.gov.ae', avatarUrl: null, isDivisionMember: false, addedAt: '2026-06-12' },
-  { id: 'init-29', name: 'Tariq Al Falahi', email: 'tariq.falahi@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-06-13' },
-  { id: 'init-30', name: 'Nawal Al Khouri', email: 'nawal.khouri@dge.gov.ae', avatarUrl: null, isDivisionMember: false, addedAt: '2026-06-14' },
-  { id: 'init-31', name: 'Rashed Al Nuaimi', email: 'rashed.nuaimi@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-06-15' },
-  { id: 'init-32', name: 'Maha Al Barrak', email: 'maha.barrak@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-06-15' },
-  { id: 'init-33', name: 'Sultan Al Qasimi', email: 'sultan.qasimi@dge.gov.ae', avatarUrl: null, isDivisionMember: false, addedAt: '2026-06-15' },
-  { id: 'init-34', name: 'Nadia Al Hamadi', email: 'nadia.hamadi@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-06-15' },
-  { id: 'init-35', name: 'Khalifa Al Shams', email: 'khalifa.shams@dge.gov.ae', avatarUrl: null, isDivisionMember: false, addedAt: '2026-06-15' },
-  { id: 'init-36', name: 'Mouza Al Saboosi', email: 'mouza.saboosi@dge.gov.ae', avatarUrl: null, isDivisionMember: true, addedAt: '2026-06-15' },
-]
+// ── Mock data removed — ready for dynamic implementation ──
 
 const ITEMS_PER_PAGE = 12
 const LAZY_BATCH = 12
@@ -122,7 +40,7 @@ const LAZY_BATCH = 12
 // ── Component ──
 
 export function MembersTab() {
-  const [members, setMembers] = useState<ActivityMember[]>(INITIAL_MEMBERS)
+  const [members, setMembers] = useState<ActivityMember[]>([])
   const [memberToDelete, setMemberToDelete] = useState<ActivityMember | null>(null)
   const [isAddMembersModalOpen, setIsAddMembersModalOpen] = useState(false)
   const [memberFilter, setMemberFilter] = useState<MemberFilter>('all')
@@ -204,7 +122,7 @@ export function MembersTab() {
     }
     setMembers((prev) => {
       const existingIds = new Set(prev.map((m) => m.id))
-      const newMembers = MOCK_USERS
+      const newMembers = ([] as MockUser[])
         .filter((u) => selectedMemberIds.has(u.id) && !existingIds.has(u.id))
         .map((u) => ({ ...u, addedAt: new Date().toISOString().slice(0, 10) }))
       return [...prev, ...newMembers]
@@ -245,7 +163,7 @@ export function MembersTab() {
 
   const filteredUsers = useMemo(() => {
     const existingIds = new Set(members.map((m) => m.id))
-    const notAddedUsers = MOCK_USERS.filter((u) => !existingIds.has(u.id))
+    const notAddedUsers = ([] as MockUser[]).filter((u) => !existingIds.has(u.id))
 
     return notAddedUsers.filter((user) => {
       if (memberFilter === 'division' && !user.isDivisionMember) return false
@@ -275,7 +193,7 @@ export function MembersTab() {
     const selectedCount = selectedMemberIds.size
     const hasSelection = selectedCount > 0
     const selectedUsers = hasSelection
-      ? MOCK_USERS.filter((u) => selectedMemberIds.has(u.id))
+      ? ([] as MockUser[]).filter((u) => selectedMemberIds.has(u.id))
       : []
 
     return (

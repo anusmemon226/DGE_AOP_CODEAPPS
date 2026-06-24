@@ -3,10 +3,9 @@ import { HelpCircle, SendHorizonal } from 'lucide-react'
 import { Card } from '../../components/ui'
 import {
   CURRENT_USER,
-  SAMPLE_CLARIFICATIONS,
   formatMessageDate,
   type ClarificationMessage,
-} from './clarificationData'
+} from './data/clarificationData'
 
 // ── User avatar initials circle ──
 
@@ -89,7 +88,7 @@ function groupByDate(messages: ClarificationMessage[]) {
 // ── Component ──
 
 export function ClarificationTab() {
-  const [messages, setMessages] = useState<ClarificationMessage[]>(SAMPLE_CLARIFICATIONS)
+  const [messages, setMessages] = useState<ClarificationMessage[]>([])
   const [inputValue, setInputValue] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)

@@ -1,4 +1,4 @@
-import { type SelectOption } from '../../components/ui'
+import { type SelectOption } from '../../../components/ui'
 
 // ── Form Types ──
 

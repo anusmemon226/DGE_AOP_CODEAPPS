@@ -7,7 +7,7 @@ import {
   getSectorIdForDivision,
   SECTOR_DIVISIONS,
   type SectorDivision,
-} from './adgesData'
+} from '../data/adgesData'
 
 // ── Helpers ──
 
@@ -377,4 +377,4 @@ export function EngagementVisibilityPicker({
 }
 
 // ── Exports for label lookup ──
-export { getVisibilityLabel } from './adgesData'
+export { getVisibilityLabel } from '../data/adgesData'

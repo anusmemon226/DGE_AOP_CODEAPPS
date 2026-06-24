@@ -54,29 +54,6 @@ function getApplicableLabel(value: ApplicableValue): string {
   return value === '576610000' ? 'Discussed' : 'Agreed'
 }
 
-const INITIAL_DEPENDENCIES: Dependency[] = [
-  { id: 'dep-01', entityName: 'Abu Dhabi Digital Authority (ADDA)', dateOfSupport: '2026-03-15', typeOfSupport: 'Data sharing agreement for citizen analytics platform.', applicable: '576610001' },
-  { id: 'dep-02', entityName: 'Department of Finance (DOF)', dateOfSupport: '2026-03-20', typeOfSupport: 'Budget allocation confirmation for Q2 infrastructure projects.', applicable: '576610001' },
-  { id: 'dep-03', entityName: 'Abu Dhabi Police GHQ', dateOfSupport: '2026-03-25', typeOfSupport: 'Security clearance and access protocols for data centre.', applicable: '576610000' },
-  { id: 'dep-04', entityName: 'Abu Dhabi Municipality', dateOfSupport: '2026-04-01', typeOfSupport: 'Site permit and zoning approval for new server facility.', applicable: '576610000' },
-  { id: 'dep-05', entityName: 'Department of Energy', dateOfSupport: '2026-04-05', typeOfSupport: 'Power supply and cooling infrastructure coordination.', applicable: '576610001' },
-  { id: 'dep-06', entityName: 'Abu Dhabi Digital Authority', dateOfSupport: '2026-04-10', typeOfSupport: 'Cybersecurity audit and compliance framework.', applicable: '576610001' },
-  { id: 'dep-07', entityName: 'Telecommunications Regulatory Authority', dateOfSupport: '2026-04-15', typeOfSupport: 'Spectrum and connectivity approvals for IoT rollout.', applicable: '576610000' },
-  { id: 'dep-08', entityName: 'Abu Dhabi Housing Authority', dateOfSupport: '2026-04-20', typeOfSupport: 'Data integration for smart housing initiative.', applicable: '576610001' },
-  { id: 'dep-09', entityName: 'Department of Transport', dateOfSupport: '2026-05-01', typeOfSupport: 'Mobility data integration for city dashboards.', applicable: '576610000' },
-  { id: 'dep-10', entityName: 'Abu Dhabi Health Authority (DOH)', dateOfSupport: '2026-05-05', typeOfSupport: 'Health data exchange standards and API access.', applicable: '576610001' },
-  { id: 'dep-11', entityName: 'Department of Culture and Tourism', dateOfSupport: '2026-05-10', typeOfSupport: 'Cultural heritage digitisation partnership.', applicable: '576610000' },
-  { id: 'dep-12', entityName: 'Abu Dhabi Education Council', dateOfSupport: '2026-05-15', typeOfSupport: 'Student data integration for educational analytics.', applicable: '576610001' },
-  { id: 'dep-13', entityName: 'Abu Dhabi Agriculture Authority', dateOfSupport: '2026-05-20', typeOfSupport: 'Food security data sharing agreement.', applicable: '576610000' },
-  { id: 'dep-14', entityName: 'Federal Authority for Identity and Citizenship', dateOfSupport: '2026-05-25', typeOfSupport: 'Population register API integration for e-services.', applicable: '576610001' },
-  { id: 'dep-15', entityName: 'Abu Dhabi Media Office', dateOfSupport: '2026-06-01', typeOfSupport: 'Communication and media campaign coordination.', applicable: '576610000' },
-  { id: 'dep-16', entityName: 'Abu Dhabi Investment Office', dateOfSupport: '2026-06-05', typeOfSupport: 'Investment reporting dashboard data integration.', applicable: '576610001' },
-  { id: 'dep-17', entityName: 'General Secretariat of the Executive Council', dateOfSupport: '2026-06-08', typeOfSupport: 'Strategic initiative progress reporting integration.', applicable: '576610001' },
-  { id: 'dep-18', entityName: 'Department of Economic Development', dateOfSupport: '2026-06-10', typeOfSupport: 'Economic indicator data pipeline for business dashboards.', applicable: '576610000' },
-  { id: 'dep-19', entityName: 'Abu Dhabi Civil Defence Authority', dateOfSupport: '2026-06-12', typeOfSupport: 'Emergency response system interoperability.', applicable: '576610001' },
-  { id: 'dep-20', entityName: 'Statistics Centre Abu Dhabi', dateOfSupport: '2026-06-14', typeOfSupport: 'Statistical data exchange standards and governance.', applicable: '576610000' },
-]
-
 const DEP_ITEMS_PER_PAGE = 5
 const DEP_LAZY_BATCH = 12
 
@@ -84,7 +61,7 @@ const DEP_LAZY_BATCH = 12
 
 export function DependenciesTab() {
   // ── Data state ──
-  const [dependencies, setDependencies] = useState<Dependency[]>(INITIAL_DEPENDENCIES)
+  const [dependencies, setDependencies] = useState<Dependency[]>([])
   const [depSearch, setDepSearch] = useState('')
   const [depViewMode, setDepViewMode] = useState<'pagination' | 'lazy'>('pagination')
   const [depCurrentPage, setDepCurrentPage] = useState(1)
@@ -395,7 +372,7 @@ export function DependenciesTab() {
   return (
     <div className="edit-activity__dependencies">
       {/* Header */}
-      <div className="edit-activity__dependencies-header">
+      <div className="edit-activity__members-header">
         <div className="edit-activity__members-header-text">
           <h2>
             Dependencies
@@ -755,41 +732,57 @@ export function DependenciesTab() {
         title={editingDep ? 'Edit Dependency' : 'Create Dependency'}
       >
         <div className="edit-activity__deps-drawer">
-          <Textarea
-            error={depFormErrors.entityName}
-            label="External Entity Name"
-            onChange={(e) => handleDepFormChange('entityName', e.target.value)}
-            placeholder="Enter the external entity or organisation name"
-            required
-            rows={4}
-            value={depForm.entityName}
-          />
-          <DatePicker
-            error={depFormErrors.dateOfSupport}
-            id="dep-date-of-support"
-            label="Date of Support"
-            onChange={(value) => handleDepFormChange('dateOfSupport', value)}
-            required
-            value={depForm.dateOfSupport}
-          />
-          <Textarea
-            error={depFormErrors.typeOfSupport}
-            label="Type of Support"
-            onChange={(e) => handleDepFormChange('typeOfSupport', e.target.value)}
-            placeholder="Describe the type of support or arrangement"
-            required
-            rows={4}
-            value={depForm.typeOfSupport}
-          />
-          <RadioGroup
-            error={depFormErrors.applicable}
-            label="Applicable"
-            name="dep-applicable"
-            onChange={(value) => handleDepFormChange('applicable', value)}
-            options={APPLICABLE_OPTIONS}
-            required
-            value={depForm.applicable}
-          />
+          <div className="edit-activity__procurement-section">
+            <div className="create-activity__section-header">
+              <div className="create-activity__section-header-inner">
+                <span className="create-activity__section-header-icon" aria-hidden="true">
+                  <GitBranch size={16} />
+                </span>
+                <div>
+                  <span>Dependency Information</span>
+                  <h2>Entity & Support Details</h2>
+                </div>
+              </div>
+            </div>
+
+            <div className="edit-activity__procurement-drawer-section">
+              <Textarea
+                error={depFormErrors.entityName}
+                label="External Entity Name"
+                onChange={(e) => handleDepFormChange('entityName', e.target.value)}
+                placeholder="Enter the external entity or organisation name"
+                required
+                rows={4}
+                value={depForm.entityName}
+              />
+              <DatePicker
+                error={depFormErrors.dateOfSupport}
+                id="dep-date-of-support"
+                label="Date of Support"
+                onChange={(value) => handleDepFormChange('dateOfSupport', value)}
+                required
+                value={depForm.dateOfSupport}
+              />
+              <Textarea
+                error={depFormErrors.typeOfSupport}
+                label="Type of Support"
+                onChange={(e) => handleDepFormChange('typeOfSupport', e.target.value)}
+                placeholder="Describe the type of support or arrangement"
+                required
+                rows={4}
+                value={depForm.typeOfSupport}
+              />
+              <RadioGroup
+                error={depFormErrors.applicable}
+                label="Applicable"
+                name="dep-applicable"
+                onChange={(value) => handleDepFormChange('applicable', value)}
+                options={APPLICABLE_OPTIONS}
+                required
+                value={depForm.applicable}
+              />
+            </div>
+          </div>
         </div>
       </SideDrawer>
 

@@ -1,4 +1,5 @@
 import { useId, useMemo, useState } from 'react'
+import { FileText, LockKeyhole } from 'lucide-react'
 import {
   Badge,
   Button,
@@ -11,9 +12,8 @@ import {
   SideDrawer,
   Textarea,
 } from '../../components/ui'
-import { LockKeyhole } from 'lucide-react'
 import { formatCurrencyAmount } from '../../utils/formatting'
-import { formatDate, getQuarter } from './sharedHelpers'
+import { formatDate, getQuarter } from './helpers/sharedHelpers'
 
 // ── Types ──
 
@@ -881,36 +881,34 @@ export function ProcurementTab() {
       </div>
 
       {/* Table */}
-      <div className="data-grid">
-        <table>
-          <thead>
-            <tr>
-              {gridColumns.map((col) => (
-                <th key={col.key}>{col.header}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {procurements.length > 0 ? (
-              procurements.map((row) => (
+      {procurements.length > 0 ? (
+        <div className="data-grid">
+          <table>
+            <thead>
+              <tr>
+                {gridColumns.map((col) => (
+                  <th key={col.key}>{col.header}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {procurements.map((row) => (
                 <tr key={row.id}>
                   {gridColumns.map((col) => (
                     <td key={col.key}>{col.render(row)}</td>
                   ))}
                 </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={gridColumns.length} className="edit-activity__procurement-empty-cell">
-                  <div className="edit-activity__procurement-empty">
-                    No procurement records yet. Click "Add Procurement" to create one.
-                  </div>
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="edit-activity__members-empty">
+          <FileText size={40} strokeWidth={1.2} />
+          <h3>No procurement records yet</h3>
+          <p>Click <strong>Add Procurement</strong> to create a procurement record.</p>
+        </div>
+      )}
 
       {/* Create/Edit Drawer */}
       {renderDrawerForm()}

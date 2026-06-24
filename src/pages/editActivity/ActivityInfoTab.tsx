@@ -30,7 +30,7 @@ import {
   type StrategyValue,
   getOptionLabel,
   getRequiredFields,
-} from './activityInfoHelpers'
+} from './helpers/activityInfoHelpers'
 
 // ── Props ──
 

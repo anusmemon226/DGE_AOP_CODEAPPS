@@ -1,4 +1,4 @@
-import type { SelectOption } from '../../components/ui'
+import type { SelectOption } from '../../../components/ui'
 
 export const ADGE_OPTIONS: readonly SelectOption<string>[] = [
   { label: 'Abu Dhabi Testing', value: 'adge-1' },

@@ -1,5 +1,5 @@
 import { useId, useMemo, useState } from 'react'
-import { LockKeyhole } from 'lucide-react'
+import { Handshake, LockKeyhole } from 'lucide-react'
 import {
   Badge,
   Button,
@@ -12,8 +12,8 @@ import {
   SideDrawer,
   Textarea,
 } from '../../components/ui'
-import { ADGE_OPTIONS, ACTIVITY_STATUS_OPTIONS, PUBLISH_STATUS_OPTIONS, ACTIVITY_STATUS_TONES, PUBLISH_STATUS_TONES, getSelectedSectorNames, getSelectedDivisionNames } from './adgesData'
-import { EngagementVisibilityPicker } from './EngagementVisibilityPicker'
+import { ADGE_OPTIONS, ACTIVITY_STATUS_OPTIONS, PUBLISH_STATUS_OPTIONS, ACTIVITY_STATUS_TONES, PUBLISH_STATUS_TONES, getSelectedSectorNames, getSelectedDivisionNames } from './data/adgesData'
+import { EngagementVisibilityPicker } from './components/EngagementVisibilityPicker'
 
 // ── Types ──
 
@@ -787,36 +787,34 @@ export function EngagementPlanTab({
       </div>
 
       {/* Table */}
-      <div className="data-grid">
-        <table>
-          <thead>
-            <tr>
-              {gridColumns.map((col) => (
-                <th key={col.key}>{col.header}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {engagementPlans.length > 0 ? (
-              engagementPlans.map((row) => (
+      {engagementPlans.length > 0 ? (
+        <div className="data-grid">
+          <table>
+            <thead>
+              <tr>
+                {gridColumns.map((col) => (
+                  <th key={col.key}>{col.header}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {engagementPlans.map((row) => (
                 <tr key={row.id}>
                   {gridColumns.map((col) => (
                     <td key={col.key}>{col.render(row)}</td>
                   ))}
                 </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={gridColumns.length} className="edit-activity__engagement-empty-cell">
-                  <div className="edit-activity__engagement-empty">
-                    No engagement plans yet. Click &quot;Add Engagement Plan&quot; to create one.
-                  </div>
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="edit-activity__members-empty">
+          <Handshake size={40} strokeWidth={1.2} />
+          <h3>No engagement plans yet</h3>
+          <p>Click <strong>Add Engagement Plan</strong> to create an engagement plan.</p>
+        </div>
+      )}
 
       {/* Create/Edit Drawer */}
       {renderDrawerForm()}

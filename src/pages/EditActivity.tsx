@@ -37,6 +37,7 @@ import { ProcurementTab } from './editActivity/ProcurementTab'
 import { BudgetTab } from './editActivity/BudgetTab'
 import { ClarificationTab } from './editActivity/ClarificationTab'
 import { EngagementPlanTab } from './editActivity/EngagementPlanTab'
+import { LogTab } from './editActivity/LogTab'
 import {
   normalizeControlledRules,
   validateForm,
@@ -45,7 +46,7 @@ import {
   type ActivityForm,
   type ActivityContext,
   type FieldErrors,
-} from './editActivity/activityInfoHelpers'
+} from './editActivity/helpers/activityInfoHelpers'
 
 // ── Types ──
 
@@ -117,6 +118,16 @@ function getPendingWithRole(statusCode: number, currentRole: AopRole): string {
   }
 }
 
+function getTabLockReason(tabId: TabId): string {
+  switch (tabId) {
+    case 'milestones': return 'Activity classification is Payment Only'
+    case 'budget': return 'Budget is not required for this activity'
+    case 'procurements': return 'Procurement is not required for this activity'
+    case 'dependencies': return 'ADEO reporting is not enabled'
+    default: return ''
+  }
+}
+
 function formatStatusCode(code: number): string {
   const labels: Record<number, string> = {
     1: 'Draft',
@@ -154,6 +165,14 @@ export function EditActivity() {
   const isPaymentOnly = form.activityClassification === '576610002'
   const isBudgetNo = form.budgetRequired === '0'
   const isAdeoVisible = form.adeoReported === '1'
+
+  // ── Tab lock conditions ──
+  const tabLocked: Partial<Record<TabId, boolean>> = {
+    milestones: isPaymentOnly,
+    budget: isBudgetNo,
+    procurements: isBudgetNo || form.procurementRequired === '0',
+    dependencies: form.adeoReported === '0',
+  }
 
   const activityLeadName = activityLeadOptions.find((o) => o.value === form.activityLeadId)?.label ?? ''
   const isDivisionMember = selectedRole === 'AOP - Division Member'
@@ -325,7 +344,7 @@ export function EditActivity() {
       case 'clarifications':
         return <ClarificationTab />
       case 'logs':
-        return <div className="edit-activity__placeholder">Activity logs table will appear here.</div>
+        return <LogTab />
     }
   }
 
@@ -609,15 +628,19 @@ export function EditActivity() {
           {TABS.map((tab) => {
             const Icon = tab.icon
             const isActive = activeTab === tab.id
+            const locked = tabLocked[tab.id] ?? false
 
             return (
               <button
                 key={tab.id}
-                className={`edit-activity__stage-tab ${isActive ? 'edit-activity__stage-tab--active' : ''}`}
-                onClick={() => setActiveTab(tab.id)}
+                className={`edit-activity__stage-tab ${isActive ? 'edit-activity__stage-tab--active' : ''} ${locked ? 'edit-activity__stage-tab--locked' : ''}`}
+                onClick={() => {
+                  if (!locked) setActiveTab(tab.id)
+                }}
                 role="tab"
                 aria-selected={isActive}
-                title={tab.label}
+                aria-disabled={locked}
+                title={locked ? `Locked — ${getTabLockReason(tab.id)}` : tab.label}
                 type="button"
               >
                 <Icon size={16} />

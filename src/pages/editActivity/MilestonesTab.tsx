@@ -3,6 +3,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Edit3,
+  Flag,
   Plus,
   Trash2,
 } from 'lucide-react'
@@ -15,7 +16,7 @@ import {
   SideDrawer,
   Textarea,
 } from '../../components/ui'
-import { formatDate, getQuarter } from './sharedHelpers'
+import { formatDate, getQuarter } from './helpers/sharedHelpers'
 
 // ── Types ──
 
@@ -57,63 +58,6 @@ function getStatusIcon(status: MilestoneStatus): string {
   }
 }
 
-// ── Sample Data ──
-
-const INITIAL_MILESTONES: Milestone[] = [
-  {
-    id: 'ms-01',
-    name: 'Finalize procurement documents',
-    plannedStartDate: '2026-07-01',
-    plannedEndDate: '2026-07-30',
-    quarter: 'Quarter 3',
-    status: 'in-progress',
-    assignee: 'John Doe',
-    weightage: 20,
-    makhrajAlMarhala: 'تقرير التقييم الأولي',
-    marhalaAlMashroua: 'المرحلة التحضيرية',
-    description: 'Complete all procurement documentation for vendor selection process.',
-  },
-  {
-    id: 'ms-02',
-    name: 'Submit quarterly progress report',
-    plannedStartDate: '2026-08-01',
-    plannedEndDate: '2026-08-15',
-    quarter: 'Quarter 3',
-    status: 'completed',
-    assignee: 'Jane Smith',
-    weightage: 15,
-    makhrajAlMarhala: 'تقرير التقدم',
-    marhalaAlMashroua: 'مرحلة التنفيذ',
-    description: 'Prepare and submit Q3 progress report to steering committee.',
-  },
-  {
-    id: 'ms-03',
-    name: 'Steering committee review meeting',
-    plannedStartDate: '2026-09-01',
-    plannedEndDate: '2026-09-01',
-    quarter: 'Quarter 3',
-    status: 'not-started',
-    assignee: 'John Doe',
-    weightage: 25,
-    makhrajAlMarhala: 'محضر الاجتماع',
-    marhalaAlMashroua: 'مرحلة المراجعة',
-    description: 'Organize and conduct steering committee review for project milestone assessment.',
-  },
-  {
-    id: 'ms-04',
-    name: 'Final approval from Director',
-    plannedStartDate: '2026-10-01',
-    plannedEndDate: '2026-10-15',
-    quarter: 'Quarter 4',
-    status: 'not-started',
-    assignee: 'Sarah Lee',
-    weightage: 40,
-    makhrajAlMarhala: 'موافقة نهائية',
-    marhalaAlMashroua: 'مرحلة الإغلاق',
-    description: 'Obtain final sign-off from Division Director for project closure.',
-  },
-]
-
 const EMPTY_FORM: MilestoneFormData = {
   name: '',
   plannedStartDate: '',
@@ -135,7 +79,7 @@ interface MilestonesTabProps {
 
 export function MilestonesTab({ isAdeoVisible }: MilestonesTabProps) {
   // ── Data state ──
-  const [milestones, setMilestones] = useState<Milestone[]>(INITIAL_MILESTONES)
+  const [milestones, setMilestones] = useState<Milestone[]>([])
   const [currentPage, setCurrentPage] = useState(1)
 
   // ── CRUD state ──
@@ -373,48 +317,82 @@ export function MilestonesTab({ isAdeoVisible }: MilestonesTabProps) {
         title={title}
       >
         <div className="edit-activity__milestones-drawer">
-          <Input
-            error={formErrors.name}
-            label="Name of Milestone"
-            onChange={(e) => handleFieldChange({ name: e.target.value })}
-            required
-            value={form.name}
-          />
+          <div className="edit-activity__procurement-section">
+            <div className="create-activity__section-header">
+              <div className="create-activity__section-header-inner">
+                <span className="create-activity__section-header-icon" aria-hidden="true">
+                  <Flag size={16} />
+                </span>
+                <div>
+                  <span>Milestone Information</span>
+                  <h2>Name, Timeline & Details</h2>
+                </div>
+              </div>
+            </div>
 
-          <div className="create-activity__date-range">
-            <DatePicker
-              error={formErrors.plannedStartDate}
-              id="ms-planned-start-date"
-              label="Planned Start Date"
-              onChange={(value) => handleFieldChange({ plannedStartDate: value })}
-              required
-              value={form.plannedStartDate}
-            />
-            <span className="create-activity__date-connector" aria-hidden="true">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M5 12h14M13 5l7 7-7 7"/>
-              </svg>
-            </span>
-            <DatePicker
-              error={formErrors.plannedEndDate}
-              id="ms-planned-end-date"
-              label="Planned End Date"
-              onChange={(value) => handleFieldChange({ plannedEndDate: value })}
-              required
-              value={form.plannedEndDate}
-            />
+            <div className="edit-activity__procurement-drawer-section">
+              <Input
+                error={formErrors.name}
+                label="Name of Milestone"
+                onChange={(e) => handleFieldChange({ name: e.target.value })}
+                required
+                value={form.name}
+              />
+
+              <div className="create-activity__date-range">
+                <DatePicker
+                  error={formErrors.plannedStartDate}
+                  id="ms-planned-start-date"
+                  label="Planned Start Date"
+                  onChange={(value) => handleFieldChange({ plannedStartDate: value })}
+                  required
+                  value={form.plannedStartDate}
+                />
+                <span className="create-activity__date-connector" aria-hidden="true">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 12h14M13 5l7 7-7 7"/>
+                  </svg>
+                </span>
+                <DatePicker
+                  error={formErrors.plannedEndDate}
+                  id="ms-planned-end-date"
+                  label="Planned End Date"
+                  onChange={(value) => handleFieldChange({ plannedEndDate: value })}
+                  required
+                  value={form.plannedEndDate}
+                />
+              </div>
+
+              <Input
+                disabled
+                label="Quarter"
+                value={form.quarter}
+              />
+
+              <Textarea
+                label="Description"
+                onChange={(e) => handleFieldChange({ description: e.target.value })}
+                rows={3}
+                value={form.description}
+              />
+            </div>
           </div>
 
-          <Input
-            disabled
-            label="Quarter"
-            value={form.quarter}
-          />
-
           {isAdeoVisible ? (
-            <>
-              <div className="edit-activity__milestones-drawer-adeo-section">
-                <div className="edit-activity__milestones-drawer-section-label">ADEO Dependent Fields</div>
+            <div className="edit-activity__procurement-section">
+              <div className="create-activity__section-header">
+                <div className="create-activity__section-header-inner">
+                  <span className="create-activity__section-header-icon" aria-hidden="true">
+                    <Flag size={16} />
+                  </span>
+                  <div>
+                    <span>ADEO Dependent Fields</span>
+                    <h2>Weightage & Project Details</h2>
+                  </div>
+                </div>
+              </div>
+
+              <div className="edit-activity__procurement-drawer-section">
                 <Input
                   error={formErrors.weightage}
                   label="Weightage (%)"
@@ -450,15 +428,8 @@ export function MilestonesTab({ isAdeoVisible }: MilestonesTabProps) {
                   value={form.marhalaAlMashroua}
                 />
               </div>
-            </>
+            </div>
           ) : null}
-
-          <Textarea
-            label="Description"
-            onChange={(e) => handleFieldChange({ description: e.target.value })}
-            rows={3}
-            value={form.description}
-          />
         </div>
       </SideDrawer>
     )
@@ -526,15 +497,17 @@ export function MilestonesTab({ isAdeoVisible }: MilestonesTabProps) {
       {renderProgressBar()}
 
       {/* Timeline */}
-      <div className="edit-activity__milestones-timeline">
-        {paginatedMilestones.length > 0 ? (
-          paginatedMilestones.map(renderTimelineCard)
-        ) : (
-          <div className="edit-activity__placeholder">
-            No milestones yet. Click "Add Milestone" to create one.
-          </div>
-        )}
-      </div>
+      {paginatedMilestones.length > 0 ? (
+        <div className="edit-activity__milestones-timeline">
+          {paginatedMilestones.map(renderTimelineCard)}
+        </div>
+      ) : (
+        <div className="edit-activity__members-empty">
+          <Flag size={40} strokeWidth={1.2} />
+          <h3>No milestones added yet</h3>
+          <p>Click <strong>Add Milestone</strong> to create a milestone.</p>
+        </div>
+      )}
 
       {/* Pagination */}
       {renderPagination()}

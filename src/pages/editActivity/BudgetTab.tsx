@@ -15,7 +15,7 @@ import {
   MONTH_LABELS,
   type BudgetFieldErrors,
   type BudgetFormData,
-} from './budgetData'
+} from './data/budgetData'
 
 // ── Helpers ──
 
