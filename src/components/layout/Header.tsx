@@ -13,7 +13,6 @@ import {
   UserRound,
 } from 'lucide-react'
 import {
-  AOP_CYCLES,
   AOP_ROLE_DISPLAY,
   AOP_ROLES,
   LANGUAGES,
@@ -21,6 +20,8 @@ import {
   type ThemeMode,
 } from '../../constants/app'
 import {
+  fetchAssessmentCycles,
+  fetchPlanningInstances,
   setLanguage,
   setSelectedCycle,
   setSelectedRole,
@@ -51,7 +52,7 @@ function formatCompactMonthRange(startDate: string, endDate: string) {
 
 export function Header() {
   const dispatch = useAppDispatch()
-  const { isNotificationPanelOpen, language, notifications, selectedCycle, selectedRole, themeMode } = useAppSelector(
+  const { assessmentCycles, isNotificationPanelOpen, language, notifications, selectedCycle, selectedRole, themeMode } = useAppSelector(
     (state) => state.app,
   )
   const [isCycleOpen, setIsCycleOpen] = useState(false)
@@ -59,8 +60,20 @@ export function Header() {
   const cycleSwitcherRef = useRef<HTMLDivElement>(null)
   const roleSwitcherRef = useRef<HTMLDivElement>(null)
   const unreadCount = notifications.filter((notification) => notification.unread).length
-  const activeCycle = AOP_CYCLES.find((cycle) => cycle.id === selectedCycle) ?? AOP_CYCLES[0]
+  const activeCycle = assessmentCycles.find((c) => c.dga_assessment_cycleid === selectedCycle) ?? assessmentCycles[0]
   const activeRole = AOP_ROLE_DISPLAY[selectedRole]
+
+  // Fetch cycles once on mount
+  useEffect(() => {
+    dispatch(fetchAssessmentCycles())
+  }, [dispatch])
+
+  // Fetch planning instances whenever the selected cycle changes
+  useEffect(() => {
+    if (selectedCycle) {
+      dispatch(fetchPlanningInstances(selectedCycle))
+    }
+  }, [dispatch, selectedCycle])
 
   useEffect(() => {
     if (!isCycleOpen) {
@@ -135,10 +148,10 @@ export function Header() {
             <span className="header__cycle-trigger-icon">
               <ShieldCheck size={15} />
             </span>
-            <strong>{activeCycle.name}</strong>
+            <strong>{activeCycle?.dga_name ?? 'Select a cycle'}</strong>
             <span className="header__cycle-trigger-divider" />
             <CalendarDays size={15} />
-            <span>{formatCompactMonthRange(activeCycle.startDate, activeCycle.endDate)}</span>
+            <span>{activeCycle ? formatCompactMonthRange(activeCycle.dga_scheduled_start_date, activeCycle.dga_scheduled_end_date) : 'No cycle selected'}</span>
             <ChevronDown className={isCycleOpen ? 'header__cycle-trigger-chevron--open' : ''} size={15} />
           </button>
 
@@ -150,7 +163,7 @@ export function Header() {
                 </span>
                 <div>
                   <strong>Switch Cycle</strong>
-                  <span>{AOP_CYCLES.length} cycles available</span>
+                  <span>{assessmentCycles.length} cycles available</span>
                 </div>
                 <button aria-label="Refresh cycles" type="button">
                   <RefreshCw size={15} />
@@ -158,25 +171,25 @@ export function Header() {
               </div>
 
               <div className="cycle-popover__list">
-                {AOP_CYCLES.map((cycle) => {
-                  const isSelected = cycle.id === selectedCycle
+                {assessmentCycles.map((cycle) => {
+                  const isSelected = cycle.dga_assessment_cycleid === selectedCycle
 
                   return (
                     <button
                       className={`cycle-popover__item ${isSelected ? 'cycle-popover__item--selected' : ''}`}
-                      key={cycle.id}
+                      key={cycle.dga_assessment_cycleid}
                       onClick={() => {
-                        dispatch(setSelectedCycle(cycle.id))
+                        dispatch(setSelectedCycle(cycle.dga_assessment_cycleid))
                         setIsCycleOpen(false)
                       }}
                       type="button"
                     >
                       <span className="cycle-popover__check">{isSelected ? <Check size={16} /> : null}</span>
                       <span className="cycle-popover__item-copy">
-                        <strong>{cycle.name}</strong>
+                        <strong>{cycle.dga_name}</strong>
                         <small>
                           <CalendarDays size={13} />
-                          {formatDisplayDate(cycle.startDate)} - {formatDisplayDate(cycle.endDate)}
+                          {formatDisplayDate(cycle.dga_scheduled_start_date)} - {formatDisplayDate(cycle.dga_scheduled_end_date)}
                         </small>
                       </span>
                       {isSelected ? <span className="cycle-popover__badge">Current</span> : null}

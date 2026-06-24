@@ -10,7 +10,10 @@ export * as Dga_aop_projectsesModel from './models/Dga_aop_projectsesModel';
 export * as Dga_assessment_cyclesModel from './models/Dga_assessment_cyclesModel';
 export * as Dga_divisional_hierarchiesModel from './models/Dga_divisional_hierarchiesModel';
 export * as Dga_project_planning_instancesModel from './models/Dga_project_planning_instancesModel';
+export * as SystemuserrolescollectionModel from './models/SystemuserrolescollectionModel';
 export * as SystemusersModel from './models/SystemusersModel';
+export * as TeammembershipsModel from './models/TeammembershipsModel';
+export * as TeamsModel from './models/TeamsModel';
 
 // Services
 export * from './services/Dga_aop_project_logsesService';
@@ -18,4 +21,7 @@ export * from './services/Dga_aop_projectsesService';
 export * from './services/Dga_assessment_cyclesService';
 export * from './services/Dga_divisional_hierarchiesService';
 export * from './services/Dga_project_planning_instancesService';
+export * from './services/SystemuserrolescollectionService';
 export * from './services/SystemusersService';
+export * from './services/TeammembershipsService';
+export * from './services/TeamsService';

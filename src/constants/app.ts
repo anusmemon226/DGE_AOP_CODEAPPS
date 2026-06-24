@@ -65,35 +65,6 @@ export const LANGUAGES = [
 
 export type LanguageCode = (typeof LANGUAGES)[number]['value']
 
-export const AOP_CYCLES = [
-  {
-    id: 'cycle-2026-q2',
-    name: 'FY 2026 - Q2',
-    startDate: '2026-04-01',
-    endDate: '2026-06-30',
-    status: 'Active',
-    isDefault: true,
-  },
-  {
-    id: 'cycle-2026-q1',
-    name: 'FY 2026 - Q1',
-    startDate: '2026-01-01',
-    endDate: '2026-03-31',
-    status: 'Active',
-    isDefault: false,
-  },
-  {
-    id: 'cycle-2025-q4',
-    name: 'FY 2025 - Q4',
-    startDate: '2025-10-01',
-    endDate: '2025-12-31',
-    status: 'Completed',
-    isDefault: false,
-  },
-] as const
-
-export type CycleId = (typeof AOP_CYCLES)[number]['id']
-
 export type NavigationItemId =
   | 'dashboard'
   | 'createActivity'
@@ -138,28 +109,5 @@ export type AppNotification = {
 }
 
 export const MOCK_NOTIFICATIONS: AppNotification[] = [
-  {
-    id: 'approval-queue',
-    title: 'Activity Approved',
-    description: 'Your activity "Digital Infrastructure Upgrade" has been approved.',
-    time: '5 min ago',
-    tone: 'success',
-    unread: true,
-  },
-  {
-    id: 'new-team-member',
-    title: 'New Team Member',
-    description: 'John Smith has been added to the Strategy Team.',
-    time: '2 hours ago',
-    tone: 'info',
-    unread: true,
-  },
-  {
-    id: 'pending-review',
-    title: 'Pending Review',
-    description: 'Procurement plan requires your attention.',
-    time: '1 day ago',
-    tone: 'warning',
-    unread: false,
-  },
+  
 ]

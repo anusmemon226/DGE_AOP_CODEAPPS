@@ -21,10 +21,8 @@ import { useNavigate } from 'react-router-dom'
 import { Badge, Button, type SelectOption } from '../components/ui'
 import { type AopRole } from '../constants/app'
 import { Dga_divisional_hierarchiesService } from '../generated/services/Dga_divisional_hierarchiesService'
-import { Dga_project_planning_instancesService } from '../generated/services/Dga_project_planning_instancesService'
 import { SystemusersService } from '../generated/services/SystemusersService'
 import type { Dga_divisional_hierarchies } from '../generated/models/Dga_divisional_hierarchiesModel'
-import type { Dga_project_planning_instances } from '../generated/models/Dga_project_planning_instancesModel'
 import type { Systemusers } from '../generated/models/SystemusersModel'
 import { APP_ROUTE_PATHS } from '../routes/appRoutes'
 import { useAppSelector } from '../store/hooks'
@@ -148,6 +146,8 @@ function formatStatusCode(code: number): string {
 export function EditActivity() {
   const navigate = useNavigate()
   const selectedRole = useAppSelector((state) => state.app.selectedRole)
+  const planningInstances = useAppSelector((state) => state.app.planningInstances)
+  const selectedCycle = useAppSelector((state) => state.app.selectedCycle)
   const [activeTab, setActiveTab] = useState<TabId>('activity-info')
   const [form, setForm] = useState<ActivityForm>(INITIAL_FORM)
   const [errors, setErrors] = useState<FieldErrors>({})
@@ -188,15 +188,12 @@ export function EditActivity() {
       setErrors((currentErrors) => ({ ...currentErrors, context: undefined }))
 
       try {
-        const [usersResult, hierarchyResult, planningResult] = await Promise.all([
+        const [usersResult, hierarchyResult] = await Promise.all([
           SystemusersService.getAll({
             select: ['systemuserid', 'fullname', 'internalemailaddress']
           }),
           Dga_divisional_hierarchiesService.getAll({
             select: ['dga_divisional_hierarchyid', 'dga_name', 'dga_type', '_dga_parent_divisional_hierarchy_value'],
-          }),
-          Dga_project_planning_instancesService.getAll({
-            select: ['dga_project_planning_instanceid', 'dga_name', '_dga_assessment_cycle_value'],
           }),
         ])
 
@@ -204,7 +201,6 @@ export function EditActivity() {
 
         const users = (usersResult?.data ?? []) as Systemusers[]
         const hierarchy = (hierarchyResult?.data ?? []) as Dga_divisional_hierarchies[]
-        const planningInstances = (planningResult?.data ?? []) as Dga_project_planning_instances[]
 
         const activityLeadUsers = (users ?? [])
           .filter((user) => user.fullname)
@@ -217,6 +213,11 @@ export function EditActivity() {
         const sectors = (hierarchy ?? []).filter((item) => item.dga_type === 776140001)
         const sector = sectors[0]
         const division = divisions[0]
+        const matchedPlanningInstance = planningInstances.find((item) => {
+          const matchesDivision = division ? item._dga_divisional_hierarchy_value === division.dga_divisional_hierarchyid : true
+          const matchesCycle = selectedCycle ? item._dga_assessment_cycle_value === selectedCycle : true
+          return matchesDivision && matchesCycle
+        }) ?? planningInstances?.[0]
 
         setActivityLeadOptions(activityLeadUsers)
         setContext({
@@ -224,7 +225,7 @@ export function EditActivity() {
           currentUserName: users?.[0]?.fullname ?? 'User',
           division,
           sector,
-          planningInstance: planningInstances?.[0],
+          planningInstance: matchedPlanningInstance,
         })
         setForm((prev) => ({
           ...prev,

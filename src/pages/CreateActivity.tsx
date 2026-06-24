@@ -14,12 +14,9 @@ import {
   Textarea,
   type SelectOption,
 } from '../components/ui'
-import { AOP_CYCLES } from '../constants/app'
 import { Dga_aop_project_logsesService } from '../generated/services/Dga_aop_project_logsesService'
 import { Dga_aop_projectsesService } from '../generated/services/Dga_aop_projectsesService'
-import { Dga_assessment_cyclesService } from '../generated/services/Dga_assessment_cyclesService'
 import { Dga_divisional_hierarchiesService } from '../generated/services/Dga_divisional_hierarchiesService'
-import { Dga_project_planning_instancesService } from '../generated/services/Dga_project_planning_instancesService'
 import { SystemusersService } from '../generated/services/SystemusersService'
 import type { Dga_aop_projectsesBase, Dga_aop_projectses } from '../generated/models/Dga_aop_projectsesModel'
 import type { Dga_aop_project_logsesBase } from '../generated/models/Dga_aop_project_logsesModel'
@@ -570,7 +567,7 @@ function getDraftWarnings(draft: CreateActivityForm) {
 
 export function CreateActivity() {
   const navigate = useNavigate()
-  const selectedCycle = useAppSelector((state) => state.app.selectedCycle)
+  const { assessmentCycles, planningInstances, selectedCycle } = useAppSelector((state) => state.app)
   const [activeTab, setActiveTab] = useState<TabValue>('copilot')
   const [form, setForm] = useState<CreateActivityForm>(INITIAL_FORM)
   const [errors, setErrors] = useState<FieldErrors>({})
@@ -583,7 +580,7 @@ export function CreateActivity() {
   const [copilotDraft, setCopilotDraft] = useState<CreateActivityForm | null>(null)
   const [attachments, setAttachments] = useState<CopilotAttachment[]>([])
   const [attachmentError, setAttachmentError] = useState('')
-  const cycle = AOP_CYCLES.find((item) => item.id === selectedCycle) ?? AOP_CYCLES[0]
+  const cycle = assessmentCycles.find((item) => item.dga_assessment_cycleid === selectedCycle) ?? assessmentCycles[0]
   const isStrategic = form.activityScope === '1'
   const isPaymentOnly = form.activityClassification === '576610002'
   const isBudgetNo = form.budgetRequired === '0'
@@ -618,7 +615,7 @@ export function CreateActivity() {
       setErrors((currentErrors) => ({ ...currentErrors, context: undefined }))
 
       try {
-        const [usersResult, hierarchyResult, cycleResult, planningResult] = await Promise.all([
+        const [usersResult, hierarchyResult] = await Promise.all([
           SystemusersService.getAll({
             select: ['systemuserid', 'fullname', 'internalemailaddress']
           }),
@@ -630,16 +627,6 @@ export function CreateActivity() {
               '_dga_parent_divisional_hierarchy_value'
             ],
           }),
-          Dga_assessment_cyclesService.getAll({
-            select: ['dga_assessment_cycleid', 'dga_name', 'dga_scheduled_start_date', 'dga_scheduled_end_date'],
-          }),
-          Dga_project_planning_instancesService.getAll({
-            select: [
-              'dga_project_planning_instanceid',
-              'dga_name',
-              '_dga_assessment_cycle_value'
-            ],
-          }),
         ])
 
 
@@ -649,18 +636,15 @@ export function CreateActivity() {
 
         const users = getResultArray<Systemusers>(usersResult.data).filter((user) => !user.isdisabled)
         const hierarchies = getResultArray<Dga_divisional_hierarchies>(hierarchyResult.data)
-        const cycles = getResultArray<{ dga_assessment_cycleid: string; dga_name: string }>(cycleResult.data)
-        const planningInstances = getResultArray<Dga_project_planning_instances>(planningResult.data)
 
         const currentUser = users[0]
         const division = hierarchies.find((item) => item.dga_type === 776140002) ?? hierarchies[0]
         const sector = division?._dga_parent_divisional_hierarchy_value
           ? hierarchies.find((item) => item.dga_divisional_hierarchyid === division._dga_parent_divisional_hierarchy_value)
           : hierarchies.find((item) => item.dga_type === 776140001)
-        const matchedCycle = cycles.find((item) => item.dga_name === cycle.name || item.dga_name.includes(cycle.name))
         const planningInstance = planningInstances.find((item) => {
           const matchesDivision = division ? item._dga_divisional_hierarchy_value === division.dga_divisional_hierarchyid : true
-          const matchesCycle = matchedCycle ? item._dga_assessment_cycle_value === matchedCycle.dga_assessment_cycleid : true
+          const matchesCycle = selectedCycle ? item._dga_assessment_cycle_value === selectedCycle : true
 
           return matchesDivision && matchesCycle
         }) ?? planningInstances.find((item) => division ? item._dga_divisional_hierarchy_value === division.dga_divisional_hierarchyid : true)
@@ -712,7 +696,7 @@ export function CreateActivity() {
     return () => {
       isMounted = false
     }
-  }, [cycle.name])
+  }, [cycle?.dga_name])
 
   function updateForm(nextFields: Partial<CreateActivityForm>) {
     setSuccessMessage('')
@@ -1315,7 +1299,7 @@ export function CreateActivity() {
             <div className="create-activity__hero-content">
               <span>Create Activity</span>
               <h1>{form.activityName.trim() || 'New Activity'}</h1>
-              <p>{cycle.name} &mdash; Activity planning for the Digital Connect Annual Operating Plan.</p>
+              <p>{cycle?.dga_name ?? 'Loading...'} &mdash; Activity planning for the Digital Connect Annual Operating Plan.</p>
             </div>
           </div>
 

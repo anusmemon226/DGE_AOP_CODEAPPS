@@ -36,6 +36,18 @@
         "divisionalhierarchies": {
           "entitySetName": "dga_divisional_hierarchies",
           "logicalName": "dga_divisional_hierarchy"
+        },
+        "teams": {
+          "entitySetName": "teams",
+          "logicalName": "team"
+        },
+        "teammembership": {
+          "entitySetName": "teammemberships",
+          "logicalName": "teammembership"
+        },
+        "systemuserroles": {
+          "entitySetName": "systemuserrolescollection",
+          "logicalName": "systemuserroles"
         }
       },
       "environmentVariableName": ""
