@@ -15,6 +15,8 @@ import {
   X,
 } from 'lucide-react'
 import { Button, ConfirmationDialog, Modal, SearchInput } from '../../components/ui'
+import type { Systemusers } from '../../generated/models/SystemusersModel'
+import { SystemusersService } from '../../generated/services/SystemusersService'
 
 // ── Types ──
 
@@ -36,12 +38,140 @@ type ActivityMember = MockUser & {
 
 const ITEMS_PER_PAGE = 12
 const LAZY_BATCH = 12
+const ACTIVITY_MEMBER_API_URL = 'https://orgb0eb9d4d.crm6.dynamics.com/api/data/v9.2/dga_WebApiForPortal'
+const ACTIVITY_MEMBER_TARGET_TABLE = 'dga_aop_projects'
+const ACTIVITY_MEMBER_RELATED_TABLE = 'systemuser'
+const ACTIVITY_MEMBER_RELATIONSHIP = 'dga_aop_projects_systemuser_systemuser'
+
+type MembersTabProps = {
+  projectId: string
+}
+
+type ActivityMemberApiAction = 'associate' | 'disassociate'
+
+type ActivityMemberApiResponse = {
+  error?: { message?: string }
+  message?: string
+  success?: boolean
+}
+
+function getCustomApiToken() {
+  const envToken = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_DGA_CUSTOM_API_TOKEN
+  return envToken
+    ?? window.localStorage.getItem('DGA_CUSTOM_API_TOKEN')
+    ?? window.localStorage.getItem('API_TOKEN')
+    ?? window.sessionStorage.getItem('DGA_CUSTOM_API_TOKEN')
+    ?? window.sessionStorage.getItem('API_TOKEN')
+    ?? ''
+}
+
+async function callActivityMemberApi(actionName: ActivityMemberApiAction, projectId: string, userId: string) {
+  console.log(projectId)
+  console.log(userId)
+  const token = getCustomApiToken()
+
+  if (!token) {
+    throw new Error('Custom API token is missing. Set VITE_DGA_CUSTOM_API_TOKEN or store API_TOKEN in browser storage.')
+  }
+
+  const response = await fetch(ACTIVITY_MEMBER_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      actionName,
+      isAdmin: true,
+      userId: '',
+      targetTableName: ACTIVITY_MEMBER_TARGET_TABLE,
+      relatedTableName: ACTIVITY_MEMBER_RELATED_TABLE,
+      targetId: projectId.replace(/[{}]/g, ''),
+      relatedId: userId.replace(/[{}]/g, ''),
+      relationship: ACTIVITY_MEMBER_RELATIONSHIP,
+    }),
+  })
+
+  const result = await response.json().catch(() => ({} as ActivityMemberApiResponse)) as ActivityMemberApiResponse
+
+  if (!response.ok || result.success === false) {
+    throw new Error(result.error?.message ?? result.message ?? `Failed to ${actionName} activity member.`)
+  }
+
+  return result
+}
+
+function getOperationErrorMessage(result: unknown, fallbackMessage: string) {
+  const error = (result as { error?: { message?: string } | string })?.error
+  const message = typeof error === 'string' ? error : error?.message
+
+  if (!message) return fallbackMessage
+
+  try {
+    const parsed = JSON.parse(message) as { error?: { message?: string } }
+    return parsed.error?.message ?? message
+  } catch {
+    return message
+  }
+}
+
+function assertOperationSuccess(result: unknown, fallbackMessage: string) {
+  if ((result as { success?: boolean })?.success === false) {
+    throw new Error(getOperationErrorMessage(result, fallbackMessage))
+  }
+}
+
+function getInitials(name: string) {
+  return name
+    .split(' ')
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+}
+
+function isDivisionUser(user: Systemusers) {
+  const text = [
+    user.businessunitidname,
+    user.jobtitle,
+    user.title,
+  ].filter(Boolean).join(' ').toLowerCase()
+
+  return text.includes('division')
+}
+
+function mapSystemUserToMember(user: Systemusers): MockUser | null {
+  if (!user.systemuserid) return null
+
+  const email = user.internalemailaddress ?? user.domainname ?? ''
+  const name = user.fullname ?? email ?? user.domainname ?? 'Unnamed User'
+
+  return {
+    avatarUrl: null,
+    email,
+    id: user.systemuserid,
+    isDivisionMember: isDivisionUser(user),
+    name,
+  }
+}
+
+function normalizeId(id?: string | null) {
+  return id?.replace(/[{}]/g, '').toLowerCase() ?? ''
+}
 
 // ── Component ──
 
-export function MembersTab() {
+export function MembersTab({ projectId }: MembersTabProps) {
+  const [availableUsers, setAvailableUsers] = useState<MockUser[]>([])
+  const [isUsersLoading, setIsUsersLoading] = useState(false)
+  const [usersError, setUsersError] = useState('')
   const [members, setMembers] = useState<ActivityMember[]>([])
+  const [isMembersLoading, setIsMembersLoading] = useState(false)
+  const [membersError, setMembersError] = useState('')
+  const [membersNotice, setMembersNotice] = useState('')
   const [memberToDelete, setMemberToDelete] = useState<ActivityMember | null>(null)
+  const [isSavingMembers, setIsSavingMembers] = useState(false)
+  const [isRemovingMember, setIsRemovingMember] = useState(false)
   const [isAddMembersModalOpen, setIsAddMembersModalOpen] = useState(false)
   const [memberFilter, setMemberFilter] = useState<MemberFilter>('all')
   const [memberSearchQuery, setMemberSearchQuery] = useState('')
@@ -53,6 +183,64 @@ export function MembersTab() {
   const [currentPage, setCurrentPage] = useState(1)
   const [lazyVisibleCount, setLazyVisibleCount] = useState(12)
   const sentinelRef = useRef<HTMLDivElement>(null)
+
+  const loadMembersContext = useCallback(async () => {
+    if (!projectId) {
+      setUsersError('')
+      setMembersError('Activity id is missing from the edit URL.')
+      setAvailableUsers([])
+      setMembers([])
+      return
+    }
+
+    setIsUsersLoading(true)
+    setIsMembersLoading(true)
+    setUsersError('')
+    setMembersError('')
+    setMembersNotice('')
+
+    try {
+      const usersResult = await SystemusersService.getAll({
+        select: [
+          'systemuserid',
+          'fullname',
+          'internalemailaddress',
+          'domainname',
+          'jobtitle',
+          'title',
+          'isdisabled',
+        ],
+        filter: 'isdisabled eq false',
+        orderBy: ['fullname asc'],
+      })
+
+      assertOperationSuccess(usersResult, 'Unable to load users.')
+
+      const users = (usersResult.data ?? [])
+        .map((user) => mapSystemUserToMember(user as Systemusers))
+        .filter((user): user is MockUser => Boolean(user))
+
+      setAvailableUsers(users)
+      setMembers([])
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to load users.'
+      setUsersError(message)
+      setMembersError(message)
+      setAvailableUsers([])
+      setMembers([])
+    } finally {
+      setIsUsersLoading(false)
+      setIsMembersLoading(false)
+    }
+  }, [projectId])
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void loadMembersContext()
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [loadMembersContext])
 
   // ── Computed ──
 
@@ -93,8 +281,12 @@ export function MembersTab() {
   }, [filteredMembers, memberViewMode, currentPage, lazyVisibleCount])
 
   useEffect(() => {
-    setCurrentPage(1)
-    setLazyVisibleCount(12)
+    const timeoutId = window.setTimeout(() => {
+      setCurrentPage(1)
+      setLazyVisibleCount(12)
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
   }, [memberListSearch, members.length])
 
   // ── Handlers ──
@@ -104,6 +296,7 @@ export function MembersTab() {
     setMemberFilter('all')
     setMemberSearchQuery('')
     setMemberSelectionError('')
+    setMembersNotice('')
     setIsAddMembersModalOpen(true)
   }, [])
 
@@ -115,32 +308,99 @@ export function MembersTab() {
     setIsAddMembersModalOpen(false)
   }, [])
 
-  const handleAddSelectedMembers = useCallback(() => {
+  const handleAddSelectedMembers = useCallback(async () => {
+    if (isSavingMembers) return
+
+    if (!projectId) {
+      setMemberSelectionError('Activity id is missing from the edit URL.')
+      return
+    }
+
     if (selectedMemberIds.size === 0) {
       setMemberSelectionError('Please select at least one user to add.')
       return
     }
+
+    const existingIds = new Set(members.map((member) => normalizeId(member.id)))
+    const selectedUserIds = Array.from(selectedMemberIds)
+      .map((userId) => userId.replace(/[{}]/g, ''))
+      .filter((userId) => !existingIds.has(normalizeId(userId)))
+
+    if (selectedUserIds.length === 0) {
+      setMemberSelectionError('Selected users are already added to this activity.')
+      return
+    }
+
+    setIsSavingMembers(true)
+    setMemberSelectionError('')
+    setMembersNotice('')
+
+    const results = await Promise.allSettled(
+      selectedUserIds.map((userId) =>
+        callActivityMemberApi('associate', projectId, userId),
+      ),
+    )
+
+    const failures = results.filter((result) => {
+      if (result.status === 'rejected') return true
+      return result.value.success === false
+    })
+
+    setIsSavingMembers(false)
+
+    if (failures.length > 0) {
+      const firstFailure = failures[0]
+      const message = firstFailure.status === 'rejected'
+        ? firstFailure.reason instanceof Error ? firstFailure.reason.message : 'Unable to add one or more members.'
+        : getOperationErrorMessage(firstFailure.value, 'Unable to add one or more members.')
+      const successCount = selectedUserIds.length - failures.length
+
+      setMemberSelectionError(`${successCount} of ${selectedUserIds.length} member${selectedUserIds.length !== 1 ? 's' : ''} added. ${message}`)
+      return
+    }
+
     setMembers((prev) => {
-      const existingIds = new Set(prev.map((m) => m.id))
-      const newMembers = ([] as MockUser[])
-        .filter((u) => selectedMemberIds.has(u.id) && !existingIds.has(u.id))
-        .map((u) => ({ ...u, addedAt: new Date().toISOString().slice(0, 10) }))
+      const existingIds = new Set(prev.map((member) => normalizeId(member.id)))
+      const newMembers = availableUsers
+        .filter((user) => selectedUserIds.some((userId) => normalizeId(userId) === normalizeId(user.id)) && !existingIds.has(normalizeId(user.id)))
+        .map((user) => ({ ...user, addedAt: new Date().toISOString().slice(0, 10) }))
+
       return [...prev, ...newMembers]
     })
     setSelectedMemberIds(new Set())
     setMemberSelectionError('')
+    setMembersNotice(`${selectedUserIds.length} member${selectedUserIds.length !== 1 ? 's' : ''} added successfully.`)
     setIsAddMembersModalOpen(false)
-  }, [selectedMemberIds])
+  }, [availableUsers, isSavingMembers, members, projectId, selectedMemberIds])
 
   const handleRemoveMember = useCallback((member: ActivityMember) => {
     setMemberToDelete(member)
   }, [])
 
-  const handleConfirmDeleteMember = useCallback(() => {
+  const handleConfirmDeleteMember = useCallback(async () => {
     if (!memberToDelete) return
-    setMembers((prev) => prev.filter((m) => m.id !== memberToDelete.id))
-    setMemberToDelete(null)
-  }, [memberToDelete])
+    if (isRemovingMember) return
+
+    if (!projectId) {
+      setMembersError('Activity id is missing from the edit URL.')
+      return
+    }
+
+    setIsRemovingMember(true)
+    setMembersError('')
+    setMembersNotice('')
+
+    try {
+      await callActivityMemberApi('disassociate', projectId, memberToDelete.id)
+      setMembers((prev) => prev.filter((m) => normalizeId(m.id) !== normalizeId(memberToDelete.id)))
+      setMemberToDelete(null)
+      setMembersNotice('Member removed successfully.')
+    } catch (error) {
+      setMembersError(error instanceof Error ? error.message : 'Unable to remove member.')
+    } finally {
+      setIsRemovingMember(false)
+    }
+  }, [isRemovingMember, memberToDelete, projectId])
 
   const handleCancelDeleteMember = useCallback(() => {
     setMemberToDelete(null)
@@ -163,7 +423,7 @@ export function MembersTab() {
 
   const filteredUsers = useMemo(() => {
     const existingIds = new Set(members.map((m) => m.id))
-    const notAddedUsers = ([] as MockUser[]).filter((u) => !existingIds.has(u.id))
+    const notAddedUsers = availableUsers.filter((u) => !existingIds.has(u.id))
 
     return notAddedUsers.filter((user) => {
       if (memberFilter === 'division' && !user.isDivisionMember) return false
@@ -174,7 +434,7 @@ export function MembersTab() {
       }
       return true
     })
-  }, [members, memberFilter, memberSearchQuery])
+  }, [availableUsers, members, memberFilter, memberSearchQuery])
 
   const memberCount = members.length
   const filteredCount = filteredMembers.length
@@ -193,7 +453,7 @@ export function MembersTab() {
     const selectedCount = selectedMemberIds.size
     const hasSelection = selectedCount > 0
     const selectedUsers = hasSelection
-      ? ([] as MockUser[]).filter((u) => selectedMemberIds.has(u.id))
+      ? availableUsers.filter((u) => selectedMemberIds.has(u.id))
       : []
 
     return (
@@ -204,8 +464,8 @@ export function MembersTab() {
               <Button onClick={handleCloseAddMembersModal} variant="secondary">
                 Cancel
               </Button>
-              <Button icon={<UserCheck size={16} />} onClick={handleAddSelectedMembers}>
-                Add Selected Members
+              <Button disabled={isUsersLoading || isSavingMembers || Boolean(usersError)} icon={<UserCheck size={16} />} onClick={handleAddSelectedMembers}>
+                {isSavingMembers ? 'Adding...' : 'Add Selected Members'}
               </Button>
             </div>
           }
@@ -248,7 +508,12 @@ export function MembersTab() {
             </div>
 
             {/* Error message */}
-            {memberSelectionError ? (
+            {usersError ? (
+              <div className="edit-activity__members-modal-error">
+                <AlertCircle size={13} />
+                {usersError}
+              </div>
+            ) : memberSelectionError ? (
               <div className="edit-activity__members-modal-error">
                 <AlertCircle size={13} />
                 {memberSelectionError}
@@ -257,7 +522,11 @@ export function MembersTab() {
 
             {/* Users list */}
             <div className="edit-activity__members-modal-list">
-              {filteredUsers.length === 0 ? (
+              {isUsersLoading ? (
+                <div className="edit-activity__members-modal-empty">
+                  Loading users...
+                </div>
+              ) : filteredUsers.length === 0 ? (
                 <div className="edit-activity__members-modal-empty">
                   {memberSearchQuery ? 'No users match your search.' : 'All users are already added to this activity.'}
                 </div>
@@ -268,7 +537,7 @@ export function MembersTab() {
                       {user.avatarUrl ? (
                         <img alt={user.name} src={user.avatarUrl} />
                       ) : (
-                        <span>{user.name.split(' ').map((part) => part[0]).join('').slice(0, 2)}</span>
+                        <span>{getInitials(user.name)}</span>
                       )}
                     </div>
                     <div className="edit-activity__members-modal-user-info">
@@ -338,10 +607,22 @@ export function MembersTab() {
           </h2>
           <p>Manage users assigned to this activity.</p>
         </div>
-        <Button icon={<UserPlus size={16} />} onClick={handleOpenAddMembersModal}>
+        <Button disabled={!projectId || isMembersLoading} icon={<UserPlus size={16} />} onClick={handleOpenAddMembersModal}>
           Add Members
         </Button>
       </div>
+
+      {membersError ? (
+        <div className="edit-activity__members-modal-error">
+          <AlertCircle size={13} />
+          {membersError}
+        </div>
+      ) : membersNotice ? (
+        <div className="edit-activity__members-modal-selected-header">
+          <Check size={14} />
+          <span>{membersNotice}</span>
+        </div>
+      ) : null}
 
       {/* Toolbar: search + view toggle */}
       {memberCount > 0 ? (
@@ -389,7 +670,13 @@ export function MembersTab() {
       ) : null}
 
       {/* Cards grid */}
-      {filteredCount === 0 ? (
+      {isMembersLoading ? (
+        <div className="edit-activity__members-empty">
+          <UsersRound size={40} strokeWidth={1.2} />
+          <h3>Loading members...</h3>
+          <p>Fetching users assigned to this activity.</p>
+        </div>
+      ) : filteredCount === 0 ? (
         <div className="edit-activity__members-empty">
           {hasFilter ? (
             <>
@@ -413,7 +700,7 @@ export function MembersTab() {
                 {member.avatarUrl ? (
                   <img alt={member.name} src={member.avatarUrl} />
                 ) : (
-                  <span>{member.name.split(' ').map((part) => part[0]).join('').slice(0, 2)}</span>
+                  <span>{getInitials(member.name)}</span>
                 )}
               </div>
               <div className="edit-activity__member-card-info">
@@ -525,7 +812,7 @@ export function MembersTab() {
 
       {/* Confirm Delete Member */}
       <ConfirmationDialog
-        confirmLabel="Remove Member"
+        confirmLabel={isRemovingMember ? 'Removing...' : 'Remove Member'}
         danger
         description="This member will be removed from this activity. This action cannot be undone."
         isOpen={memberToDelete !== null}

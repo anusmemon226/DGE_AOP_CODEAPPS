@@ -56,6 +56,18 @@
         "securityroles": {
           "entitySetName": "roles",
           "logicalName": "role"
+        },
+        "dga_aop_projects_systemuser": {
+          "entitySetName": "dga_aop_projects_systemuserset",
+          "logicalName": "dga_aop_projects_systemuser"
+        },
+        "dga_aop_projects_systemuser_1": {
+          "entitySetName": "dga_aop_projects_systemuserset",
+          "logicalName": "dga_aop_projects_systemuser"
+        },
+        "dependencies": {
+          "entitySetName": "dga_dependencies",
+          "logicalName": "dga_dependency"
         }
       },
       "environmentVariableName": ""

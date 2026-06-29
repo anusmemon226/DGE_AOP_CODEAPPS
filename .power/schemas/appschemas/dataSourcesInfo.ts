@@ -26,6 +26,20 @@ export const dataSourcesInfo = {
     "dataSourceType": "Dataverse",
     "apis": {}
   },
+  "dga_dependencies": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "dga_dependencyid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
+  "dga_aop_projects_systemuserset": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "dga_aop_projects_systemuserid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
   "dga_divisional_hierarchies": {
     "tableId": "",
     "version": "",

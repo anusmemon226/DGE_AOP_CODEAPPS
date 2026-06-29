@@ -1,0 +1,58 @@
+{
+  "name": "dga_aop_projects_systemuser",
+  "title": "dga_aop_projects_systemuser",
+  "schema": {
+    "type": "array",
+    "items": {
+      "type": "object",
+      "x-ms-dataverse-entity": true,
+      "x-ms-dataverse-entityset": "dga_aop_projects_systemuserset",
+      "x-ms-dataverse-primary-id": "dga_aop_projects_systemuserid",
+      "x-ms-dataverse-primary-name": null,
+      "properties": {
+        "dga_aop_projects_systemuserid": {
+          "type": "string",
+          "title": "dga_aop_projects_systemuserid",
+          "x-ms-dataverse-attribute": "dga_aop_projects_systemuserid",
+          "x-ms-dataverse-type": "UniqueidentifierType",
+          "x-ms-schema-name": "dga_aop_projects_SystemUserId",
+          "x-ms-read-only": true,
+          "x-ms-dataverse-primary-id": true,
+          "required": true,
+          "x-ms-keyType": "primary"
+        },
+        "dga_aop_projectsid": {
+          "type": "string",
+          "title": "dga_aop_projectsid",
+          "x-ms-dataverse-attribute": "dga_aop_projectsid",
+          "x-ms-dataverse-type": "UniqueidentifierType",
+          "x-ms-schema-name": "dga_aop_projectsid",
+          "x-ms-read-only": true,
+          "required": true
+        },
+        "systemuserid": {
+          "type": "string",
+          "title": "systemuserid",
+          "x-ms-dataverse-attribute": "systemuserid",
+          "x-ms-dataverse-type": "UniqueidentifierType",
+          "x-ms-schema-name": "systemuserid",
+          "x-ms-read-only": true,
+          "required": true
+        },
+        "versionnumber": {
+          "type": "string",
+          "title": "versionnumber",
+          "x-ms-dataverse-attribute": "versionnumber",
+          "x-ms-dataverse-type": "BigIntType",
+          "x-ms-schema-name": "VersionNumber",
+          "x-ms-read-only": true
+        }
+      },
+      "required": [
+        "dga_aop_projects_systemuserid",
+        "dga_aop_projectsid",
+        "systemuserid"
+      ]
+    }
+  }
+}
