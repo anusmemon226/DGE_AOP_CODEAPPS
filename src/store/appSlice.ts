@@ -33,22 +33,30 @@ export const fetchAssessmentCycles = createAsyncThunk(
   },
 )
 
-export const fetchPlanningInstances = createAsyncThunk(
+export const fetchPlanningInstances = createAsyncThunk<
+  Dga_project_planning_instances[],
+  string | undefined,
+  { rejectValue: string }
+>(
   'app/fetchPlanningInstances',
-  async (cycleId: string | undefined) => {
-    const filter = cycleId
-      ? `_dga_assessment_cycle_value eq ${cycleId}`
-      : undefined
-    const result = await Dga_project_planning_instancesService.getAll({
-      filter,
-      select: [
-        'dga_project_planning_instanceid',
-        'dga_name',
-        '_dga_assessment_cycle_value',
-        '_dga_divisional_hierarchy_value',
-      ],
-    })
-    return (result.data ?? []) as Dga_project_planning_instances[]
+  async (cycleId, { rejectWithValue }) => {
+    if (!cycleId) {
+      return []
+    }
+
+    try {
+      const result = await Dga_project_planning_instancesService.getAll({
+        filter: `_dga_assessment_cycle_value eq ${cycleId}`,
+        select: [
+          'dga_project_planning_instanceid',
+          '_dga_assessment_cycle_value',
+          '_dga_divisional_hierarchy_value',
+        ],
+      })
+      return (result.data ?? []) as Dga_project_planning_instances[]
+    } catch (error) {
+      return rejectWithValue(error instanceof Error ? error.message : 'Unable to load planning instances.')
+    }
   },
 )
 
@@ -79,7 +87,9 @@ type AppState = {
   assessmentCycles: Dga_assessment_cycles[]
   assessmentCyclesLoading: boolean
   planningInstances: Dga_project_planning_instances[]
+  planningInstancesCycleId: string
   planningInstancesLoading: boolean
+  planningInstancesError: string | null
   currentUser: Systemusers | null
   currentUserLoading: boolean
   themeMode: ThemeMode
@@ -98,7 +108,9 @@ const initialState: AppState = {
   assessmentCycles: [],
   assessmentCyclesLoading: false,
   planningInstances: [],
+  planningInstancesCycleId: '',
   planningInstancesLoading: false,
+  planningInstancesError: null,
   currentUser: null,
   currentUserLoading: false,
   themeMode: 'light',
@@ -120,6 +132,9 @@ export const appSlice = createSlice({
     },
     setSelectedCycle: (state, action: PayloadAction<string>) => {
       state.selectedCycle = action.payload
+      state.planningInstances = []
+      state.planningInstancesCycleId = ''
+      state.planningInstancesError = null
     },
     setDefaultCycle: (state, action: PayloadAction<string>) => {
       state.defaultCycleId = action.payload
@@ -173,13 +188,21 @@ export const appSlice = createSlice({
       })
       .addCase(fetchPlanningInstances.pending, (state) => {
         state.planningInstancesLoading = true
+        state.planningInstances = []
+        state.planningInstancesCycleId = ''
+        state.planningInstancesError = null
       })
       .addCase(fetchPlanningInstances.fulfilled, (state, action) => {
         state.planningInstances = action.payload
+        state.planningInstancesCycleId = action.meta.arg ?? ''
         state.planningInstancesLoading = false
+        state.planningInstancesError = null
       })
-      .addCase(fetchPlanningInstances.rejected, (state) => {
+      .addCase(fetchPlanningInstances.rejected, (state, action) => {
+        state.planningInstances = []
+        state.planningInstancesCycleId = action.meta.arg ?? ''
         state.planningInstancesLoading = false
+        state.planningInstancesError = action.payload ?? action.error.message ?? 'Unable to load planning instances.'
       })
       .addCase(fetchCurrentUser.pending, (state) => {
         state.currentUserLoading = true

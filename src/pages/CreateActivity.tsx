@@ -24,6 +24,7 @@ import type { Dga_project_planning_instances } from '../generated/models/Dga_pro
 import type { Systemusers } from '../generated/models/SystemusersModel'
 import { APP_ROUTE_PATHS } from '../routes/appRoutes'
 import { useAppSelector } from '../store/hooks'
+import type { UserRole } from '../store/userSlice'
 
 type TabValue = 'manual' | 'copilot'
 type ActivityTypeValue = '1' | '2' | '3' | '4'
@@ -68,6 +69,7 @@ const FIELD_LABELS: Partial<Record<keyof CreateActivityForm, string>> = {
   sectorName: 'Sector',
   divisionName: 'Division',
   activityScope: 'Activity Scope',
+  strategies: 'Strategy Categorization',
   activityClassification: 'Activity Classification',
   budgetRequired: 'Budget requirement',
   procurementRequired: 'Procurement requirement',
@@ -89,9 +91,21 @@ const FIELD_LABELS: Partial<Record<keyof CreateActivityForm, string>> = {
 type ActivityContext = {
   currentUserId: string
   currentUserName: string
-  division?: Dga_divisional_hierarchies
-  sector?: Dga_divisional_hierarchies
-  planningInstance?: Dga_project_planning_instances
+  ownerTeamId: string
+  roleTeamId: string
+  cycleId: string
+  division: Dga_divisional_hierarchies
+  sector: Dga_divisional_hierarchies
+  planningInstance: Dga_project_planning_instances
+}
+
+type DgaAopProjectCreatePayload = Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid' | 'dga_project_categorized_under' | 'ownerid' | 'owneridtype'> & {
+  dga_project_categorized_under?: string
+  'ownerid@odata.bind': string
+}
+
+type DgaAopProjectLogCreatePayload = Omit<Dga_aop_project_logsesBase, 'dga_aop_project_logsid' | 'ownerid' | 'owneridtype'> & {
+  'ownerid@odata.bind': string
 }
 
 type CopilotAttachment = {
@@ -192,12 +206,38 @@ function getResultArray<T>(result: unknown): T[] {
   return []
 }
 
+function getOperationErrorMessage(result: unknown, fallbackMessage: string) {
+  const error = (result as { error?: { message?: string } | string })?.error
+  const message = typeof error === 'string' ? error : error?.message
+
+  if (!message) {
+    return fallbackMessage
+  }
+
+  try {
+    const parsed = JSON.parse(message) as { error?: { message?: string } }
+    return parsed.error?.message ?? message
+  } catch {
+    return message
+  }
+}
+
+function assertOperationSuccess(result: unknown, fallbackMessage: string) {
+  if ((result as { success?: boolean })?.success === false) {
+    throw new Error(getOperationErrorMessage(result, fallbackMessage))
+  }
+}
+
 function escapeODataValue(value: string) {
   return value.replace(/'/g, "''")
 }
 
 function toEntityBind(entitySetName: string, id: string) {
   return `/${entitySetName}(${id})`
+}
+
+function normalizeId(id: string | null | undefined) {
+  return (id ?? '').replace(/[{}]/g, '').toLowerCase()
 }
 
 function withoutUndefined<TRecord extends Record<string, unknown>>(record: TRecord) {
@@ -328,6 +368,10 @@ function validateForm(form: CreateActivityForm) {
     }
   })
 
+  if (form.activityScope === '1' && form.strategies.length === 0) {
+    errors.strategies = 'Select at least one strategy for Strategic activities.'
+  }
+
   if (form.plannedStartDate && form.plannedEndDate) {
     if (form.plannedStartDate >= form.plannedEndDate) {
       errors.plannedStartDate = 'Planned Start Date must be earlier than Planned End Date.'
@@ -372,6 +416,10 @@ function getRequiredFields(form: CreateActivityForm): Array<keyof CreateActivity
     )
   }
 
+  if (form.activityScope === '1') {
+    fields.push('strategies')
+  }
+
   return fields
 }
 
@@ -410,38 +458,41 @@ function buildProjectType(activityType: ActivityTypeValue) {
   return 3
 }
 
-function buildProjectPayload(form: CreateActivityForm, context: ActivityContext): Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'> {
+function serializeStrategies(strategies: StrategyValue[]) {
+  return strategies.length > 0 ? strategies.join(',') : undefined
+}
+
+function buildProjectPayload(form: CreateActivityForm, context: ActivityContext): DgaAopProjectCreatePayload {
   return withoutUndefined({
     dga_activity_classification: Number(form.activityClassification) as Dga_aop_projectsesBase['dga_activity_classification'],
     'dga_activity_lead@odata.bind': toEntityBind('systemusers', form.activityLeadId),
     dga_activity_type: Number(form.activityType) as Dga_aop_projectsesBase['dga_activity_type'],
     dga_adeo_review_required: form.adeoReported === '1',
-    'dga_department@odata.bind': toEntityBind('dga_divisional_hierarchies', form.divisionId),
+    'dga_department@odata.bind': toEntityBind('dga_divisional_hierarchies', context.division.dga_divisional_hierarchyid),
     dga_description_summary: form.summary,
     dga_longtermimpactprojectlongtermimpact: form.longTermImpact,
     dga_name: form.activityName.trim(),
     dga_planned_end_date: form.plannedEndDate,
     dga_planned_start_date: form.plannedStartDate,
     dga_project_activity_status: 776140014,
-    dga_project_categorized_under: form.strategies[0] ? Number(form.strategies[0]) as Dga_aop_projectsesBase['dga_project_categorized_under'] : undefined,
+    dga_project_categorized_under: serializeStrategies(form.strategies),
     dga_project_description: form.adeoProjectDescription || form.scopeDescription,
     dga_project_long_term_impact: form.overallLongTermImpact,
     dga_project_name: form.adeoProjectName || form.activityName.trim(),
     dga_project_phase: 776140000,
     dga_project_plan_if_any: form.activityPlan,
-    'dga_project_planning_instance@odata.bind': context.planningInstance
-      ? toEntityBind('dga_project_planning_instances', context.planningInstance.dga_project_planning_instanceid)
-      : undefined,
+    'dga_project_planning_instance@odata.bind': toEntityBind('dga_project_planning_instances', context.planningInstance.dga_project_planning_instanceid),
     dga_project_type: buildProjectType(form.activityType as ActivityTypeValue),
+    'dga_record_creator@odata.bind': toEntityBind('systemusers', context.currentUserId),
+    'dga_record_creator_team_id@odata.bind': toEntityBind('systemusers', context.currentUserId),
     dga_risks: form.risks,
     dga_scope: form.scopeDescription,
-    'dga_sector@odata.bind': toEntityBind('dga_divisional_hierarchies', form.sectorId),
+    'dga_sector@odata.bind': toEntityBind('dga_divisional_hierarchies', context.sector.dga_divisional_hierarchyid),
     dga_stakeholders: form.stakeholder,
     dga_strategic_vs_operation: form.activityScope ? Number(form.activityScope) as Dga_aop_projectsesBase['dga_strategic_vs_operation'] : undefined,
     importsequencenumber: undefined,
     overriddencreatedon: undefined,
-    ownerid: context.currentUserId,
-    owneridtype: 'systemuser',
+    'ownerid@odata.bind': toEntityBind('systemusers', context.currentUserId),
     statecode: 0,
     statuscode: 1,
     timezoneruleversionnumber: undefined,
@@ -449,7 +500,7 @@ function buildProjectPayload(form: CreateActivityForm, context: ActivityContext)
   })
 }
 
-function buildProjectLogPayload(projectId: string, activityName: string, context: ActivityContext): Omit<Dga_aop_project_logsesBase, 'dga_aop_project_logsid'> {
+function buildProjectLogPayload(projectId: string, activityName: string, context: ActivityContext): DgaAopProjectLogCreatePayload {
   return withoutUndefined({
     'dga_aop_project@odata.bind': toEntityBind('dga_aop_projectses', projectId),
     dga_name: 'Activity Creation',
@@ -458,8 +509,7 @@ function buildProjectLogPayload(projectId: string, activityName: string, context
     dga_type: 776140002,
     importsequencenumber: undefined,
     overriddencreatedon: undefined,
-    ownerid: context.currentUserId,
-    owneridtype: 'systemuser',
+    'ownerid@odata.bind': toEntityBind('teams', context.ownerTeamId),
     statecode: 0,
     statuscode: 1,
     timezoneruleversionnumber: undefined,
@@ -564,10 +614,97 @@ function getDraftWarnings(draft: CreateActivityForm) {
   return warnings
 }
 
+function resolveCreationContext({
+  allHierarchies,
+  currentRole,
+  currentRoleDivisionalHierarchy,
+  planningInstances,
+  selectedCycle,
+  systemUser,
+}: {
+  allHierarchies: Dga_divisional_hierarchies[]
+  currentRole: UserRole | null
+  currentRoleDivisionalHierarchy: { hierarchyId: string } | null
+  planningInstances: Dga_project_planning_instances[]
+  selectedCycle: string
+  systemUser: Systemusers | null
+}): ActivityContext {
+  if (!selectedCycle) {
+    throw new Error('Select an assessment cycle before creating an activity.')
+  }
+
+  if (!systemUser?.systemuserid) {
+    throw new Error('Current system user could not be resolved.')
+  }
+
+  if (!currentRole?.teamId) {
+    throw new Error('Current role team could not be resolved.')
+  }
+
+  if (!currentRoleDivisionalHierarchy?.hierarchyId) {
+    throw new Error('Current role divisional hierarchy could not be resolved.')
+  }
+
+  const division = allHierarchies.find(
+    (hierarchy) => normalizeId(hierarchy.dga_divisional_hierarchyid) === normalizeId(currentRoleDivisionalHierarchy.hierarchyId),
+  )
+
+  if (!division?.dga_divisional_hierarchyid) {
+    throw new Error('Current division could not be resolved from the selected role.')
+  }
+
+  const sector = division._dga_parent_divisional_hierarchy_value
+    ? allHierarchies.find(
+      (hierarchy) => normalizeId(hierarchy.dga_divisional_hierarchyid) === normalizeId(division._dga_parent_divisional_hierarchy_value),
+    )
+    : undefined
+
+  if (!sector?.dga_divisional_hierarchyid) {
+    throw new Error('Current sector could not be resolved from the selected division.')
+  }
+
+  const matchingPlanningInstances = planningInstances.filter(
+    (instance) =>
+      normalizeId(instance._dga_assessment_cycle_value) === normalizeId(selectedCycle) &&
+      normalizeId(instance._dga_divisional_hierarchy_value) === normalizeId(division.dga_divisional_hierarchyid),
+  )
+
+  if (matchingPlanningInstances.length === 0) {
+    throw new Error('No planning instance was found for the selected cycle and current division.')
+  }
+
+  if (matchingPlanningInstances.length > 1) {
+    throw new Error('Multiple planning instances were found for the selected cycle and current division.')
+  }
+
+  return {
+    currentUserId: systemUser.systemuserid,
+    currentUserName: systemUser.fullname ?? systemUser.internalemailaddress ?? 'AOP - Division Member',
+    ownerTeamId: currentRole.teamId,
+    roleTeamId: currentRole.teamId,
+    cycleId: selectedCycle,
+    division,
+    sector,
+    planningInstance: matchingPlanningInstances[0],
+  }
+}
+
 export function CreateActivity() {
   const navigate = useNavigate()
-  const { assessmentCycles, currentUser, planningInstances, selectedCycle } = useAppSelector((state) => state.app)
-  const { currentRoleDivisionalHierarchy, divisionalHierarchies: allHierarchies } = useAppSelector((state) => state.user)
+  const {
+    assessmentCycles,
+    planningInstances,
+    planningInstancesCycleId,
+    planningInstancesError,
+    planningInstancesLoading,
+    selectedCycle,
+  } = useAppSelector((state) => state.app)
+  const {
+    currentRole,
+    currentRoleDivisionalHierarchy,
+    divisionalHierarchies: allHierarchies,
+    systemUser,
+  } = useAppSelector((state) => state.user)
   const [activeTab, setActiveTab] = useState<TabValue>('copilot')
   const [form, setForm] = useState<CreateActivityForm>(INITIAL_FORM)
   const [errors, setErrors] = useState<FieldErrors>({})
@@ -575,12 +712,14 @@ export function CreateActivity() {
   const [activityLeadOptions, setActivityLeadOptions] = useState<SelectOption<string>[]>([])
   const [isContextLoading, setIsContextLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [createdProjectId, setCreatedProjectId] = useState('')
+  const [creationWarning, setCreationWarning] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [copilotPrompt, setCopilotPrompt] = useState('')
   const [copilotDraft, setCopilotDraft] = useState<CreateActivityForm | null>(null)
   const [attachments, setAttachments] = useState<CopilotAttachment[]>([])
   const [attachmentError, setAttachmentError] = useState('')
-  const cycle = assessmentCycles.find((item) => item.dga_assessment_cycleid === selectedCycle) ?? assessmentCycles[0]
+  const cycle = assessmentCycles.find((item) => item.dga_assessment_cycleid === selectedCycle)
   const isStrategic = form.activityScope === '1'
   const isPaymentOnly = form.activityClassification === '576610002'
   const isBudgetNo = form.budgetRequired === '0'
@@ -613,8 +752,26 @@ export function CreateActivity() {
     async function loadContext() {
       setIsContextLoading(true)
       setErrors((currentErrors) => ({ ...currentErrors, context: undefined }))
+      setContext(null)
+
+      if (planningInstancesLoading || (selectedCycle && planningInstancesCycleId !== selectedCycle)) {
+        return
+      }
 
       try {
+        if (planningInstancesError) {
+          throw new Error(planningInstancesError)
+        }
+
+        const nextContext = resolveCreationContext({
+          allHierarchies,
+          currentRole,
+          currentRoleDivisionalHierarchy,
+          planningInstances,
+          selectedCycle,
+          systemUser,
+        })
+
         const [usersResult] = await Promise.all([
           SystemusersService.getAll({
             select: ['systemuserid', 'fullname', 'internalemailaddress']
@@ -626,33 +783,7 @@ export function CreateActivity() {
         }
 
         const users = getResultArray<Systemusers>(usersResult.data).filter((user) => !user.isdisabled)
-
-        const activeUser = currentUser ?? users[0]
-        // Use matched hierarchy from userSlice, fall back to first Division type
-        const division = currentRoleDivisionalHierarchy
-          ? allHierarchies.find((h) => h.dga_divisional_hierarchyid === currentRoleDivisionalHierarchy.hierarchyId)
-          : allHierarchies.find((item) => item.dga_type === 776140002) ?? allHierarchies[0]
-        const sector = division?._dga_parent_divisional_hierarchy_value
-          ? allHierarchies.find((item) => item.dga_divisional_hierarchyid === division._dga_parent_divisional_hierarchy_value)
-          : allHierarchies.find((item) => item.dga_type === 776140001)
-        const planningInstance = planningInstances.find((item) => {
-          const matchesDivision = division ? item._dga_divisional_hierarchy_value === division.dga_divisional_hierarchyid : true
-          const matchesCycle = selectedCycle ? item._dga_assessment_cycle_value === selectedCycle : true
-
-          return matchesDivision && matchesCycle
-        }) ?? planningInstances.find((item) => division ? item._dga_divisional_hierarchy_value === division.dga_divisional_hierarchyid : true)
-
-        if (!activeUser || !division) {
-          throw new Error('Current user or divisional hierarchy could not be resolved from Dataverse.')
-        }
-
-        setContext({
-          currentUserId: activeUser.systemuserid,
-          currentUserName: activeUser.fullname ?? activeUser.internalemailaddress ?? 'AOP - Division Member',
-          division,
-          sector: sector ?? division,
-          planningInstance,
-        })
+        setContext(nextContext)
         setActivityLeadOptions(
           users.map((user) => ({
             label: user.fullname ?? user.internalemailaddress ?? 'Unnamed user',
@@ -660,14 +791,17 @@ export function CreateActivity() {
             meta: user.internalemailaddress,
           })),
         )
-        setForm((currentForm) => ({
-          ...currentForm,
-          activityLeadId: currentForm.activityLeadId,
-          divisionId: division.dga_divisional_hierarchyid,
-          divisionName: division.dga_name,
-          sectorId: (sector ?? division).dga_divisional_hierarchyid,
-          sectorName: (sector ?? division).dga_name,
-        }))
+        setForm({
+          ...INITIAL_FORM,
+          divisionId: nextContext.division.dga_divisional_hierarchyid,
+          divisionName: nextContext.division.dga_name,
+          sectorId: nextContext.sector.dga_divisional_hierarchyid,
+          sectorName: nextContext.sector.dga_name,
+        })
+        setCopilotDraft(null)
+        setSuccessMessage('')
+        setCreationWarning('')
+        setCreatedProjectId('')
       } catch (error) {
         if (!isMounted) {
           return
@@ -689,10 +823,23 @@ export function CreateActivity() {
     return () => {
       isMounted = false
     }
-  }, [cycle?.dga_name])
+  }, [
+    allHierarchies,
+    currentRole,
+    currentRoleDivisionalHierarchy,
+    planningInstances,
+    planningInstancesCycleId,
+    planningInstancesError,
+    planningInstancesLoading,
+    selectedCycle,
+    systemUser,
+  ])
 
   function updateForm(nextFields: Partial<CreateActivityForm>) {
     setSuccessMessage('')
+    if (!createdProjectId) {
+      setCreationWarning('')
+    }
     const changedFields = Object.keys(nextFields) as Array<keyof CreateActivityForm>
     const normalizedForm = normalizeControlledRules({ ...form, ...nextFields })
 
@@ -1007,10 +1154,16 @@ export function CreateActivity() {
     }
 
     const filterParts = [`dga_name eq '${escapeODataValue(form.activityName.trim())}'`]
+    const cyclePlanningInstanceIds = planningInstances
+      .filter((item) => normalizeId(item._dga_assessment_cycle_value) === normalizeId(context?.cycleId))
+      .map((item) => item.dga_project_planning_instanceid)
+      .filter(Boolean)
 
-    if (context?.planningInstance?.dga_project_planning_instanceid) {
-      filterParts.push(`_dga_project_planning_instance_value eq ${context.planningInstance.dga_project_planning_instanceid}`)
+    if (cyclePlanningInstanceIds.length === 0) {
+      return false
     }
+
+    filterParts.push(`(${cyclePlanningInstanceIds.map((id) => `_dga_project_planning_instance_value eq ${id}`).join(' or ')})`)
 
     const result = await Dga_aop_projectsesService.getAll({
       select: ['dga_aop_projectsid', 'dga_name'],
@@ -1023,7 +1176,17 @@ export function CreateActivity() {
   }
 
   async function saveDraft() {
+    if (isSaving) {
+      return
+    }
+
+    if (createdProjectId) {
+      navigate(`${APP_ROUTE_PATHS.editActivity}?id=${createdProjectId}`)
+      return
+    }
+
     setSuccessMessage('')
+    setCreationWarning('')
     const nextErrors = validateForm(form)
 
     if (!context) {
@@ -1047,10 +1210,10 @@ export function CreateActivity() {
         return
       }
 
-      const projectResult = await Dga_aop_projectsesService.create(buildProjectPayload(form, context!))
-
-
-      console.log(projectResult)
+      const projectPayload = buildProjectPayload(form, context!)
+      console.log('Create activity payload', projectPayload)
+      const projectResult = await Dga_aop_projectsesService.create(projectPayload as unknown as Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>)
+      assertOperationSuccess(projectResult, 'Unable to save activity draft.')
 
       const createdProject = getResultValue<Dga_aop_projectses>(projectResult)
       const projectId = createdProject?.dga_aop_projectsid
@@ -1059,9 +1222,10 @@ export function CreateActivity() {
         throw new Error('Activity was created, but the created record id was not returned.')
       }
 
-      await Dga_aop_project_logsesService.create(buildProjectLogPayload(projectId, form.activityName.trim(), context!))
+      setCreatedProjectId(projectId)
+      
       setSuccessMessage('Activity created successfully.')
-      navigate(`${APP_ROUTE_PATHS.activitiesList}?created=${projectId}`)
+      navigate(`${APP_ROUTE_PATHS.editActivity}?id=${projectId}`)
     } catch (error) {
       setErrors({
         submit: error instanceof Error ? error.message : 'Unable to save activity draft.',
@@ -1319,7 +1483,7 @@ export function CreateActivity() {
               </span>
             </div>
             <Button disabled={isSaving || Boolean(errors.context)} icon={<Save size={16} />} onClick={saveDraft}>
-              {isSaving ? 'Saving...' : 'Save Draft'}
+              {isSaving ? 'Saving...' : createdProjectId ? 'Open Created Activity' : 'Save Draft'}
             </Button>
           </div>
         </header>
@@ -1338,6 +1502,14 @@ export function CreateActivity() {
       ) : null}
 
       {successMessage ? <div className="create-activity__notice create-activity__notice--success">{successMessage}</div> : null}
+      {creationWarning ? (
+        <div className="create-activity__notice create-activity__notice--warning">
+          <span>{creationWarning}</span>
+          <Button onClick={() => navigate(`${APP_ROUTE_PATHS.editActivity}?id=${createdProjectId}`)} variant="secondary">
+            Open Created Activity
+          </Button>
+        </div>
+      ) : null}
       {errors.submit ? <div className="create-activity__notice create-activity__notice--error">{errors.submit}</div> : null}
 
       {activeTab === 'manual' ? (
@@ -1408,6 +1580,7 @@ export function CreateActivity() {
                         />
                       ))}
                     </div>
+                    {errors.strategies ? <span className="field__error">{errors.strategies}</span> : null}
                   </fieldset>
                 </div>
               ) : null}
