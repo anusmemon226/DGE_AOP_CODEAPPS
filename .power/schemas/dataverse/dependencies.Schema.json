@@ -123,6 +123,37 @@
           "x-ms-schema-name": "dga_name_of_external_entity",
           "maxLength": 500
         },
+        "dga_please_check_where_applicable": {
+          "type": "string",
+          "title": "Please Check where Applicable",
+          "x-ms-dataverse-attribute": "dga_please_check_where_applicable",
+          "x-ms-dataverse-type": "PicklistType",
+          "x-ms-schema-name": "dga_please_check_where_applicable",
+          "enum": [
+            "Discussed",
+            "Agreed"
+          ],
+          "x-ms-enum-values": [
+            576610000,
+            576610001
+          ],
+          "Color": [
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "97cd88a1-bf73-f111-ab0f-002248d3a07d",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "Please Check where Applicable",
+          "x-ms-optionSetType": "Picklist"
+        },
+        "dga_please_check_where_applicablename": {
+          "type": "string",
+          "title": "dga_please_check_where_applicablename",
+          "x-ms-dataverse-attribute": "dga_please_check_where_applicablename",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "dga_please_check_where_applicableName",
+          "x-ms-read-only": true
+        },
         "dga_type_of_support": {
           "type": "string",
           "title": "Type of Support",

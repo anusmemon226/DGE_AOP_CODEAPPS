@@ -464,7 +464,7 @@ export function EditActivity() {
       case 'members':
         return <MembersTab projectId={projectId} />
       case 'dependencies':
-        return <DependenciesTab />
+        return <DependenciesTab projectId={projectId} />
       case 'objectives':
         return <ObjectivesTab />
       case 'milestones':

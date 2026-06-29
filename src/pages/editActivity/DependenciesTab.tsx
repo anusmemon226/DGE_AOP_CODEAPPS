@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowDown,
   ArrowUp,
@@ -16,6 +16,10 @@ import {
 } from 'lucide-react'
 import { Button, ConfirmationDialog, DatePicker, Input, RadioGroup, Select, SideDrawer, Textarea } from '../../components/ui'
 import type { SelectOption } from '../../components/ui'
+import type { Dga_dependencies, Dga_dependenciesBase } from '../../generated/models/Dga_dependenciesModel'
+import { Dga_dependenciesService } from '../../generated/services/Dga_dependenciesService'
+import { useAppSelector } from '../../store/hooks'
+import { formatDateDisplay } from '../../utils/formatting'
 
 // ── Types ──
 
@@ -33,6 +37,12 @@ type DepColumnKey = 'entityName' | 'dateOfSupport' | 'typeOfSupport' | 'applicab
 type FilterOperator = 'equals' | 'contains' | 'gt' | 'lt'
 type ColumnFilter = { operator: FilterOperator; value: string }
 type SortConfig = { column: DepColumnKey; direction: 'asc' | 'desc' } | null
+type DependenciesTabProps = {
+  projectId: string
+}
+type DependencyCreatePayload = Omit<Dga_dependenciesBase, 'dga_dependencyid' | 'ownerid' | 'owneridtype'> & {
+  'ownerid@odata.bind': string
+}
 
 // ── Constants ──
 
@@ -57,15 +67,79 @@ function getApplicableLabel(value: ApplicableValue): string {
 const DEP_ITEMS_PER_PAGE = 5
 const DEP_LAZY_BATCH = 12
 
+function getOperationErrorMessage(result: unknown, fallbackMessage: string) {
+  const error = (result as { error?: { message?: string } | string })?.error
+  const message = typeof error === 'string' ? error : error?.message
+
+  if (!message) return fallbackMessage
+
+  try {
+    const parsed = JSON.parse(message) as { error?: { message?: string } }
+    return parsed.error?.message ?? message
+  } catch {
+    return message
+  }
+}
+
+function assertOperationSuccess(result: unknown, fallbackMessage: string) {
+  if ((result as { success?: boolean })?.success === false) {
+    throw new Error(getOperationErrorMessage(result, fallbackMessage))
+  }
+}
+
+function normalizeId(id?: string | null) {
+  return id?.replace(/[{}]/g, '') ?? ''
+}
+
+function projectLookupFilter(projectId: string) {
+  return `_dga_aop_project_value eq '${normalizeId(projectId)}'`
+}
+
+function dependencyToUi(record: Dga_dependencies): Dependency | null {
+  if (!record.dga_dependencyid) return null
+
+  return {
+    applicable: String(record.dga_please_check_where_applicable ?? '') as ApplicableValue,
+    dateOfSupport: record.dga_date_of_support ?? '',
+    entityName: record.dga_name_of_external_entity ?? record.dga_name ?? '',
+    id: record.dga_dependencyid,
+    typeOfSupport: record.dga_type_of_support ?? '',
+  }
+}
+
+function buildDependencyPayload(
+  form: Omit<Dependency, 'id'>,
+  projectId: string,
+  ownerId: string,
+): DependencyCreatePayload {
+  return {
+    'dga_aop_project@odata.bind': `/dga_aop_projectses(${normalizeId(projectId)})`,
+    dga_date_of_support: form.dateOfSupport,
+    dga_name: form.entityName.trim(),
+    dga_name_of_external_entity: form.entityName.trim(),
+    dga_please_check_where_applicable: Number(form.applicable) as Dga_dependenciesBase['dga_please_check_where_applicable'],
+    dga_type_of_support: form.typeOfSupport.trim(),
+    'ownerid@odata.bind': `/systemusers(${normalizeId(ownerId)})`,
+    statecode: 0,
+    statuscode: 1,
+  }
+}
+
 // ── Component ──
 
-export function DependenciesTab() {
+export function DependenciesTab({ projectId }: DependenciesTabProps) {
+  const systemUser = useAppSelector((state) => state.user.systemUser)
   // ── Data state ──
   const [dependencies, setDependencies] = useState<Dependency[]>([])
   const [depSearch, setDepSearch] = useState('')
   const [depViewMode, setDepViewMode] = useState<'pagination' | 'lazy'>('pagination')
   const [depCurrentPage, setDepCurrentPage] = useState(1)
   const [depLazyCount, setDepLazyCount] = useState(12)
+  const [isDepsLoading, setIsDepsLoading] = useState(false)
+  const [isDepSaving, setIsDepSaving] = useState(false)
+  const [isDepDeleting, setIsDepDeleting] = useState(false)
+  const [depError, setDepError] = useState('')
+  const [depNotice, setDepNotice] = useState('')
   const depSentinelRef = useRef<HTMLDivElement>(null)
 
   // ── CRUD state ──
@@ -84,12 +158,62 @@ export function DependenciesTab() {
   const [openFilterColumn, setOpenFilterColumn] = useState<DepColumnKey | null>(null)
   const [filterPopoverPos, setFilterPopoverPos] = useState({ top: 0, left: 0 })
   const filterPopoverRef = useRef<HTMLDivElement>(null)
+  const filterClickHandlerRef = useRef<((event: MouseEvent) => void) | null>(null)
   const depsTableWrapRef = useRef<HTMLDivElement>(null)
 
   // Local editing state for filter popover
   const [editFilterOp, setEditFilterOp] = useState<FilterOperator>('contains')
   const [editFilterVal, setEditFilterVal] = useState('')
   const [editApplicableVal, setEditApplicableVal] = useState('')
+
+  const loadDependencies = useCallback(async () => {
+    if (!projectId) {
+      setDepError('Activity id is missing from the edit URL.')
+      setDependencies([])
+      return
+    }
+
+    setIsDepsLoading(true)
+    setDepError('')
+
+    try {
+      const result = await Dga_dependenciesService.getAll({
+        select: [
+          'dga_dependencyid',
+          'dga_name',
+          'dga_name_of_external_entity',
+          'dga_date_of_support',
+          'dga_type_of_support',
+          'dga_please_check_where_applicable',
+          '_dga_aop_project_value',
+        ],
+        filter: projectLookupFilter(projectId),
+        orderBy: ['createdon desc'],
+      })
+
+      assertOperationSuccess(result, 'Unable to load dependencies.')
+
+      const mapped = (result.data ?? [])
+        .map((dependency) => dependencyToUi(dependency as Dga_dependencies))
+        .filter((dependency): dependency is Dependency => Boolean(dependency))
+
+      setDependencies(mapped)
+      setSelectedDepIds(new Set())
+    } catch (error) {
+      setDepError(error instanceof Error ? error.message : 'Unable to load dependencies.')
+      setDependencies([])
+    } finally {
+      setIsDepsLoading(false)
+    }
+  }, [projectId])
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void loadDependencies()
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [loadDependencies])
 
   // ── Derived data ──
 
@@ -165,8 +289,12 @@ export function DependenciesTab() {
   }, [displayDeps, depViewMode, depCurrentPage, depLazyCount])
 
   useEffect(() => {
-    setDepCurrentPage(1)
-    setDepLazyCount(12)
+    const timeoutId = window.setTimeout(() => {
+      setDepCurrentPage(1)
+      setDepLazyCount(12)
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
   }, [depSearch, dependencies.length, depFilters])
 
   // ── Filter/sort handlers ──
@@ -263,7 +391,7 @@ export function DependenciesTab() {
         }
       }
       document.addEventListener('mousedown', handleClick)
-      ;(el as any).__clickHandler = handleClick
+      filterClickHandlerRef.current = handleClick
     })
 
     function handleKeyDown(e: KeyboardEvent) {
@@ -274,8 +402,9 @@ export function DependenciesTab() {
     return () => {
       cancelAnimationFrame(raf)
       document.removeEventListener('keydown', handleKeyDown)
-      if (popover && (popover as any).__clickHandler) {
-        document.removeEventListener('mousedown', (popover as any).__clickHandler)
+      if (filterClickHandlerRef.current) {
+        document.removeEventListener('mousedown', filterClickHandlerRef.current)
+        filterClickHandlerRef.current = null
       }
     }
   }, [openFilterColumn])
@@ -318,28 +447,94 @@ export function DependenciesTab() {
     return Object.keys(errors).length === 0
   }
 
-  function handleSaveDep() {
+  async function handleSaveDep() {
     if (!validateDepForm()) return
-    if (editingDep) {
-      setDependencies((prev) => prev.map((d) => d.id === editingDep.id ? { ...d, ...depForm } : d))
-    } else {
-      const newId = `dep-${String(dependencies.length + 1).padStart(2, '0')}-${Date.now()}`
-      setDependencies((prev) => [...prev, { id: newId, ...depForm }])
+
+    if (!projectId) {
+      setDepError('Activity id is missing from the edit URL.')
+      return
     }
-    handleCloseDepModal()
+
+    if (!systemUser?.systemuserid) {
+      setDepError('Current system user could not be resolved.')
+      return
+    }
+
+    setIsDepSaving(true)
+    setDepError('')
+    setDepNotice('')
+
+    try {
+      const payload = buildDependencyPayload(depForm, projectId, systemUser.systemuserid)
+
+      if (editingDep) {
+        const result = await Dga_dependenciesService.update(
+          editingDep.id,
+          {
+            dga_date_of_support: payload.dga_date_of_support,
+            dga_name: payload.dga_name,
+            dga_name_of_external_entity: payload.dga_name_of_external_entity,
+            dga_please_check_where_applicable: payload.dga_please_check_where_applicable,
+            dga_type_of_support: payload.dga_type_of_support,
+          },
+        )
+        assertOperationSuccess(result, 'Unable to update dependency.')
+        setDepNotice('Dependency updated successfully.')
+      } else {
+        const result = await Dga_dependenciesService.create(
+          payload as unknown as Omit<Dga_dependenciesBase, 'dga_dependencyid'>,
+        )
+        assertOperationSuccess(result, 'Unable to create dependency.')
+        setDepNotice('Dependency created successfully.')
+      }
+
+      handleCloseDepModal()
+      await loadDependencies()
+    } catch (error) {
+      setDepError(error instanceof Error ? error.message : 'Unable to save dependency.')
+    } finally {
+      setIsDepSaving(false)
+    }
   }
 
-  function handleConfirmDeleteDep() {
+  async function handleConfirmDeleteDep() {
     if (!depToDelete) return
-    setDependencies((prev) => prev.filter((d) => d.id !== depToDelete.id))
-    setSelectedDepIds((prev) => { const next = new Set(prev); next.delete(depToDelete.id); return next })
-    setDepToDelete(null)
+    setIsDepDeleting(true)
+    setDepError('')
+    setDepNotice('')
+
+    try {
+      await Dga_dependenciesService.delete(depToDelete.id)
+      setDependencies((prev) => prev.filter((d) => d.id !== depToDelete.id))
+      setSelectedDepIds((prev) => { const next = new Set(prev); next.delete(depToDelete.id); return next })
+      setDepToDelete(null)
+      setDepNotice('Dependency deleted successfully.')
+    } catch (error) {
+      setDepError(error instanceof Error ? error.message : 'Unable to delete dependency.')
+    } finally {
+      setIsDepDeleting(false)
+    }
   }
 
-  function handleBulkDelete() {
-    setDependencies((prev) => prev.filter((d) => !selectedDepIds.has(d.id)))
-    setSelectedDepIds(new Set())
+  async function handleBulkDelete() {
+    setIsDepDeleting(true)
+    setDepError('')
+    setDepNotice('')
+
+    const idsToDelete = Array.from(selectedDepIds)
+    const results = await Promise.allSettled(idsToDelete.map((id) => Dga_dependenciesService.delete(id)))
+    const failedCount = results.filter((result) => result.status === 'rejected').length
+
+    setIsDepDeleting(false)
     setIsBulkDeleteConfirm(false)
+
+    if (failedCount > 0) {
+      setDepError(`${idsToDelete.length - failedCount} of ${idsToDelete.length} dependencies deleted. ${failedCount} failed.`)
+    } else {
+      setDepNotice(`${idsToDelete.length} dependenc${idsToDelete.length !== 1 ? 'ies' : 'y'} deleted successfully.`)
+    }
+
+    await loadDependencies()
   }
 
   function handleToggleDepSelection(id: string) {
@@ -385,6 +580,7 @@ export function DependenciesTab() {
         <div className="edit-activity__dependencies-header-actions">
           {selectedCount > 0 ? (
             <Button
+              disabled={isDepDeleting}
               icon={<Trash2 size={16} />}
               onClick={() => setIsBulkDeleteConfirm(true)}
               variant="secondary"
@@ -393,11 +589,23 @@ export function DependenciesTab() {
               Delete ({selectedCount})
             </Button>
           ) : null}
-          <Button icon={<GitBranch size={16} />} onClick={() => handleOpenDepModal()}>
+          <Button disabled={!projectId || isDepsLoading} icon={<GitBranch size={16} />} onClick={() => handleOpenDepModal()}>
             Create Dependency
           </Button>
         </div>
       </div>
+
+      {depError ? (
+        <div className="edit-activity__members-modal-error">
+          <X size={13} />
+          {depError}
+        </div>
+      ) : depNotice ? (
+        <div className="edit-activity__members-modal-selected-header">
+          <Check size={14} />
+          <span>{depNotice}</span>
+        </div>
+      ) : null}
 
       {/* Toolbar */}
       {depCount > 0 ? (
@@ -447,7 +655,13 @@ export function DependenciesTab() {
       ) : null}
 
       {/* Table */}
-      {filteredCount === 0 ? (
+      {isDepsLoading ? (
+        <div className="edit-activity__members-empty">
+          <GitBranch size={40} strokeWidth={1.2} />
+          <h3>Loading dependencies...</h3>
+          <p>Fetching dependencies for this activity.</p>
+        </div>
+      ) : filteredCount === 0 ? (
         <div className="edit-activity__members-empty">
           {hasFilter ? (
             <>
@@ -544,7 +758,7 @@ export function DependenciesTab() {
                     {dep.entityName}
                   </button>
                   <div className="edit-activity__deps-table-cell edit-activity__deps-table-cell--date">
-                    {dep.dateOfSupport || '—'}
+                    {formatDateDisplay(dep.dateOfSupport) || '—'}
                   </div>
                   <div className="edit-activity__deps-table-cell edit-activity__deps-table-cell--type" title={dep.typeOfSupport}>
                     {dep.typeOfSupport}
@@ -722,8 +936,8 @@ export function DependenciesTab() {
             <Button onClick={handleCloseDepModal} variant="secondary">
               Cancel
             </Button>
-            <Button icon={<Check size={16} />} onClick={handleSaveDep}>
-              {editingDep ? 'Update Dependency' : 'Create Dependency'}
+            <Button disabled={isDepSaving} icon={<Check size={16} />} onClick={handleSaveDep}>
+              {isDepSaving ? 'Saving...' : editingDep ? 'Update Dependency' : 'Create Dependency'}
             </Button>
           </div>
         }
@@ -788,7 +1002,7 @@ export function DependenciesTab() {
 
       {/* Single delete confirmation */}
       <ConfirmationDialog
-        confirmLabel="Delete Dependency"
+        confirmLabel={isDepDeleting ? 'Deleting...' : 'Delete Dependency'}
         danger
         description="This dependency will be permanently removed. This action cannot be undone."
         isOpen={depToDelete !== null}
@@ -799,7 +1013,7 @@ export function DependenciesTab() {
 
       {/* Bulk delete confirmation */}
       <ConfirmationDialog
-        confirmLabel={`Delete ${selectedCount} Dependenc${selectedCount !== 1 ? 'ies' : 'y'}`}
+        confirmLabel={isDepDeleting ? 'Deleting...' : `Delete ${selectedCount} Dependenc${selectedCount !== 1 ? 'ies' : 'y'}`}
         danger
         description="These dependencies will be permanently removed. This action cannot be undone."
         isOpen={isBulkDeleteConfirm}

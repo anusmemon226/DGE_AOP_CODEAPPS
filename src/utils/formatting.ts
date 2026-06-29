@@ -5,7 +5,8 @@ export function formatDateDisplay(value?: string | null) {
     return ''
   }
 
-  const [year, month, day] = value.split('-')
+  const [datePart] = value.split('T')
+  const [year, month, day] = datePart.split('-')
 
   if (!year || !month || !day) {
     return value

@@ -19,12 +19,23 @@ type DatePickerProps = {
   value?: string
 }
 
-function toDate(value?: string) {
+function normalizeDateValue(value?: string) {
   if (!value) {
+    return ''
+  }
+
+  const [datePart] = value.split('T')
+  return datePart
+}
+
+function toDate(value?: string) {
+  const normalizedValue = normalizeDateValue(value)
+
+  if (!normalizedValue) {
     return new Date()
   }
 
-  const [year, month, day] = value.split('-').map(Number)
+  const [year, month, day] = normalizedValue.split('-').map(Number)
   const date = new Date(year, month - 1, day)
 
   return Number.isNaN(date.getTime()) ? new Date() : date
@@ -39,7 +50,9 @@ function toIsoDate(date: Date) {
 
 function isDateDisabled(date: Date, min?: string, max?: string) {
   const isoDate = toIsoDate(date)
-  return Boolean((min && isoDate < min) || (max && isoDate > max))
+  const normalizedMin = normalizeDateValue(min)
+  const normalizedMax = normalizeDateValue(max)
+  return Boolean((normalizedMin && isoDate < normalizedMin) || (normalizedMax && isoDate > normalizedMax))
 }
 
 export function DatePicker({
@@ -63,7 +76,7 @@ export function DatePicker({
   const rootRef = useRef<HTMLDivElement>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
   const [popoverRect, setPopoverRect] = useState<{ top: number; left: number } | null>(null)
-  const activeValue = value ?? selectedValue
+  const activeValue = normalizeDateValue(value ?? selectedValue)
 
   if ((value ?? '') !== lastPropValue) {
     const nextValue = value ?? ''
