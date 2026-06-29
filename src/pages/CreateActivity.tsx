@@ -14,11 +14,9 @@ import {
   Textarea,
   type SelectOption,
 } from '../components/ui'
-import { Dga_aop_project_logsesService } from '../generated/services/Dga_aop_project_logsesService'
 import { Dga_aop_projectsesService } from '../generated/services/Dga_aop_projectsesService'
 import { SystemusersService } from '../generated/services/SystemusersService'
 import type { Dga_aop_projectsesBase, Dga_aop_projectses } from '../generated/models/Dga_aop_projectsesModel'
-import type { Dga_aop_project_logsesBase } from '../generated/models/Dga_aop_project_logsesModel'
 import type { Dga_divisional_hierarchies } from '../generated/models/Dga_divisional_hierarchiesModel'
 import type { Dga_project_planning_instances } from '../generated/models/Dga_project_planning_instancesModel'
 import type { Systemusers } from '../generated/models/SystemusersModel'
@@ -101,10 +99,6 @@ type ActivityContext = {
 
 type DgaAopProjectCreatePayload = Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid' | 'dga_project_categorized_under' | 'ownerid' | 'owneridtype'> & {
   dga_project_categorized_under?: string
-  'ownerid@odata.bind': string
-}
-
-type DgaAopProjectLogCreatePayload = Omit<Dga_aop_project_logsesBase, 'dga_aop_project_logsid' | 'ownerid' | 'owneridtype'> & {
   'ownerid@odata.bind': string
 }
 
@@ -470,6 +464,12 @@ function buildProjectPayload(form: CreateActivityForm, context: ActivityContext)
     dga_adeo_review_required: form.adeoReported === '1',
     'dga_department@odata.bind': toEntityBind('dga_divisional_hierarchies', context.division.dga_divisional_hierarchyid),
     dga_description_summary: form.summary,
+    dga_does_this_project_require_procurement: form.procurementRequired
+      ? Number(form.procurementRequired) as Dga_aop_projectsesBase['dga_does_this_project_require_procurement']
+      : undefined,
+    dga_doesthisprojectrequirebudgetallocation: form.budgetRequired
+      ? Number(form.budgetRequired) as Dga_aop_projectsesBase['dga_doesthisprojectrequirebudgetallocation']
+      : undefined,
     dga_longtermimpactprojectlongtermimpact: form.longTermImpact,
     dga_name: form.activityName.trim(),
     dga_planned_end_date: form.plannedEndDate,
@@ -477,6 +477,7 @@ function buildProjectPayload(form: CreateActivityForm, context: ActivityContext)
     dga_project_activity_status: 776140014,
     dga_project_categorized_under: serializeStrategies(form.strategies),
     dga_project_description: form.adeoProjectDescription || form.scopeDescription,
+    dga_project_kpi: form.activityKpi || undefined,
     dga_project_long_term_impact: form.overallLongTermImpact,
     dga_project_name: form.adeoProjectName || form.activityName.trim(),
     dga_project_phase: 776140000,
@@ -485,6 +486,7 @@ function buildProjectPayload(form: CreateActivityForm, context: ActivityContext)
     dga_project_type: buildProjectType(form.activityType as ActivityTypeValue),
     'dga_record_creator@odata.bind': toEntityBind('systemusers', context.currentUserId),
     'dga_record_creator_team_id@odata.bind': toEntityBind('systemusers', context.currentUserId),
+    dga_registered_or_will_be_registered_in_epm: form.activityClassification === '576610000',
     dga_risks: form.risks,
     dga_scope: form.scopeDescription,
     'dga_sector@odata.bind': toEntityBind('dga_divisional_hierarchies', context.sector.dga_divisional_hierarchyid),
@@ -493,23 +495,6 @@ function buildProjectPayload(form: CreateActivityForm, context: ActivityContext)
     importsequencenumber: undefined,
     overriddencreatedon: undefined,
     'ownerid@odata.bind': toEntityBind('systemusers', context.currentUserId),
-    statecode: 0,
-    statuscode: 1,
-    timezoneruleversionnumber: undefined,
-    utcconversiontimezonecode: undefined,
-  })
-}
-
-function buildProjectLogPayload(projectId: string, activityName: string, context: ActivityContext): DgaAopProjectLogCreatePayload {
-  return withoutUndefined({
-    'dga_aop_project@odata.bind': toEntityBind('dga_aop_projectses', projectId),
-    dga_name: 'Activity Creation',
-    dga_new_value: activityName,
-    dga_previous_value: '',
-    dga_type: 776140002,
-    importsequencenumber: undefined,
-    overriddencreatedon: undefined,
-    'ownerid@odata.bind': toEntityBind('teams', context.ownerTeamId),
     statecode: 0,
     statuscode: 1,
     timezoneruleversionnumber: undefined,

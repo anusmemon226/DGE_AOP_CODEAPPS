@@ -25,6 +25,16 @@ export const Dga_aop_projectsesdga_budget_type = {
   2: 'Capex'
 } as const;
 export type Dga_aop_projectsesdga_budget_type = keyof typeof Dga_aop_projectsesdga_budget_type;
+export const Dga_aop_projectsesdga_does_this_project_require_procurement = {
+  1: 'Yes',
+  0: 'No'
+} as const;
+export type Dga_aop_projectsesdga_does_this_project_require_procurement = keyof typeof Dga_aop_projectsesdga_does_this_project_require_procurement;
+export const Dga_aop_projectsesdga_doesthisprojectrequirebudgetallocation = {
+  1: 'Yes',
+  0: 'No'
+} as const;
+export type Dga_aop_projectsesdga_doesthisprojectrequirebudgetallocation = keyof typeof Dga_aop_projectsesdga_doesthisprojectrequirebudgetallocation;
 export const Dga_aop_projectsesdga_opex_capex = {
   1: 'Opex',
   2: 'Capex'
@@ -109,6 +119,8 @@ export interface Dga_aop_projectsesBase {
   "dga_department@odata.bind": string;
   dga_description_summary?: string;
   "dga_dge_corporate_strategy_pillar@odata.bind"?: string;
+  dga_does_this_project_require_procurement?: Dga_aop_projectsesdga_does_this_project_require_procurement;
+  dga_doesthisprojectrequirebudgetallocation?: Dga_aop_projectsesdga_doesthisprojectrequirebudgetallocation;
   "dga_govdigital_pillar@odata.bind"?: string;
   dga_is_project_start?: boolean;
   dga_is_rejected?: boolean;
@@ -127,7 +139,7 @@ export interface Dga_aop_projectsesBase {
   dga_project_activity_status?: Dga_aop_projectsesdga_project_activity_status;
   dga_project_categorized_under?: Dga_aop_projectsesdga_project_categorized_under;
   dga_project_description?: string;
-  "dga_project_kpi@odata.bind"?: string;
+  dga_project_kpi?: string;
   dga_project_long_term_impact?: string;
   dga_project_name: string;
   dga_project_overall_long_term_impact?: string;
@@ -178,6 +190,8 @@ export interface Dga_aop_projectses extends Dga_aop_projectsesBase {
   dga_budget_typename?: string;
   dga_departmentname?: string;
   dga_dge_corporate_strategy_pillarname?: string;
+  dga_does_this_project_require_procurementname?: string;
+  dga_doesthisprojectrequirebudgetallocationname?: string;
   dga_govdigital_pillarname?: string;
   dga_is_project_startname?: string;
   dga_is_rejectedname?: string;
@@ -187,7 +201,6 @@ export interface Dga_aop_projectses extends Dga_aop_projectsesBase {
   dga_opex_capexname?: string;
   dga_project_activity_statusname?: string;
   dga_project_categorized_undername?: string;
-  dga_project_kpiname?: string;
   dga_project_phasename?: string;
   dga_project_planning_instancename?: string;
   dga_project_typename?: string;
@@ -232,8 +245,6 @@ export interface Dga_aop_projectses extends Dga_aop_projectsesBase {
   _dga_link_to_dge_strategic_objective_value?: string;
   dga_link_to_strategic_kpis?: object;
   _dga_link_to_strategic_kpis_value?: string;
-  dga_project_kpi?: object;
-  _dga_project_kpi_value?: string;
   dga_project_planning_instance?: object;
   _dga_project_planning_instance_value?: string;
   dga_record_creator?: object;

@@ -606,6 +606,14 @@
   opacity: 0.55;
 }
 
+.date-picker__grid button.date-picker__day--selected {
+  background: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+  color: var(--color-on-primary);
+  font-weight: 800;
+  opacity: 1;
+}
+
 .multi-select__trigger {
   align-items: center;
   cursor: pointer;

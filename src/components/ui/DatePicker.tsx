@@ -25,7 +25,9 @@ function toDate(value?: string) {
   }
 
   const [year, month, day] = value.split('-').map(Number)
-  return new Date(year, month - 1, day)
+  const date = new Date(year, month - 1, day)
+
+  return Number.isNaN(date.getTime()) ? new Date() : date
 }
 
 function toIsoDate(date: Date) {
@@ -55,26 +57,36 @@ export function DatePicker({
   value,
 }: DatePickerProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [selectedValue, setSelectedValue] = useState(value ?? '')
+  const [lastPropValue, setLastPropValue] = useState(value ?? '')
   const [viewDate, setViewDate] = useState(() => toDate(value))
   const rootRef = useRef<HTMLDivElement>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
   const [popoverRect, setPopoverRect] = useState<{ top: number; left: number } | null>(null)
+  const activeValue = value ?? selectedValue
+
+  if ((value ?? '') !== lastPropValue) {
+    const nextValue = value ?? ''
+    setLastPropValue(nextValue)
+    setSelectedValue(nextValue)
+  }
 
   // Close on outside click and Escape; reposition on scroll
   useEffect(() => {
     if (!isOpen) {
-      setPopoverRect(null)
       return
     }
 
     function handlePointerDown(event: PointerEvent) {
       if (!rootRef.current?.contains(event.target as Node) && !popoverRef.current?.contains(event.target as Node)) {
+        setPopoverRect(null)
         setIsOpen(false)
       }
     }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
+        setPopoverRect(null)
         setIsOpen(false)
       }
     }
@@ -132,8 +144,13 @@ export function DatePicker({
     if (readOnly) return
 
     if (isOpen) {
+      setPopoverRect(null)
       setIsOpen(false)
       return
+    }
+
+    if (activeValue) {
+      setViewDate(toDate(activeValue))
     }
 
     // Calculate fixed position from trigger
@@ -157,6 +174,7 @@ export function DatePicker({
   }
 
   function handleClose() {
+    setPopoverRect(null)
     setIsOpen(false)
   }
 
@@ -229,7 +247,7 @@ export function DatePicker({
                 {calendarDays.map((day) => {
                   const isoDate = toIsoDate(day)
                   const isMuted = day.getMonth() !== viewDate.getMonth()
-                  const isSelected = isoDate === value
+                  const isSelected = isoDate === activeValue
                   const isDisabled = isDateDisabled(day, min, max)
 
                   return (
@@ -238,6 +256,8 @@ export function DatePicker({
                       disabled={isDisabled}
                       key={isoDate}
                       onClick={() => {
+                        setSelectedValue(isoDate)
+                        setViewDate(day)
                         onChange(isoDate)
                         handleClose()
                       }}

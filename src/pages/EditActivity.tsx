@@ -9,6 +9,7 @@ import {
   GitBranch,
   HelpCircle,
   History,
+  Save,
   Send,
   Sparkles,
   Target,
@@ -17,11 +18,14 @@ import {
   Wallet,
 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Badge, Button, type SelectOption } from '../components/ui'
-import { type AopRole } from '../constants/app'
+import type { Dga_aop_projectses, Dga_aop_projectsesBase } from '../generated/models/Dga_aop_projectsesModel'
+import { Dga_aop_projectsesService } from '../generated/services/Dga_aop_projectsesService'
 import { SystemusersService } from '../generated/services/SystemusersService'
+import { TeamsService } from '../generated/services/TeamsService'
 import type { Systemusers } from '../generated/models/SystemusersModel'
+import type { Teams } from '../generated/models/TeamsModel'
 import { APP_ROUTE_PATHS } from '../routes/appRoutes'
 import { useAppSelector } from '../store/hooks'
 import { ActivityInfoTab } from './editActivity/ActivityInfoTab'
@@ -35,12 +39,15 @@ import { ClarificationTab } from './editActivity/ClarificationTab'
 import { EngagementPlanTab } from './editActivity/EngagementPlanTab'
 import { LogTab } from './editActivity/LogTab'
 import {
+  assertOperationSuccess,
+  buildActivityInfoUpdatePayload,
+  getResultValue,
   normalizeControlledRules,
+  projectToActivityForm,
   validateForm,
   getRuntimeErrors,
   INITIAL_FORM,
   type ActivityForm,
-  type ActivityContext,
   type FieldErrors,
 } from './editActivity/helpers/activityInfoHelpers'
 
@@ -78,6 +85,39 @@ const TABS: TabConfig[] = [
   { id: 'logs', label: 'Logs', shortLabel: 'Logs', icon: History },
 ]
 
+const ACTIVITY_INFO_SELECT_FIELDS = [
+  'dga_aop_projectsid',
+  'dga_name',
+  'dga_activity_type',
+  'dga_activity_classification',
+  'dga_strategic_vs_operation',
+  'dga_project_categorized_under',
+  'dga_doesthisprojectrequirebudgetallocation',
+  'dga_does_this_project_require_procurement',
+  'dga_adeo_review_required',
+  '_dga_activity_lead_value',
+  'dga_planned_start_date',
+  'dga_planned_end_date',
+  'dga_scope',
+  'dga_description_summary',
+  'dga_project_name',
+  'dga_project_description',
+  'dga_longtermimpactprojectlongtermimpact',
+  'dga_project_long_term_impact',
+  'dga_project_overall_long_term_impact',
+  'dga_stakeholders',
+  'dga_project_kpi',
+  'dga_project_plan_if_any',
+  'dga_risks',
+  '_dga_sector_value',
+  '_dga_department_value',
+  '_owningteam_value',
+  '_owninguser_value',
+  'statuscode',
+  'dga_project_phase',
+  'dga_project_activity_status',
+]
+
 // ── Status helpers ──
 
 function getStatusTone(status: string): 'neutral' | 'info' | 'warning' | 'success' {
@@ -99,18 +139,6 @@ function getStatusTone(status: string): 'neutral' | 'info' | 'warning' | 'succes
       return 'neutral'
     default:
       return 'neutral'
-  }
-}
-
-function getPendingWithRole(statusCode: number, currentRole: AopRole): string {
-  switch (statusCode) {
-    case 1: return 'Division Member'
-    case 776140001: return 'Division Director'
-    case 776140012: return 'Division Member'
-    case 776140003: return 'Strategy Team'
-    case 776140004: return 'Executive Director'
-    case 776140002: return 'Director General'
-    default: return currentRole
   }
 }
 
@@ -138,29 +166,34 @@ function formatStatusCode(code: number): string {
   return labels[code] ?? 'Unknown'
 }
 
+function normalizeId(id?: string | null) {
+  return id?.replace(/[{}]/g, '').toLowerCase() ?? ''
+}
+
 
 // ── Component ──
 
 export function EditActivity() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const projectId = searchParams.get('id') ?? ''
   const selectedRole = useAppSelector((state) => state.app.selectedRole)
-  const currentUser = useAppSelector((state) => state.app.currentUser)
-  const planningInstances = useAppSelector((state) => state.app.planningInstances)
-  const selectedCycle = useAppSelector((state) => state.app.selectedCycle)
   const { currentRoleDivisionalHierarchy, divisionalHierarchies: allHierarchies } = useAppSelector((state) => state.user)
   const [activeTab, setActiveTab] = useState<TabId>('activity-info')
+  const [activity, setActivity] = useState<Dga_aop_projectses | null>(null)
   const [form, setForm] = useState<ActivityForm>(INITIAL_FORM)
   const [errors, setErrors] = useState<FieldErrors>({})
-  const [_context, setContext] = useState<ActivityContext | null>(null)
   const [activityLeadOptions, setActivityLeadOptions] = useState<SelectOption<string>[]>([])
   const [isContextLoading, setIsContextLoading] = useState(true)
+  const [isSavingActivityInfo, setIsSavingActivityInfo] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
+  const [pendingWith, setPendingWith] = useState('Loading...')
 
-  // ── Placeholder activity data ──
-  const activityName = 'Digital Infrastructure Upgrade'
-  const aiSummary = 'This project aims to modernize the digital backbone to support 99.9% uptime across all government service channels.'
-  const statusCode = 1 // Draft
-  const projectPhase = 776140000 // Planning
-  const pendingWith = getPendingWithRole(statusCode, selectedRole)
+  // ── Loaded activity data ──
+  const activityName = activity?.dga_name || form.activityName || 'Edit Activity'
+  const aiSummary = activity?.dga_description_summary || form.summary || 'No summary is available for this activity yet.'
+  const statusCode = activity?.statuscode ?? 1 // Draft
+  const projectPhase = activity?.dga_project_phase ?? 776140000 // Planning
   const isStrategic = form.activityScope === '1'
   const isPaymentOnly = form.activityClassification === '576610002'
   const isBudgetNo = form.budgetRequired === '0'
@@ -181,20 +214,55 @@ export function EditActivity() {
   // ── Context loading ──
 
   useEffect(() => {
+    if (!successMessage) return
+
+    const timeoutId = window.setTimeout(() => {
+      setSuccessMessage('')
+    }, 10000)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [successMessage])
+
+  useEffect(() => {
     let isMounted = true
 
     async function loadContext() {
       setIsContextLoading(true)
+      setSuccessMessage('')
+      setPendingWith('Loading...')
       setErrors((currentErrors) => ({ ...currentErrors, context: undefined }))
 
+      if (!projectId) {
+        setErrors((currentErrors) => ({
+          ...currentErrors,
+          context: 'Activity id is missing from the edit URL.',
+        }))
+        setActivity(null)
+        setPendingWith('Not assigned')
+        setIsContextLoading(false)
+        return
+      }
+
       try {
-        const [usersResult] = await Promise.all([
+        const [usersResult, projectResult] = await Promise.all([
           SystemusersService.getAll({
             select: ['systemuserid', 'fullname', 'internalemailaddress']
+          }),
+          Dga_aop_projectsesService.get(projectId, {
+            select: ACTIVITY_INFO_SELECT_FIELDS,
           }),
         ])
 
         if (!isMounted) return
+
+        assertOperationSuccess(usersResult, 'Failed to load activity leads.')
+        assertOperationSuccess(projectResult, 'Failed to load activity information.')
+        const project = getResultValue<Dga_aop_projectses>(projectResult)
+        
+
+        if (!project) {
+          throw new Error('Activity information could not be found.')
+        }
 
         const users = (usersResult?.data ?? []) as Systemusers[]
 
@@ -205,29 +273,45 @@ export function EditActivity() {
             value: user.systemuserid ?? '',
           }))
 
-        // Use matched hierarchy from userSlice, fall back to first Division type
+        const ownerUserId = normalizeId(project._owninguser_value)
+        const ownerTeamId = normalizeId(project._owningteam_value)
+        let ownerName = project.owneridname ?? ''
+
+        if (!ownerName && ownerUserId) {
+          const ownerUser = users.find((user) => normalizeId(user.systemuserid) === ownerUserId)
+          ownerName = ownerUser?.fullname ?? ownerUser?.internalemailaddress ?? ''
+        }
+
+        if (!ownerName && ownerUserId) {
+          const ownerUserResult = await SystemusersService.get(ownerUserId, {
+            select: ['systemuserid', 'fullname', 'internalemailaddress'],
+          })
+          assertOperationSuccess(ownerUserResult, 'Failed to load activity owner user.')
+          const ownerUser = getResultValue<Systemusers>(ownerUserResult)
+          ownerName = ownerUser?.fullname ?? ownerUser?.internalemailaddress ?? ''
+        }
+
+        if (!ownerName && ownerTeamId) {
+          const teamResult = await TeamsService.get(ownerTeamId, {
+            select: ['teamid', 'name'],
+          })
+          assertOperationSuccess(teamResult, 'Failed to load activity owner team.')
+          const team = getResultValue<Teams>(teamResult)
+          ownerName = team?.name ?? ''
+        }
+
+        if (!isMounted) return
+
         const division = currentRoleDivisionalHierarchy
           ? allHierarchies.find((h) => h.dga_divisional_hierarchyid === currentRoleDivisionalHierarchy.hierarchyId)
-          : allHierarchies.filter((item) => item.dga_type === 776140002)[0] ?? allHierarchies[0]
+          : undefined
         const sector = division?._dga_parent_divisional_hierarchy_value
           ? allHierarchies.find((h) => h.dga_divisional_hierarchyid === division._dga_parent_divisional_hierarchy_value)
-          : allHierarchies.filter((item) => item.dga_type === 776140001)[0]
-        const matchedPlanningInstance = planningInstances.find((item) => {
-          const matchesDivision = division ? item._dga_divisional_hierarchy_value === division.dga_divisional_hierarchyid : true
-          const matchesCycle = selectedCycle ? item._dga_assessment_cycle_value === selectedCycle : true
-          return matchesDivision && matchesCycle
-        }) ?? planningInstances?.[0]
-
+          : undefined
         setActivityLeadOptions(activityLeadUsers)
-        setContext({
-          currentUserId: currentUser?.systemuserid ?? users?.[0]?.systemuserid ?? '',
-          currentUserName: currentUser?.fullname ?? users?.[0]?.fullname ?? 'User',
-          division,
-          sector,
-          planningInstance: matchedPlanningInstance,
-        })
-        setForm((prev) => ({
-          ...prev,
+        setPendingWith(ownerName || 'Not assigned')
+        setActivity(project)
+        setForm(projectToActivityForm(project, {
           sectorId: sector?.dga_divisional_hierarchyid ?? '',
           sectorName: sector?.dga_name ?? '',
           divisionId: division?.dga_divisional_hierarchyid ?? '',
@@ -236,6 +320,8 @@ export function EditActivity() {
       } catch (error) {
         if (isMounted) {
           setErrors({ context: error instanceof Error ? error.message : 'Failed to load context.' })
+          setActivity(null)
+          setPendingWith('Not assigned')
         }
       } finally {
         if (isMounted) setIsContextLoading(false)
@@ -244,7 +330,11 @@ export function EditActivity() {
 
     loadContext()
     return () => { isMounted = false }
-  }, [])
+  }, [
+    allHierarchies,
+    currentRoleDivisionalHierarchy,
+    projectId,
+  ])
 
   // ── Form handlers ──
 
@@ -252,6 +342,7 @@ export function EditActivity() {
     const changedFields = Object.keys(nextFields) as Array<keyof ActivityForm>
     const normalizedForm = normalizeControlledRules({ ...form, ...nextFields })
 
+    setSuccessMessage('')
     setForm(normalizedForm)
     setErrors((currentErrors) => {
       const nextErrors = { ...currentErrors }
@@ -286,6 +377,62 @@ export function EditActivity() {
   }
 
   // ── Action handlers ──
+
+  async function handleSaveActivityInfo() {
+    setSuccessMessage('')
+
+    if (!projectId) {
+      setErrors((currentErrors) => ({
+        ...currentErrors,
+        context: 'Activity id is missing from the edit URL.',
+      }))
+      return
+    }
+
+    const nextErrors = validateForm(form)
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors)
+      setActiveTab('activity-info')
+      return
+    }
+
+    setIsSavingActivityInfo(true)
+    try {
+      const payload = buildActivityInfoUpdatePayload(form)
+      console.log('Edit activity information payload', payload)
+      const result = await Dga_aop_projectsesService.update(
+        projectId,
+        payload as unknown as Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>>,
+      )
+
+      assertOperationSuccess(result, 'Failed to save activity information.')
+
+      setActivity((currentActivity) => currentActivity ? {
+        ...currentActivity,
+        dga_name: form.activityName.trim(),
+        dga_description_summary: form.summary,
+        dga_activity_classification: payload.dga_activity_classification ?? currentActivity.dga_activity_classification,
+        dga_activity_type: payload.dga_activity_type ?? currentActivity.dga_activity_type,
+        dga_adeo_review_required: payload.dga_adeo_review_required ?? currentActivity.dga_adeo_review_required,
+        dga_does_this_project_require_procurement: payload.dga_does_this_project_require_procurement ?? currentActivity.dga_does_this_project_require_procurement,
+        dga_doesthisprojectrequirebudgetallocation: payload.dga_doesthisprojectrequirebudgetallocation ?? currentActivity.dga_doesthisprojectrequirebudgetallocation,
+        dga_planned_end_date: form.plannedEndDate,
+        dga_planned_start_date: form.plannedStartDate,
+        dga_project_kpi: form.activityKpi,
+        dga_scope: form.scopeDescription,
+        dga_strategic_vs_operation: payload.dga_strategic_vs_operation ?? currentActivity.dga_strategic_vs_operation,
+      } : currentActivity)
+      setErrors((currentErrors) => ({ ...currentErrors, submit: undefined }))
+      setSuccessMessage('Activity information saved successfully.')
+    } catch (error) {
+      setErrors((currentErrors) => ({
+        ...currentErrors,
+        submit: error instanceof Error ? error.message : 'Failed to save activity information.',
+      }))
+    } finally {
+      setIsSavingActivityInfo(false)
+    }
+  }
 
   const handleSubmitToDivisionDirector = useCallback(() => {
     // TODO: Implement submit logic
@@ -605,6 +752,15 @@ export function EditActivity() {
           </div>
 
           <div className="edit-activity__actions">
+            {activeTab === 'activity-info' ? (
+              <Button
+                disabled={isSavingActivityInfo || Boolean(errors.context)}
+                icon={<Save size={16} />}
+                onClick={handleSaveActivityInfo}
+              >
+                {isSavingActivityInfo ? 'Saving...' : statusCode === 1 ? 'Save Draft' : 'Save Changes'}
+              </Button>
+            ) : null}
             {isDivisionMember ? (
               <Button icon={<Send size={16} />} onClick={handleSubmitToDivisionDirector}>
                 Submit to Division Director
@@ -621,6 +777,18 @@ export function EditActivity() {
           </div>
         </div>
       </header>
+
+      {successMessage ? (
+        <div className="create-activity__notice create-activity__notice--success" role="status">
+          {successMessage}
+        </div>
+      ) : null}
+
+      {errors.submit ? (
+        <div className="create-activity__notice create-activity__notice--error" role="alert">
+          {errors.submit}
+        </div>
+      ) : null}
 
       {/* Premium stage tabs */}
       <div className="edit-activity__stages">

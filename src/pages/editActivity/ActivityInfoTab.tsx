@@ -231,7 +231,7 @@ export function ActivityInfoTab({
         </div>
       </aside>
     )
-  }, [form, errors])
+  }, [form])
 
   // ── Form cards ──
   const formCards = useMemo(() => {
@@ -312,6 +312,7 @@ export function ActivityInfoTab({
                       />
                     ))}
                   </div>
+                  {errors.strategies ? <span className="field__error">{errors.strategies}</span> : null}
                 </fieldset>
               </div>
             ) : null}

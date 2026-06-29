@@ -418,6 +418,68 @@
           "x-ms-read-only": true,
           "maxLength": 200
         },
+        "dga_does_this_project_require_procurement": {
+          "type": "string",
+          "title": "Does this project require procurement?",
+          "x-ms-dataverse-attribute": "dga_does_this_project_require_procurement",
+          "x-ms-dataverse-type": "PicklistType",
+          "x-ms-schema-name": "dga_does_this_project_require_procurement",
+          "enum": [
+            "Yes",
+            "No"
+          ],
+          "x-ms-enum-values": [
+            1,
+            0
+          ],
+          "Color": [
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "ba80c5ea-7873-f111-ab0f-002248d3af8a",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "Does this project require procurement?",
+          "x-ms-optionSetType": "Picklist"
+        },
+        "dga_does_this_project_require_procurementname": {
+          "type": "string",
+          "title": "dga_does_this_project_require_procurementname",
+          "x-ms-dataverse-attribute": "dga_does_this_project_require_procurementname",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "dga_does_this_project_require_procurementName",
+          "x-ms-read-only": true
+        },
+        "dga_doesthisprojectrequirebudgetallocation": {
+          "type": "string",
+          "title": "Does this project require budget allocation?",
+          "x-ms-dataverse-attribute": "dga_doesthisprojectrequirebudgetallocation",
+          "x-ms-dataverse-type": "PicklistType",
+          "x-ms-schema-name": "dga_doesthisprojectrequirebudgetallocation",
+          "enum": [
+            "Yes",
+            "No"
+          ],
+          "x-ms-enum-values": [
+            1,
+            0
+          ],
+          "Color": [
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "60a54e2b-7973-f111-ab0f-002248d3a07d",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "Does this project require budget allocation?",
+          "x-ms-optionSetType": "Picklist"
+        },
+        "dga_doesthisprojectrequirebudgetallocationname": {
+          "type": "string",
+          "title": "dga_doesthisprojectrequirebudgetallocationname",
+          "x-ms-dataverse-attribute": "dga_doesthisprojectrequirebudgetallocationname",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "dga_doesthisprojectrequirebudgetallocationName",
+          "x-ms-read-only": true
+        },
         "dga_govdigital_pillar": {
           "type": "string",
           "title": "Gov Digital Pillar",
@@ -751,17 +813,9 @@
           "type": "string",
           "title": "Project KPI",
           "x-ms-dataverse-attribute": "dga_project_kpi",
-          "x-ms-dataverse-type": "LookupType",
-          "x-ms-schema-name": "dga_project_kpi"
-        },
-        "dga_project_kpiname": {
-          "type": "string",
-          "title": "dga_project_kpiname",
-          "x-ms-dataverse-attribute": "dga_project_kpiname",
           "x-ms-dataverse-type": "StringType",
-          "x-ms-schema-name": "dga_project_kpiName",
-          "x-ms-read-only": true,
-          "maxLength": 200
+          "x-ms-schema-name": "dga_project_kpi",
+          "maxLength": 4000
         },
         "dga_project_long_term_impact": {
           "type": "string",

@@ -1234,13 +1234,17 @@
 
 .create-activity__guidance-ring-value {
   color: var(--color-text-primary);
-  font-size: 1.35rem;
+  font-size: 1.12rem;
   font-weight: 850;
   left: 50%;
   letter-spacing: -0.03em;
+  line-height: 1;
+  min-width: 3.4rem;
   position: absolute;
+  text-align: center;
   top: 50%;
   transform: translate(-50%, -50%);
+  white-space: nowrap;
 }
 
 .create-activity__guidance-ring-stats {

@@ -1,4 +1,5 @@
 import { type SelectOption } from '../../../components/ui'
+import type { Dga_aop_projectses, Dga_aop_projectsesBase } from '../../../generated/models/Dga_aop_projectsesModel'
 
 // ── Form Types ──
 
@@ -38,6 +39,10 @@ export type ActivityForm = {
 
 export type FieldErrors = Partial<Record<keyof ActivityForm | 'submit' | 'context', string>>
 
+export type ActivityInfoUpdatePayload = Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid' | 'dga_project_categorized_under'>> & {
+  dga_project_categorized_under?: string
+}
+
 export type ActivityContext = {
   currentUserId: string
   currentUserName: string
@@ -54,6 +59,7 @@ export const FIELD_LABELS: Partial<Record<keyof ActivityForm, string>> = {
   sectorName: 'Sector',
   divisionName: 'Division',
   activityScope: 'Activity Scope',
+  strategies: 'Strategy Categorization',
   activityClassification: 'Activity Classification',
   budgetRequired: 'Budget requirement',
   procurementRequired: 'Procurement requirement',
@@ -224,6 +230,10 @@ export function validateForm(form: ActivityForm) {
     }
   })
 
+  if (form.activityScope === '1' && form.strategies.length === 0) {
+    errors.strategies = 'Select at least one strategy for Strategic activities.'
+  }
+
   if (form.plannedStartDate && form.plannedEndDate) {
     if (form.plannedStartDate >= form.plannedEndDate) {
       errors.plannedStartDate = 'Planned Start Date must be earlier than Planned End Date.'
@@ -268,6 +278,10 @@ export function getRequiredFields(form: ActivityForm): Array<keyof ActivityForm>
     )
   }
 
+  if (form.activityScope === '1') {
+    fields.push('strategies')
+  }
+
   return fields
 }
 
@@ -287,4 +301,137 @@ export function getRuntimeErrors(form: ActivityForm, fields: Array<keyof Activit
   }
 
   return nextErrors
+}
+
+export function getResultValue<T>(result: unknown): T | undefined {
+  const shaped = result as { data?: T; value?: T; result?: T; record?: T }
+
+  return shaped.data ?? shaped.value ?? shaped.result ?? shaped.record
+}
+
+export function getOperationErrorMessage(result: unknown, fallbackMessage: string) {
+  const error = (result as { error?: { message?: string } | string })?.error
+  const message = typeof error === 'string' ? error : error?.message
+
+  if (!message) {
+    return fallbackMessage
+  }
+
+  try {
+    const parsed = JSON.parse(message) as { error?: { message?: string } }
+    return parsed.error?.message ?? message
+  } catch {
+    return message
+  }
+}
+
+export function assertOperationSuccess(result: unknown, fallbackMessage: string) {
+  if ((result as { success?: boolean })?.success === false) {
+    throw new Error(getOperationErrorMessage(result, fallbackMessage))
+  }
+}
+
+export function parseStrategies(value: unknown): StrategyValue[] {
+  const allowedValues = new Set(STRATEGY_OPTIONS.map((option) => option.value))
+  const rawValue = Array.isArray(value) ? value.join(',') : String(value ?? '')
+
+  return rawValue
+    .split(',')
+    .map((item) => item.trim())
+    .filter((item): item is StrategyValue => allowedValues.has(item as StrategyValue))
+}
+
+export function serializeStrategies(strategies: StrategyValue[]) {
+  return strategies.length > 0 ? strategies.join(',') : undefined
+}
+
+function toStringChoice<TValue extends string>(value: unknown, allowedValues: readonly TValue[]): TValue | '' {
+  const normalized = String(value ?? '')
+
+  return allowedValues.includes(normalized as TValue) ? normalized as TValue : ''
+}
+
+function toYesNoValue(value: unknown): YesNoValue | '' {
+  return toStringChoice(value, ['1', '0'] as const)
+}
+
+function booleanToYesNo(value: boolean | null | undefined): YesNoValue | '' {
+  if (value === true) return '1'
+  if (value === false) return '0'
+  return ''
+}
+
+function toDateOnly(value: string | null | undefined) {
+  if (!value) return ''
+  return value.split('T')[0] ?? ''
+}
+
+function numberOrUndefined<TValue>(value: string): TValue | undefined {
+  return value ? Number(value) as TValue : undefined
+}
+
+type ActivityFormLookupFallbacks = Pick<ActivityForm, 'sectorId' | 'sectorName' | 'divisionId' | 'divisionName'>
+
+export function projectToActivityForm(project: Dga_aop_projectses, fallbacks: ActivityFormLookupFallbacks = INITIAL_FORM): ActivityForm {
+  const activityClassification = toStringChoice(project.dga_activity_classification, ['576610000', '576610001', '576610002'] as const)
+  const activityScope = toStringChoice(project.dga_strategic_vs_operation, ['1', '2'] as const)
+
+  return normalizeControlledRules({
+    ...INITIAL_FORM,
+    activityName: project.dga_name ?? '',
+    activityType: toStringChoice(project.dga_activity_type, ['1', '2', '3', '4'] as const),
+    sectorId: project._dga_sector_value ?? fallbacks.sectorId,
+    sectorName: project.dga_sectorname ?? fallbacks.sectorName,
+    divisionId: project._dga_department_value ?? fallbacks.divisionId,
+    divisionName: project.dga_departmentname ?? fallbacks.divisionName,
+    activityScope,
+    strategies: parseStrategies(project.dga_project_categorized_under),
+    activityClassification,
+    budgetRequired: toYesNoValue(project.dga_doesthisprojectrequirebudgetallocation),
+    procurementRequired: toYesNoValue(project.dga_does_this_project_require_procurement),
+    adeoReported: booleanToYesNo(project.dga_adeo_review_required),
+    activityLeadId: project._dga_activity_lead_value ?? '',
+    plannedStartDate: toDateOnly(project.dga_planned_start_date),
+    plannedEndDate: toDateOnly(project.dga_planned_end_date),
+    scopeDescription: project.dga_scope ?? '',
+    summary: project.dga_description_summary ?? '',
+    adeoProjectName: project.dga_project_name ?? '',
+    adeoProjectDescription: project.dga_project_description ?? '',
+    longTermImpact: project.dga_longtermimpactprojectlongtermimpact ?? '',
+    overallLongTermImpact: project.dga_project_overall_long_term_impact ?? project.dga_project_long_term_impact ?? '',
+    stakeholder: project.dga_stakeholders ?? '',
+    activityKpi: project.dga_project_kpi ?? '',
+    activityPlan: project.dga_project_plan_if_any ?? '',
+    risks: project.dga_risks ?? '',
+  })
+}
+
+export function buildActivityInfoUpdatePayload(form: ActivityForm): ActivityInfoUpdatePayload {
+  const normalizedForm = normalizeControlledRules(form)
+
+  return {
+    dga_activity_classification: numberOrUndefined<Dga_aop_projectsesBase['dga_activity_classification']>(normalizedForm.activityClassification),
+    'dga_activity_lead@odata.bind': normalizedForm.activityLeadId ? `/systemusers(${normalizedForm.activityLeadId})` : undefined,
+    dga_activity_type: numberOrUndefined<Dga_aop_projectsesBase['dga_activity_type']>(normalizedForm.activityType),
+    dga_adeo_review_required: normalizedForm.adeoReported === '1',
+    dga_description_summary: normalizedForm.summary,
+    dga_does_this_project_require_procurement: numberOrUndefined<Dga_aop_projectsesBase['dga_does_this_project_require_procurement']>(normalizedForm.procurementRequired),
+    dga_doesthisprojectrequirebudgetallocation: numberOrUndefined<Dga_aop_projectsesBase['dga_doesthisprojectrequirebudgetallocation']>(normalizedForm.budgetRequired),
+    dga_longtermimpactprojectlongtermimpact: normalizedForm.longTermImpact,
+    dga_name: normalizedForm.activityName.trim(),
+    dga_planned_end_date: normalizedForm.plannedEndDate,
+    dga_planned_start_date: normalizedForm.plannedStartDate,
+    dga_project_categorized_under: serializeStrategies(normalizedForm.strategies) ?? '',
+    dga_project_description: normalizedForm.adeoProjectDescription,
+    dga_project_kpi: normalizedForm.activityKpi,
+    dga_project_long_term_impact: normalizedForm.overallLongTermImpact,
+    dga_project_name: normalizedForm.adeoProjectName,
+    dga_project_overall_long_term_impact: normalizedForm.overallLongTermImpact,
+    dga_project_plan_if_any: normalizedForm.activityPlan,
+    dga_registered_or_will_be_registered_in_epm: normalizedForm.activityClassification === '576610000',
+    dga_risks: normalizedForm.risks,
+    dga_scope: normalizedForm.scopeDescription,
+    dga_stakeholders: normalizedForm.stakeholder,
+    dga_strategic_vs_operation: numberOrUndefined<Dga_aop_projectsesBase['dga_strategic_vs_operation']>(normalizedForm.activityScope),
+  }
 }
