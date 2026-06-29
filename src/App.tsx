@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AppLayout } from './components/layout/AppLayout'
 import { NAVIGATION_ITEMS } from './constants/app'
 import { DEFAULT_APP_ROUTE, APP_ROUTE_PATHS, UI_SHOWCASE_ROUTE } from './routes/appRoutes'
+import { ActivitiesList } from './pages/ActivitiesList'
 import { CreateActivity } from './pages/CreateActivity'
 import { EditActivity } from './pages/EditActivity'
 import { UiShowcase } from './pages/UiShowcase'
@@ -44,7 +45,7 @@ function App() {
           <Route element={<EditActivity />} path={APP_ROUTE_PATHS.editActivity} />
           <Route element={<EmptyScreen />} path={APP_ROUTE_PATHS.overview} />
           <Route element={<EmptyScreen />} path={APP_ROUTE_PATHS.activityLeads} />
-          <Route element={<EmptyScreen />} path={APP_ROUTE_PATHS.activitiesList} />
+          <Route element={<ActivitiesList />} path={APP_ROUTE_PATHS.activitiesList} />
           <Route element={<EmptyScreen />} path={APP_ROUTE_PATHS.approvals} />
           <Route element={<EmptyScreen />} path={APP_ROUTE_PATHS.procurementPlan} />
           <Route element={<EmptyScreen />} path={APP_ROUTE_PATHS.engagementPlan} />

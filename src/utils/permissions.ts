@@ -25,7 +25,10 @@ export function canViewNavigationItem(role: AopRole, item: NavigationItem) {
 }
 
 export function getNavigationForRole(role: AopRole) {
-  return NAVIGATION_ITEMS.filter((item) => canViewNavigationItem(role, item)).map((item) => {
+  return NAVIGATION_ITEMS
+    .filter((item) => item.id !== 'editActivity')
+    .filter((item) => canViewNavigationItem(role, item))
+    .map((item) => {
     if (item.id !== 'overview') {
       return item
     }
