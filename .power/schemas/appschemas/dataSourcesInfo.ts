@@ -5,6 +5,27 @@
  */
 
 export const dataSourcesInfo = {
+  "accounts": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "accountid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
+  "dga_aop_cost_centers": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "dga_aop_cost_centerid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
+  "dga_aop_engagement_plans": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "dga_aop_engagement_planid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
   "dga_aop_project_logses": {
     "tableId": "",
     "version": "",
@@ -12,10 +33,24 @@ export const dataSourcesInfo = {
     "dataSourceType": "Dataverse",
     "apis": {}
   },
+  "dga_aop_project_milestone_detailses": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "dga_aop_project_milestone_detailsid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
   "dga_aop_projectses": {
     "tableId": "",
     "version": "",
     "primaryKey": "dga_aop_projectsid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
+  "dga_categories": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "dga_categoryid",
     "dataSourceType": "Dataverse",
     "apis": {}
   },
@@ -44,6 +79,27 @@ export const dataSourcesInfo = {
     "tableId": "",
     "version": "",
     "primaryKey": "dga_divisional_hierarchyid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
+  "dga_engagement_sub_types": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "dga_engagement_sub_typeid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
+  "dga_objectives": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "dga_objectiveid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
+  "dga_procurement_plans": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "dga_procurement_planid",
     "dataSourceType": "Dataverse",
     "apis": {}
   },

@@ -1,69 +1,72 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, ChevronDown } from 'lucide-react'
-import {
-  getAllDivisionIds,
-  getDivisionIdsForSector,
-  getSectorIdForDivision,
-  SECTOR_DIVISIONS,
-  type SectorDivision,
-} from '../data/adgesData'
 
-// ── Helpers ──
+export type SectorDivision = {
+  sectorId: string
+  sectorName: string
+  divisions: { divisionId: string; divisionName: string }[]
+}
 
-function getIndeterminate(
-  sector: SectorDivision,
-  selected: string[],
-): boolean {
+function getIndeterminate(sector: SectorDivision, selected: string[]): boolean {
   const ids = sector.divisions.map((d) => d.divisionId)
   const count = ids.filter((id) => selected.includes(id)).length
   return count > 0 && count < ids.length
 }
 
 function isSectorFullySelected(sector: SectorDivision, selected: string[]): boolean {
-  return sector.divisions.every((d) => selected.includes(d.divisionId))
+  return sector.divisions.length > 0 && sector.divisions.every((d) => selected.includes(d.divisionId))
 }
 
 function isSectorSelected(sector: SectorDivision, selected: string[]): boolean {
   return selected.includes(sector.sectorId)
 }
 
-// ── Props ──
+function getAllDivisionIds(sectorDivisions: SectorDivision[]): string[] {
+  return sectorDivisions.flatMap((s) => s.divisions.map((d) => d.divisionId))
+}
+
+function getDivisionIdsForSector(sectorDivisions: SectorDivision[], sectorId: string): string[] {
+  return sectorDivisions.find((s) => s.sectorId === sectorId)?.divisions.map((d) => d.divisionId) ?? []
+}
+
+function getSectorIdForDivision(sectorDivisions: SectorDivision[], divisionId: string): string | undefined {
+  return sectorDivisions.find((s) => s.divisions.some((d) => d.divisionId === divisionId))?.sectorId
+}
 
 type EngagementVisibilityPickerProps = {
   error?: string
   label: string
   onChange: (value: string[]) => void
   required?: boolean
+  sectorDivisions: SectorDivision[]
   value: string[]
 }
-
-// ── Component ──
 
 export function EngagementVisibilityPicker({
   error,
   label,
   onChange,
   required = false,
+  sectorDivisions,
   value,
 }: EngagementVisibilityPickerProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [expandedSectors, setExpandedSectors] = useState<string[]>([])
   const rootRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number } | null>(null)
 
-  // ── Derived ──
-  const allDivisionIds = useMemo(() => getAllDivisionIds(), [])
-  const allSelected = allDivisionIds.every((id) => value.includes(id))
-  const sectorCount = SECTOR_DIVISIONS.filter((s) =>
-    s.divisions.some((d) => value.includes(d.divisionId)),
+  const allDivisionIds = useMemo(() => getAllDivisionIds(sectorDivisions), [sectorDivisions])
+  const allSelected = allDivisionIds.length > 0 && allDivisionIds.every((id) => value.includes(id))
+  const selectedSectorIds = useMemo(() => new Set(sectorDivisions.map((s) => s.sectorId)), [sectorDivisions])
+  const sectorCount = sectorDivisions.filter((s) =>
+    value.includes(s.sectorId) || s.divisions.some((d) => value.includes(d.divisionId)),
   ).length
-  const divisionCount = value.filter((v) => !SECTOR_DIVISIONS.some((s) => s.sectorId === v)).length
+  const divisionCount = value.filter((v) => !selectedSectorIds.has(v)).length
 
-  // ── Click-outside / Escape / scroll reposition (same pattern as Select) ──
   useEffect(() => {
     if (!isOpen) {
-      setMenuPos(null)
       return
     }
 
@@ -110,48 +113,49 @@ export function EngagementVisibilityPicker({
     }
   }, [isOpen])
 
-  // ── Toggle handlers ──
-
   function toggleAll() {
     onChange(allSelected ? [] : [...allDivisionIds])
+    setExpandedSectors(allSelected ? [] : sectorDivisions.map((sector) => sector.sectorId))
   }
 
   function toggleSector(sector: SectorDivision) {
     const divisionIds = sector.divisions.map((d) => d.divisionId)
     const allChecked = divisionIds.every((id) => value.includes(id))
 
-    if (allChecked) {
+    if (allChecked || value.includes(sector.sectorId)) {
       onChange(value.filter((v) => !divisionIds.includes(v) && v !== sector.sectorId))
-    } else {
-      const next = [...value.filter((v) => v !== sector.sectorId)]
-      divisionIds.forEach((id) => {
-        if (!next.includes(id)) next.push(id)
-      })
-      onChange(next)
+      setExpandedSectors((current) => current.filter((sectorId) => sectorId !== sector.sectorId))
+      return
     }
+
+    const next = [...value.filter((v) => v !== sector.sectorId)]
+    divisionIds.forEach((id) => {
+      if (!next.includes(id)) next.push(id)
+    })
+    if (!next.includes(sector.sectorId)) next.push(sector.sectorId)
+    onChange(next)
+    setExpandedSectors((current) => current.includes(sector.sectorId) ? current : [...current, sector.sectorId])
   }
 
   function toggleDivision(divisionId: string) {
-    const sectorId = getSectorIdForDivision(divisionId)
+    const sectorId = getSectorIdForDivision(sectorDivisions, divisionId)
     const next = value.includes(divisionId)
       ? value.filter((v) => v !== divisionId)
       : [...value, divisionId]
 
-    // If all divisions in the sector are now selected, auto-select the sector too
     if (sectorId) {
-      const sector = SECTOR_DIVISIONS.find((s) => s.sectorId === sectorId)
+      const sector = sectorDivisions.find((s) => s.sectorId === sectorId)
       if (sector) {
         const divisionIds = sector.divisions.map((d) => d.divisionId)
         const allDivisionsSelected = divisionIds.every((id) => next.includes(id))
         if (allDivisionsSelected && !next.includes(sectorId)) {
           next.push(sectorId)
         }
-        // If a division was deselected, remove the sector if it was selected
         if (!next.includes(divisionId) && next.includes(sectorId)) {
-          const idx = next.indexOf(sectorId)
-          next.splice(idx, 1)
+          next.splice(next.indexOf(sectorId), 1)
         }
       }
+      setExpandedSectors((current) => current.includes(sectorId) ? current : [...current, sectorId])
     }
 
     onChange(next)
@@ -160,6 +164,7 @@ export function EngagementVisibilityPicker({
   function handleToggle() {
     if (isOpen) {
       setIsOpen(false)
+      setMenuPos(null)
       return
     }
 
@@ -179,12 +184,10 @@ export function EngagementVisibilityPicker({
     setIsOpen(true)
   }
 
-  // ── Render chips ──
-
   function renderChips(): ReactNode {
     const groups: ReactNode[] = []
 
-    for (const sector of SECTOR_DIVISIONS) {
+    for (const sector of sectorDivisions) {
       const selectedDivisions = sector.divisions.filter((d) => value.includes(d.divisionId))
       const sectorSelected = value.includes(sector.sectorId)
 
@@ -192,20 +195,21 @@ export function EngagementVisibilityPicker({
 
       const chips: ReactNode[] = []
 
-      // Sector chip (blue)
       chips.push(
         <span
           className="engagement-visibility__chip engagement-visibility__chip--sector"
           key={sector.sectorId}
           onClick={() => {
-            const ids = [...getDivisionIdsForSector(sector.sectorId), sector.sectorId]
+            const ids = [...getDivisionIdsForSector(sectorDivisions, sector.sectorId), sector.sectorId]
             onChange(value.filter((v) => !ids.includes(v)))
+            setExpandedSectors((current) => current.filter((sectorId) => sectorId !== sector.sectorId))
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault()
-              const ids = [...getDivisionIdsForSector(sector.sectorId), sector.sectorId]
+              const ids = [...getDivisionIdsForSector(sectorDivisions, sector.sectorId), sector.sectorId]
               onChange(value.filter((v) => !ids.includes(v)))
+              setExpandedSectors((current) => current.filter((sectorId) => sectorId !== sector.sectorId))
             }
           }}
           role="button"
@@ -220,7 +224,6 @@ export function EngagementVisibilityPicker({
         </span>,
       )
 
-      // Individual division chips (purple)
       for (const div of selectedDivisions) {
         chips.push(
           <span
@@ -258,18 +261,11 @@ export function EngagementVisibilityPicker({
     ) : null
   }
 
-  // ── Render menu content ──
-
   function renderMenu() {
     return (
       <div className="engagement-visibility__menu" ref={menuRef} role="listbox">
-        {/* Select All */}
         <label className="engagement-visibility__option engagement-visibility__option--select-all">
-          <input
-            checked={allSelected}
-            onChange={toggleAll}
-            type="checkbox"
-          />
+          <input checked={allSelected} onChange={toggleAll} type="checkbox" />
           <span className="engagement-visibility__check" aria-hidden="true">
             {allSelected ? <Check size={13} /> : null}
           </span>
@@ -278,15 +274,18 @@ export function EngagementVisibilityPicker({
 
         <div className="engagement-visibility__divider" />
 
-        {/* Sectors */}
-        {SECTOR_DIVISIONS.map((sector) => {
+        {sectorDivisions.length === 0 ? (
+          <div className="select-menu__empty">No sectors or divisions found.</div>
+        ) : null}
+
+        {sectorDivisions.map((sector) => {
           const isIndeterminate = getIndeterminate(sector, value)
           const isFullySelected = isSectorFullySelected(sector, value)
           const isSectorSel = isSectorSelected(sector, value)
+          const isExpanded = expandedSectors.includes(sector.sectorId)
 
           return (
             <div className="engagement-visibility__sector-group" key={sector.sectorId}>
-              {/* Sector row */}
               <label className="engagement-visibility__option engagement-visibility__option--sector">
                 <input
                   checked={isFullySelected || isSectorSel}
@@ -302,8 +301,7 @@ export function EngagementVisibilityPicker({
                 <span className="engagement-visibility__label">{sector.sectorName}</span>
               </label>
 
-              {/* Divisions */}
-              {sector.divisions.map((div) => (
+              {isExpanded ? sector.divisions.map((div) => (
                 <label className="engagement-visibility__option engagement-visibility__option--division" key={div.divisionId}>
                   <input
                     checked={value.includes(div.divisionId)}
@@ -315,15 +313,13 @@ export function EngagementVisibilityPicker({
                   </span>
                   <span className="engagement-visibility__label">{div.divisionName}</span>
                 </label>
-              ))}
+              )) : null}
             </div>
           )
         })}
       </div>
     )
   }
-
-  // ── Render ──
 
   return (
     <div className={`field engagement-visibility ${error ? 'engagement-visibility--invalid' : ''}`.trim()} ref={rootRef}>
@@ -358,12 +354,12 @@ export function EngagementVisibilityPicker({
               className="engagement-visibility__popover"
               role="dialog"
               style={{
+                left: menuPos.left,
+                maxWidth: Math.min(menuPos.width + 80, window.innerWidth - 16),
+                minWidth: menuPos.width,
                 position: 'fixed',
                 top: menuPos.top,
-                left: menuPos.left,
-                minWidth: menuPos.width,
                 width: 'max-content',
-                maxWidth: Math.min(menuPos.width + 80, window.innerWidth - 16),
                 zIndex: 99999,
               }}
             >
@@ -375,6 +371,3 @@ export function EngagementVisibilityPicker({
     </div>
   )
 }
-
-// ── Exports for label lookup ──
-export { getVisibilityLabel } from '../data/adgesData'

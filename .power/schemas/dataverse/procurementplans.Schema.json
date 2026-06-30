@@ -1,0 +1,994 @@
+{
+  "name": "dga_procurement_plan",
+  "title": "Procurement Plans",
+  "schema": {
+    "type": "array",
+    "items": {
+      "type": "object",
+      "x-ms-dataverse-entity": true,
+      "x-ms-dataverse-entityset": "dga_procurement_plans",
+      "x-ms-dataverse-primary-id": "dga_procurement_planid",
+      "x-ms-dataverse-primary-name": "dga_name",
+      "properties": {
+        "createdby": {
+          "type": "string",
+          "title": "Created By",
+          "x-ms-dataverse-attribute": "createdby",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "CreatedBy",
+          "x-ms-read-only": true
+        },
+        "createdbyname": {
+          "type": "string",
+          "title": "createdbyname",
+          "x-ms-dataverse-attribute": "createdbyname",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "CreatedByName",
+          "x-ms-read-only": true,
+          "maxLength": 100
+        },
+        "createdbyyominame": {
+          "type": "string",
+          "title": "createdbyyominame",
+          "x-ms-dataverse-attribute": "createdbyyominame",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "CreatedByYomiName",
+          "x-ms-read-only": true,
+          "required": true,
+          "maxLength": 100
+        },
+        "createdon": {
+          "type": "string",
+          "title": "Created On",
+          "x-ms-dataverse-attribute": "createdon",
+          "x-ms-dataverse-type": "DateTimeType",
+          "x-ms-schema-name": "CreatedOn",
+          "x-ms-read-only": true
+        },
+        "createdonbehalfby": {
+          "type": "string",
+          "title": "Created By (Delegate)",
+          "x-ms-dataverse-attribute": "createdonbehalfby",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "CreatedOnBehalfBy",
+          "x-ms-read-only": true
+        },
+        "createdonbehalfbyname": {
+          "type": "string",
+          "title": "createdonbehalfbyname",
+          "x-ms-dataverse-attribute": "createdonbehalfbyname",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "CreatedOnBehalfByName",
+          "x-ms-read-only": true,
+          "maxLength": 100
+        },
+        "createdonbehalfbyyominame": {
+          "type": "string",
+          "title": "createdonbehalfbyyominame",
+          "x-ms-dataverse-attribute": "createdonbehalfbyyominame",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "CreatedOnBehalfByYomiName",
+          "x-ms-read-only": true,
+          "required": true,
+          "maxLength": 100
+        },
+        "dga_actual_contract_duration_in_months": {
+          "type": "string",
+          "title": "Actual Contract Duration (Months)",
+          "x-ms-dataverse-attribute": "dga_actual_contract_duration_in_months",
+          "x-ms-dataverse-type": "IntegerType",
+          "x-ms-schema-name": "dga_actual_contract_duration_in_months"
+        },
+        "dga_actual_contract_value": {
+          "type": "string",
+          "title": "Actual Contract Value",
+          "x-ms-dataverse-attribute": "dga_actual_contract_value",
+          "x-ms-dataverse-type": "MoneyType",
+          "x-ms-schema-name": "dga_actual_contract_value"
+        },
+        "dga_actual_contract_value_base": {
+          "type": "string",
+          "title": "Actual Contract Value (Base)",
+          "x-ms-dataverse-attribute": "dga_actual_contract_value_base",
+          "x-ms-dataverse-type": "MoneyType",
+          "x-ms-schema-name": "dga_actual_contract_value_Base",
+          "x-ms-read-only": true
+        },
+        "dga_aligned_with_strategic_plan": {
+          "type": "string",
+          "title": "Aligned with Strategic Plan",
+          "x-ms-dataverse-attribute": "dga_aligned_with_strategic_plan",
+          "x-ms-dataverse-type": "BooleanType",
+          "x-ms-schema-name": "dga_aligned_with_strategic_plan",
+          "enum": [
+            "No",
+            "Yes"
+          ],
+          "x-ms-enum-values": [
+            0,
+            1
+          ],
+          "Color": [
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "4e17b8da-5765-f111-a826-002248d3a07d",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "Aligned with Strategic Plan",
+          "x-ms-optionSetType": "Boolean"
+        },
+        "dga_aligned_with_strategic_planname": {
+          "type": "string",
+          "title": "dga_aligned_with_strategic_planname",
+          "x-ms-dataverse-attribute": "dga_aligned_with_strategic_planname",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "dga_aligned_with_strategic_planName",
+          "x-ms-read-only": true
+        },
+        "dga_aop_cost_centre": {
+          "type": "string",
+          "title": "AOP Cost Centre",
+          "x-ms-dataverse-attribute": "dga_aop_cost_centre",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "dga_aop_cost_centre"
+        },
+        "dga_aop_cost_centrename": {
+          "type": "string",
+          "title": "dga_aop_cost_centrename",
+          "x-ms-dataverse-attribute": "dga_aop_cost_centrename",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "dga_aop_cost_centreName",
+          "x-ms-read-only": true,
+          "maxLength": 200
+        },
+        "dga_aop_project": {
+          "type": "string",
+          "title": "AOP Project",
+          "x-ms-dataverse-attribute": "dga_aop_project",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "dga_aop_project"
+        },
+        "dga_aop_projectname": {
+          "type": "string",
+          "title": "dga_aop_projectname",
+          "x-ms-dataverse-attribute": "dga_aop_projectname",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "dga_aop_projectName",
+          "x-ms-read-only": true,
+          "maxLength": 200
+        },
+        "dga_category_code": {
+          "type": "string",
+          "title": "Category Code",
+          "x-ms-dataverse-attribute": "dga_category_code",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "dga_category_code"
+        },
+        "dga_category_codename": {
+          "type": "string",
+          "title": "dga_category_codename",
+          "x-ms-dataverse-attribute": "dga_category_codename",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "dga_category_codeName",
+          "x-ms-read-only": true,
+          "maxLength": 200
+        },
+        "dga_category_description": {
+          "type": "string",
+          "title": "Category Description",
+          "x-ms-dataverse-attribute": "dga_category_description",
+          "x-ms-dataverse-type": "MemoType",
+          "x-ms-schema-name": "dga_category_description",
+          "maxLength": 2000
+        },
+        "dga_confirmed": {
+          "type": "string",
+          "title": "Confirmed",
+          "x-ms-dataverse-attribute": "dga_confirmed",
+          "x-ms-dataverse-type": "BooleanType",
+          "x-ms-schema-name": "dga_confirmed",
+          "enum": [
+            "No",
+            "Yes"
+          ],
+          "x-ms-enum-values": [
+            0,
+            1
+          ],
+          "Color": [
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "5017b8da-5765-f111-a826-002248d3a07d",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "Confirmed",
+          "x-ms-optionSetType": "Boolean"
+        },
+        "dga_confirmedname": {
+          "type": "string",
+          "title": "dga_confirmedname",
+          "x-ms-dataverse-attribute": "dga_confirmedname",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "dga_confirmedName",
+          "x-ms-read-only": true
+        },
+        "dga_current_procurement_status": {
+          "type": "string",
+          "title": "Current Procurement Status",
+          "x-ms-dataverse-attribute": "dga_current_procurement_status",
+          "x-ms-dataverse-type": "PicklistType",
+          "x-ms-schema-name": "dga_current_procurement_status",
+          "enum": [
+            "Floated",
+            "Awarded",
+            "Commercial Evaluation",
+            "Technical Evaluation",
+            "Postponed",
+            "Pending Approval",
+            "Contracting",
+            "Execution Started",
+            "Not Started",
+            "On Hold",
+            "Drafted",
+            "Cancelled",
+            "Delayed",
+            "On Track",
+            "Completed",
+            "Under Renewal",
+            "Not Floated"
+          ],
+          "x-ms-enum-values": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17
+          ],
+          "Color": [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "5217b8da-5765-f111-a826-002248d3a07d",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "Current Procurement Status",
+          "x-ms-optionSetType": "Picklist"
+        },
+        "dga_current_procurement_statusname": {
+          "type": "string",
+          "title": "dga_current_procurement_statusname",
+          "x-ms-dataverse-attribute": "dga_current_procurement_statusname",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "dga_current_procurement_statusName",
+          "x-ms-read-only": true
+        },
+        "dga_does_this_project_require_tender": {
+          "type": "string",
+          "title": "Requires Tender",
+          "x-ms-dataverse-attribute": "dga_does_this_project_require_tender",
+          "x-ms-dataverse-type": "BooleanType",
+          "x-ms-schema-name": "dga_does_this_project_require_tender",
+          "enum": [
+            "No",
+            "Yes"
+          ],
+          "x-ms-enum-values": [
+            0,
+            1
+          ],
+          "Color": [
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "5417b8da-5765-f111-a826-002248d3a07d",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "Requires Tender",
+          "x-ms-optionSetType": "Boolean"
+        },
+        "dga_does_this_project_require_tendername": {
+          "type": "string",
+          "title": "dga_does_this_project_require_tendername",
+          "x-ms-dataverse-attribute": "dga_does_this_project_require_tendername",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "dga_does_this_project_require_tenderName",
+          "x-ms-read-only": true
+        },
+        "dga_end_user_comments": {
+          "type": "string",
+          "title": "End User Comments",
+          "x-ms-dataverse-attribute": "dga_end_user_comments",
+          "x-ms-dataverse-type": "MemoType",
+          "x-ms-schema-name": "dga_end_user_comments",
+          "maxLength": 2000
+        },
+        "dga_expected_awarding_by_quarter": {
+          "type": "string",
+          "title": "Expected Awarding (Quarter)",
+          "x-ms-dataverse-attribute": "dga_expected_awarding_by_quarter",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "dga_expected_awarding_by_quarter",
+          "maxLength": 50
+        },
+        "dga_expected_awarding_date_by_month": {
+          "type": "string",
+          "title": "Expected Awarding Date (Month)",
+          "x-ms-dataverse-attribute": "dga_expected_awarding_date_by_month",
+          "x-ms-dataverse-type": "DateTimeType",
+          "x-ms-schema-name": "dga_expected_awarding_date_by_month"
+        },
+        "dga_expected_contract_duration": {
+          "type": "string",
+          "title": "Expected Contract Duration",
+          "x-ms-dataverse-attribute": "dga_expected_contract_duration",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "dga_expected_contract_duration",
+          "maxLength": 100
+        },
+        "dga_item_service_description": {
+          "type": "string",
+          "title": "Item/Service Description",
+          "x-ms-dataverse-attribute": "dga_item_service_description",
+          "x-ms-dataverse-type": "MemoType",
+          "x-ms-schema-name": "dga_item_service_description",
+          "maxLength": 2000
+        },
+        "dga_justification_date": {
+          "type": "string",
+          "title": "Justification Date",
+          "x-ms-dataverse-attribute": "dga_justification_date",
+          "x-ms-dataverse-type": "DateTimeType",
+          "x-ms-schema-name": "dga_justification_date"
+        },
+        "dga_justification_of_the_change": {
+          "type": "string",
+          "title": "Justification of the Change",
+          "x-ms-dataverse-attribute": "dga_justification_of_the_change",
+          "x-ms-dataverse-type": "MemoType",
+          "x-ms-schema-name": "dga_justification_of_the_change",
+          "maxLength": 2000
+        },
+        "dga_name": {
+          "type": "string",
+          "title": "Procurement Plan Name",
+          "x-ms-dataverse-attribute": "dga_name",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "dga_name",
+          "x-ms-dataverse-primary-name": true,
+          "required": true,
+          "maxLength": 200
+        },
+        "dga_new_outcome": {
+          "type": "string",
+          "title": "New Outcome Type",
+          "x-ms-dataverse-attribute": "dga_new_outcome",
+          "x-ms-dataverse-type": "PicklistType",
+          "x-ms-schema-name": "dga_new_outcome",
+          "enum": [
+            "Purchase Order",
+            "Contract Agreement"
+          ],
+          "x-ms-enum-values": [
+            1,
+            2
+          ],
+          "Color": [
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "5617b8da-5765-f111-a826-002248d3a07d",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "New Outcome Type",
+          "x-ms-optionSetType": "Picklist"
+        },
+        "dga_new_outcomename": {
+          "type": "string",
+          "title": "dga_new_outcomename",
+          "x-ms-dataverse-attribute": "dga_new_outcomename",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "dga_new_outcomeName",
+          "x-ms-read-only": true
+        },
+        "dga_opex_capex": {
+          "type": "string",
+          "title": "OPEX / CAPEX",
+          "x-ms-dataverse-attribute": "dga_opex_capex",
+          "x-ms-dataverse-type": "PicklistType",
+          "x-ms-schema-name": "dga_opex_capex",
+          "enum": [
+            "Opex",
+            "Capex"
+          ],
+          "x-ms-enum-values": [
+            1,
+            2
+          ],
+          "Color": [
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "5817b8da-5765-f111-a826-002248d3a07d",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "OPEX / CAPEX",
+          "x-ms-optionSetType": "Picklist"
+        },
+        "dga_opex_capexname": {
+          "type": "string",
+          "title": "dga_opex_capexname",
+          "x-ms-dataverse-attribute": "dga_opex_capexname",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "dga_opex_capexName",
+          "x-ms-read-only": true
+        },
+        "dga_pr_expected_value_2024": {
+          "type": "string",
+          "title": "PR Expected Value 2024",
+          "x-ms-dataverse-attribute": "dga_pr_expected_value_2024",
+          "x-ms-dataverse-type": "MoneyType",
+          "x-ms-schema-name": "dga_pr_expected_value_2024"
+        },
+        "dga_pr_expected_value_2024_base": {
+          "type": "string",
+          "title": "PR Expected Value 2024 (Base)",
+          "x-ms-dataverse-attribute": "dga_pr_expected_value_2024_base",
+          "x-ms-dataverse-type": "MoneyType",
+          "x-ms-schema-name": "dga_pr_expected_value_2024_Base",
+          "x-ms-read-only": true
+        },
+        "dga_pr_ticket_number": {
+          "type": "string",
+          "title": "PR Ticket Number",
+          "x-ms-dataverse-attribute": "dga_pr_ticket_number",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "dga_pr_ticket_number",
+          "maxLength": 200
+        },
+        "dga_procurement_planid": {
+          "type": "string",
+          "title": "Procurement Plan",
+          "x-ms-dataverse-attribute": "dga_procurement_planid",
+          "x-ms-dataverse-type": "UniqueidentifierType",
+          "x-ms-schema-name": "dga_procurement_planId",
+          "x-ms-dataverse-primary-id": true,
+          "required": true,
+          "x-ms-keyType": "primary"
+        },
+        "dga_procurement_review_comment": {
+          "type": "string",
+          "title": "Procurement Review Comment",
+          "x-ms-dataverse-attribute": "dga_procurement_review_comment",
+          "x-ms-dataverse-type": "MemoType",
+          "x-ms-schema-name": "dga_procurement_review_comment",
+          "maxLength": 2000
+        },
+        "dga_procurement_reviewed": {
+          "type": "string",
+          "title": "Procurement Reviewed",
+          "x-ms-dataverse-attribute": "dga_procurement_reviewed",
+          "x-ms-dataverse-type": "BooleanType",
+          "x-ms-schema-name": "dga_procurement_reviewed",
+          "enum": [
+            "No",
+            "Yes"
+          ],
+          "x-ms-enum-values": [
+            0,
+            1
+          ],
+          "Color": [
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "5e17b8da-5765-f111-a826-002248d3a07d",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "Procurement Reviewed",
+          "x-ms-optionSetType": "Boolean"
+        },
+        "dga_procurement_reviewedname": {
+          "type": "string",
+          "title": "dga_procurement_reviewedname",
+          "x-ms-dataverse-attribute": "dga_procurement_reviewedname",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "dga_procurement_reviewedName",
+          "x-ms-read-only": true
+        },
+        "dga_progress_update": {
+          "type": "string",
+          "title": "Progress Update",
+          "x-ms-dataverse-attribute": "dga_progress_update",
+          "x-ms-dataverse-type": "MemoType",
+          "x-ms-schema-name": "dga_progress_update",
+          "maxLength": 2000
+        },
+        "dga_purchase_request_raising_by_quarter": {
+          "type": "string",
+          "title": "PR Raising (Quarter)",
+          "x-ms-dataverse-attribute": "dga_purchase_request_raising_by_quarter",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "dga_purchase_request_raising_by_quarter",
+          "maxLength": 50
+        },
+        "dga_purchase_request_raising_date_by_month": {
+          "type": "string",
+          "title": "PR Raising Date (Month)",
+          "x-ms-dataverse-attribute": "dga_purchase_request_raising_date_by_month",
+          "x-ms-dataverse-type": "DateTimeType",
+          "x-ms-schema-name": "dga_purchase_request_raising_date_by_month"
+        },
+        "dga_request_type": {
+          "type": "string",
+          "title": "Request Type",
+          "x-ms-dataverse-attribute": "dga_request_type",
+          "x-ms-dataverse-type": "PicklistType",
+          "x-ms-schema-name": "dga_request_type",
+          "enum": [
+            "New",
+            "Renewal",
+            "Amendment",
+            "Existing Contract",
+            "GWPL",
+            "NA"
+          ],
+          "x-ms-enum-values": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "Color": [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "6017b8da-5765-f111-a826-002248d3a07d",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "Request Type",
+          "x-ms-optionSetType": "Picklist"
+        },
+        "dga_request_typename": {
+          "type": "string",
+          "title": "dga_request_typename",
+          "x-ms-dataverse-attribute": "dga_request_typename",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "dga_request_typeName",
+          "x-ms-read-only": true
+        },
+        "dga_solicitation_channel": {
+          "type": "string",
+          "title": "Solicitation Channel",
+          "x-ms-dataverse-attribute": "dga_solicitation_channel",
+          "x-ms-dataverse-type": "PicklistType",
+          "x-ms-schema-name": "dga_solicitation_channel",
+          "enum": [
+            "RFQ",
+            "RFP",
+            "RFI",
+            "NA",
+            "GWPL"
+          ],
+          "x-ms-enum-values": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "Color": [
+            null,
+            null,
+            null,
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "6217b8da-5765-f111-a826-002248d3a07d",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "Solicitation Channel",
+          "x-ms-optionSetType": "Picklist"
+        },
+        "dga_solicitation_channelname": {
+          "type": "string",
+          "title": "dga_solicitation_channelname",
+          "x-ms-dataverse-attribute": "dga_solicitation_channelname",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "dga_solicitation_channelName",
+          "x-ms-read-only": true
+        },
+        "dga_sourcing_method": {
+          "type": "string",
+          "title": "Sourcing Method",
+          "x-ms-dataverse-attribute": "dga_sourcing_method",
+          "x-ms-dataverse-type": "PicklistType",
+          "x-ms-schema-name": "dga_sourcing_method",
+          "enum": [
+            "Public Tender",
+            "Limited Tender",
+            "Sole Source Tender",
+            "Single Source Tender",
+            "NA",
+            "GWPL"
+          ],
+          "x-ms-enum-values": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "Color": [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "6417b8da-5765-f111-a826-002248d3a07d",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "Sourcing Method",
+          "x-ms-optionSetType": "Picklist"
+        },
+        "dga_sourcing_methodname": {
+          "type": "string",
+          "title": "dga_sourcing_methodname",
+          "x-ms-dataverse-attribute": "dga_sourcing_methodname",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "dga_sourcing_methodName",
+          "x-ms-read-only": true
+        },
+        "dga_stage_update_date": {
+          "type": "string",
+          "title": "Stage Update Date",
+          "x-ms-dataverse-attribute": "dga_stage_update_date",
+          "x-ms-dataverse-type": "DateTimeType",
+          "x-ms-schema-name": "dga_stage_update_date"
+        },
+        "dga_tender_type": {
+          "type": "string",
+          "title": "Tender Type",
+          "x-ms-dataverse-attribute": "dga_tender_type",
+          "x-ms-dataverse-type": "PicklistType",
+          "x-ms-schema-name": "dga_tender_type",
+          "enum": [
+            "Raised",
+            "Not raised"
+          ],
+          "x-ms-enum-values": [
+            1,
+            2
+          ],
+          "Color": [
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "6617b8da-5765-f111-a826-002248d3a07d",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "Tender Type",
+          "x-ms-optionSetType": "Picklist"
+        },
+        "dga_tender_typename": {
+          "type": "string",
+          "title": "dga_tender_typename",
+          "x-ms-dataverse-attribute": "dga_tender_typename",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "dga_tender_typeName",
+          "x-ms-read-only": true
+        },
+        "dga_total_project_budget": {
+          "type": "string",
+          "title": "Total Estimated Value",
+          "x-ms-dataverse-attribute": "dga_total_project_budget",
+          "x-ms-dataverse-type": "MoneyType",
+          "x-ms-schema-name": "dga_total_project_budget"
+        },
+        "dga_total_project_budget_base": {
+          "type": "string",
+          "title": "Total Estimated Value (Base)",
+          "x-ms-dataverse-attribute": "dga_total_project_budget_base",
+          "x-ms-dataverse-type": "MoneyType",
+          "x-ms-schema-name": "dga_total_project_budget_Base",
+          "x-ms-read-only": true
+        },
+        "exchangerate": {
+          "type": "string",
+          "title": "Exchange Rate",
+          "x-ms-dataverse-attribute": "exchangerate",
+          "x-ms-dataverse-type": "DecimalType",
+          "x-ms-schema-name": "ExchangeRate",
+          "x-ms-read-only": true
+        },
+        "importsequencenumber": {
+          "type": "string",
+          "title": "Import Sequence Number",
+          "x-ms-dataverse-attribute": "importsequencenumber",
+          "x-ms-dataverse-type": "IntegerType",
+          "x-ms-schema-name": "ImportSequenceNumber"
+        },
+        "modifiedby": {
+          "type": "string",
+          "title": "Modified By",
+          "x-ms-dataverse-attribute": "modifiedby",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "ModifiedBy",
+          "x-ms-read-only": true
+        },
+        "modifiedbyname": {
+          "type": "string",
+          "title": "modifiedbyname",
+          "x-ms-dataverse-attribute": "modifiedbyname",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "ModifiedByName",
+          "x-ms-read-only": true,
+          "maxLength": 100
+        },
+        "modifiedbyyominame": {
+          "type": "string",
+          "title": "modifiedbyyominame",
+          "x-ms-dataverse-attribute": "modifiedbyyominame",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "ModifiedByYomiName",
+          "x-ms-read-only": true,
+          "required": true,
+          "maxLength": 100
+        },
+        "modifiedon": {
+          "type": "string",
+          "title": "Modified On",
+          "x-ms-dataverse-attribute": "modifiedon",
+          "x-ms-dataverse-type": "DateTimeType",
+          "x-ms-schema-name": "ModifiedOn",
+          "x-ms-read-only": true
+        },
+        "modifiedonbehalfby": {
+          "type": "string",
+          "title": "Modified By (Delegate)",
+          "x-ms-dataverse-attribute": "modifiedonbehalfby",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "ModifiedOnBehalfBy",
+          "x-ms-read-only": true
+        },
+        "modifiedonbehalfbyname": {
+          "type": "string",
+          "title": "modifiedonbehalfbyname",
+          "x-ms-dataverse-attribute": "modifiedonbehalfbyname",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "ModifiedOnBehalfByName",
+          "x-ms-read-only": true,
+          "maxLength": 100
+        },
+        "modifiedonbehalfbyyominame": {
+          "type": "string",
+          "title": "modifiedonbehalfbyyominame",
+          "x-ms-dataverse-attribute": "modifiedonbehalfbyyominame",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "ModifiedOnBehalfByYomiName",
+          "x-ms-read-only": true,
+          "required": true,
+          "maxLength": 100
+        },
+        "overriddencreatedon": {
+          "type": "string",
+          "title": "Record Created On",
+          "x-ms-dataverse-attribute": "overriddencreatedon",
+          "x-ms-dataverse-type": "DateTimeType",
+          "x-ms-schema-name": "OverriddenCreatedOn"
+        },
+        "ownerid": {
+          "type": "string",
+          "title": "Owner",
+          "x-ms-dataverse-attribute": "ownerid",
+          "x-ms-dataverse-type": "OwnerType",
+          "x-ms-schema-name": "OwnerId",
+          "required": true
+        },
+        "owneridname": {
+          "type": "string",
+          "title": "owneridname",
+          "x-ms-dataverse-attribute": "owneridname",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "OwnerIdName",
+          "x-ms-read-only": true,
+          "required": true,
+          "maxLength": 100
+        },
+        "owneridtype": {
+          "type": "string",
+          "title": "owneridtype",
+          "x-ms-dataverse-attribute": "owneridtype",
+          "x-ms-dataverse-type": "EntityNameType",
+          "x-ms-schema-name": "OwnerIdType",
+          "required": true
+        },
+        "owneridyominame": {
+          "type": "string",
+          "title": "owneridyominame",
+          "x-ms-dataverse-attribute": "owneridyominame",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "OwnerIdYomiName",
+          "x-ms-read-only": true,
+          "required": true,
+          "maxLength": 100
+        },
+        "owningbusinessunit": {
+          "type": "string",
+          "title": "Owning Business Unit",
+          "x-ms-dataverse-attribute": "owningbusinessunit",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "OwningBusinessUnit",
+          "x-ms-read-only": true
+        },
+        "owningbusinessunitname": {
+          "type": "string",
+          "title": "owningbusinessunitname",
+          "x-ms-dataverse-attribute": "owningbusinessunitname",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "OwningBusinessUnitName",
+          "x-ms-read-only": true,
+          "required": true,
+          "maxLength": 100
+        },
+        "owningteam": {
+          "type": "string",
+          "title": "Owning Team",
+          "x-ms-dataverse-attribute": "owningteam",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "OwningTeam",
+          "x-ms-read-only": true
+        },
+        "owninguser": {
+          "type": "string",
+          "title": "Owning User",
+          "x-ms-dataverse-attribute": "owninguser",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "OwningUser",
+          "x-ms-read-only": true
+        },
+        "statecode": {
+          "type": "string",
+          "title": "Status",
+          "x-ms-dataverse-attribute": "statecode",
+          "x-ms-dataverse-type": "StateType",
+          "x-ms-schema-name": "statecode",
+          "required": true,
+          "enum": [
+            "Active",
+            "Inactive"
+          ],
+          "x-ms-enum-values": [
+            0,
+            1
+          ],
+          "Color": [
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "0f17b8da-5765-f111-a826-002248d3a07d",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "Status",
+          "x-ms-optionSetType": "State"
+        },
+        "statecodename": {
+          "type": "string",
+          "title": "statecodename",
+          "x-ms-dataverse-attribute": "statecodename",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "statecodeName",
+          "x-ms-read-only": true
+        },
+        "statuscode": {
+          "type": "string",
+          "title": "Status Reason",
+          "x-ms-dataverse-attribute": "statuscode",
+          "x-ms-dataverse-type": "StatusType",
+          "x-ms-schema-name": "statuscode",
+          "enum": [
+            "Active",
+            "Inactive"
+          ],
+          "x-ms-enum-values": [
+            1,
+            2
+          ],
+          "Color": [
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "1917b8da-5765-f111-a826-002248d3a07d",
+          "x-ms-isGlobal": false,
+          "x-ms-optionsetdisplayname": "Status Reason",
+          "x-ms-optionSetType": "Status"
+        },
+        "statuscodename": {
+          "type": "string",
+          "title": "statuscodename",
+          "x-ms-dataverse-attribute": "statuscodename",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "statuscodeName",
+          "x-ms-read-only": true
+        },
+        "timezoneruleversionnumber": {
+          "type": "string",
+          "title": "Time Zone Rule Version Number",
+          "x-ms-dataverse-attribute": "timezoneruleversionnumber",
+          "x-ms-dataverse-type": "IntegerType",
+          "x-ms-schema-name": "TimeZoneRuleVersionNumber"
+        },
+        "transactioncurrencyid": {
+          "type": "string",
+          "title": "Currency",
+          "x-ms-dataverse-attribute": "transactioncurrencyid",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "TransactionCurrencyId"
+        },
+        "transactioncurrencyidname": {
+          "type": "string",
+          "title": "transactioncurrencyidname",
+          "x-ms-dataverse-attribute": "transactioncurrencyidname",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "TransactionCurrencyIdName",
+          "x-ms-read-only": true,
+          "maxLength": 100
+        },
+        "utcconversiontimezonecode": {
+          "type": "string",
+          "title": "UTC Conversion Time Zone Code",
+          "x-ms-dataverse-attribute": "utcconversiontimezonecode",
+          "x-ms-dataverse-type": "IntegerType",
+          "x-ms-schema-name": "UTCConversionTimeZoneCode"
+        },
+        "versionnumber": {
+          "type": "string",
+          "title": "Version Number",
+          "x-ms-dataverse-attribute": "versionnumber",
+          "x-ms-dataverse-type": "BigIntType",
+          "x-ms-schema-name": "VersionNumber",
+          "x-ms-read-only": true
+        }
+      },
+      "required": [
+        "createdbyyominame",
+        "createdonbehalfbyyominame",
+        "dga_name",
+        "dga_procurement_planid",
+        "modifiedbyyominame",
+        "modifiedonbehalfbyyominame",
+        "ownerid",
+        "owneridname",
+        "owneridtype",
+        "owneridyominame",
+        "owningbusinessunitname",
+        "statecode"
+      ]
+    }
+  }
+}

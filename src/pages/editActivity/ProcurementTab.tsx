@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import { FileText, LockKeyhole } from 'lucide-react'
 import {
   Badge,
@@ -9,9 +9,16 @@ import {
   Input,
   RadioGroup,
   Select,
+  type SelectOption,
   SideDrawer,
   Textarea,
 } from '../../components/ui'
+import type { Dga_aop_cost_centers } from '../../generated/models/Dga_aop_cost_centersModel'
+import type { Dga_categories } from '../../generated/models/Dga_categoriesModel'
+import type { Dga_procurement_plans, Dga_procurement_plansBase } from '../../generated/models/Dga_procurement_plansModel'
+import { Dga_aop_cost_centersService } from '../../generated/services/Dga_aop_cost_centersService'
+import { Dga_categoriesService } from '../../generated/services/Dga_categoriesService'
+import { Dga_procurement_plansService } from '../../generated/services/Dga_procurement_plansService'
 import { formatCurrencyAmount } from '../../utils/formatting'
 import { formatDate, getQuarter } from './helpers/sharedHelpers'
 
@@ -57,6 +64,19 @@ type Procurement = {
 
 type ProcurementFormData = Omit<Procurement, 'id'>
 type FormErrors = Partial<Record<keyof ProcurementFormData, string>>
+type ProcurementCostCenter = Dga_aop_cost_centers & {
+  dga_cost_center?: string
+}
+type LookupOption = SelectOption<string>
+type ActivityScopeValue = '' | '1' | '2'
+type ProcurementPlanPayload = Partial<Omit<Dga_procurement_plansBase, 'dga_procurement_planid' | 'ownerid' | 'owneridtype'>>
+
+type ProcurementTabProps = {
+  activityScope: ActivityScopeValue
+  activityPlannedEndDate: string
+  activityPlannedStartDate: string
+  projectId: string
+}
 
 // ── Constants ──
 
@@ -156,12 +176,6 @@ const SOLICITATION_CHANNEL_OPTIONS = [
   { label: 'GWPL', value: '5' },
 ] as const
 
-const COST_CENTER_OPTIONS = [
-  { label: 'Select cost center', value: '' },
-  { label: 'DGE - Information Security Risk Management & Compliance Division', value: '0e0fd34-8bc3-f011-bbd3-000d3ae0dcbf' },
-  { label: 'DGE - Cyber Threat Intelligence Division', value: '2e0fd34-8bc3-f011-bbd3-000d3ae0dcbf' },
-] as const
-
 const OPEX_CAPEX_OPTIONS = [
   { label: 'Opex', value: '1' },
   { label: 'Capex', value: '2' },
@@ -176,17 +190,6 @@ const OUTCOME_OPTIONS = [
   { label: 'Purchase Order', value: '1' },
   { label: 'Contract Agreement', value: '2' },
 ] as const
-
-const CATEGORY_DESCRIPTION_OPTIONS = [
-  { label: 'Select category', value: '' },
-  { label: 'Abrasive wheels (31191600)', value: '3c264a4e-85bf-f011-bbd3-000d3ae0d033' },
-  { label: 'Abrasives and abrasive media (31191500)', value: '3e264a4e-85bf-f011-bbd3-000d3ae0d033' },
-] as const
-
-const COST_CENTER_CODES: Record<string, string> = {
-  '0e0fd34-8bc3-f011-bbd3-000d3ae0dcbf': '2466001',
-  '2e0fd34-8bc3-f011-bbd3-000d3ae0dcbf': '2466001',
-}
 
 const CATEGORY_CODES: Record<string, string> = {
   '3c264a4e-85bf-f011-bbd3-000d3ae0d033': '31191600',
@@ -220,13 +223,247 @@ function getStatusLabel(value: string): string {
   return all.find((s) => s.value === value)?.label ?? value
 }
 
+function getOperationErrorMessage(result: unknown, fallbackMessage: string) {
+  const error = (result as { error?: { message?: string } | string })?.error
+  const message = typeof error === 'string' ? error : error?.message
+
+  if (!message) return fallbackMessage
+
+  try {
+    const parsed = JSON.parse(message) as { error?: { message?: string } }
+    return parsed.error?.message ?? message
+  } catch {
+    return message
+  }
+}
+
+function assertOperationSuccess(result: unknown, fallbackMessage: string) {
+  if ((result as { success?: boolean })?.success === false) {
+    throw new Error(getOperationErrorMessage(result, fallbackMessage))
+  }
+}
+
+function normalizeId(id?: string | null) {
+  return id?.replace(/[{}]/g, '').toLowerCase() ?? ''
+}
+
+function buildCostCenterOption(costCenter: ProcurementCostCenter): LookupOption | null {
+  if (!costCenter.dga_aop_cost_centerid) return null
+
+  const code = costCenter.dga_name ?? ''
+  const name = costCenter.dga_cost_center ?? costCenter.dga_divisional_hierarchyname ?? code
+
+  return {
+    description: code ? `Code: ${code}` : undefined,
+    label: name,
+    meta: costCenter.dga_strategic_vs_operationname,
+    value: costCenter.dga_aop_cost_centerid,
+  }
+}
+
+function buildCategoryOption(category: Dga_categories): LookupOption | null {
+  if (!category.dga_categoryid) return null
+
+  const code = category.dga_name ?? ''
+  const description = category.dga_description ?? code
+
+  return {
+    description: code ? `Code: ${code}` : undefined,
+    label: code ? `${description}` : description,
+    value: category.dga_categoryid,
+  }
+}
+
+function isCostCenterInActivityScope(costCenter: ProcurementCostCenter, activityScope: ActivityScopeValue) {
+  if (!activityScope) return true
+  return String(costCenter.dga_strategic_vs_operation) === activityScope
+}
+
+function toDateOnly(value?: string | null) {
+  return value?.split('T')[0] ?? ''
+}
+
+function addDaysToIsoDate(value: string, days: number) {
+  const dateOnly = toDateOnly(value)
+  if (!dateOnly) return ''
+
+  const [year, month, day] = dateOnly.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+
+  if (Number.isNaN(date.getTime())) return ''
+
+  date.setDate(date.getDate() + days)
+
+  const nextYear = date.getFullYear()
+  const nextMonth = String(date.getMonth() + 1).padStart(2, '0')
+  const nextDay = String(date.getDate()).padStart(2, '0')
+
+  return `${nextYear}-${nextMonth}-${nextDay}`
+}
+
+function toStringChoice<TValue extends string>(value: unknown, allowedValues: readonly TValue[]): TValue | '' {
+  const normalized = String(value ?? '')
+  return allowedValues.includes(normalized as TValue) ? normalized as TValue : ''
+}
+
+function numberOrUndefined<TValue extends number | undefined>(value: string): TValue | undefined {
+  if (!value) return undefined
+  return Number(value) as TValue
+}
+
+function booleanToYesNo(value?: boolean | null): StrategicPlanValue {
+  if (value === true) return '1'
+  if (value === false) return '0'
+  return ''
+}
+
+function yesNoToBoolean(value: StrategicPlanValue | TenderRequiredValue) {
+  if (value === '1') return true
+  if (value === '0') return false
+  return undefined
+}
+
+function currencyToNumber(value: string) {
+  const normalized = value.replace(/,/g, '').trim()
+  if (!normalized) return undefined
+  const parsed = Number(normalized)
+  return Number.isNaN(parsed) ? undefined : parsed
+}
+
+function numberToCurrencyString(value?: number | null) {
+  return value == null ? '' : String(value)
+}
+
+function normalizeProjectLookupFilter(projectId: string) {
+  return `_dga_aop_project_value eq '${projectId.replace(/[{}]/g, '')}'`
+}
+
+function planToProcurement(record: Dga_procurement_plans): Procurement | null {
+  if (!record.dga_procurement_planid) return null
+
+  const plannedPrCreationDate = toDateOnly(record.dga_purchase_request_raising_date_by_month)
+  const expectedAwardingDate = toDateOnly(record.dga_expected_awarding_date_by_month)
+
+  return {
+    id: record.dga_procurement_planid,
+    tenderRequired: booleanToYesNo(record.dga_does_this_project_require_tender),
+    tenderType: toStringChoice(record.dga_tender_type, ['1', '2'] as const),
+    procurementStatus: toStringChoice(record.dga_current_procurement_status, ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17'] as const),
+    procurementName: record.dga_name ?? '',
+    requestType: toStringChoice(record.dga_request_type, ['1', '2', '3', '4', '5', '6'] as const),
+    contractNumber: record.dga_pr_ticket_number ?? '',
+    recommendedSuppliers: '',
+    tenderingMethod: toStringChoice(record.dga_sourcing_method, ['1', '2', '3', '4', '5', '6'] as const),
+    solicitationChannel: toStringChoice(record.dga_solicitation_channel, ['1', '2', '3', '4', '5'] as const),
+    costCenter: record._dga_aop_cost_centre_value ?? '',
+    costCenterCode: '',
+    opexCapex: toStringChoice(record.dga_opex_capex, ['1', '2'] as const),
+    alignedStrategicPlan: booleanToYesNo(record.dga_aligned_with_strategic_plan),
+    outcome: toStringChoice(record.dga_new_outcome, ['1', '2'] as const),
+    categoryDescription: record._dga_category_code_value ?? '',
+    categoryCode: '',
+    endUserComments: record.dga_end_user_comments ?? '',
+    itemServiceDescription: record.dga_item_service_description ?? '',
+    totalEstimatedValue: numberToCurrencyString(record.dga_total_project_budget),
+    prExpectedValue2026: numberToCurrencyString(record.dga_pr_expected_value_2024),
+    expectedContractDuration: record.dga_expected_contract_duration ?? '',
+    plannedPrCreationDate,
+    purchaseRequestRaisingQuarter: record.dga_purchase_request_raising_by_quarter ?? getQuarter(plannedPrCreationDate),
+    expectedAwardingDate,
+    expectedAwardingQuarter: record.dga_expected_awarding_by_quarter ?? getQuarter(expectedAwardingDate),
+  }
+}
+
+function buildProcurementPayload(form: ProcurementFormData, projectId?: string): ProcurementPlanPayload {
+  const payload: ProcurementPlanPayload = {
+    dga_aligned_with_strategic_plan: yesNoToBoolean(form.alignedStrategicPlan),
+    dga_category_description: form.categoryCode,
+    dga_current_procurement_status: numberOrUndefined<Dga_procurement_plansBase['dga_current_procurement_status']>(form.procurementStatus),
+    dga_does_this_project_require_tender: yesNoToBoolean(form.tenderRequired),
+    dga_end_user_comments: form.endUserComments,
+    dga_expected_awarding_by_quarter: form.expectedAwardingQuarter,
+    dga_expected_awarding_date_by_month: form.expectedAwardingDate,
+    dga_expected_contract_duration: form.expectedContractDuration,
+    dga_item_service_description: form.itemServiceDescription,
+    dga_name: form.procurementName.trim(),
+    dga_new_outcome: numberOrUndefined<Dga_procurement_plansBase['dga_new_outcome']>(form.outcome),
+    dga_opex_capex: numberOrUndefined<Dga_procurement_plansBase['dga_opex_capex']>(form.opexCapex),
+    dga_pr_expected_value_2024: currencyToNumber(form.prExpectedValue2026),
+    dga_pr_ticket_number: form.contractNumber,
+    dga_purchase_request_raising_by_quarter: form.purchaseRequestRaisingQuarter,
+    dga_purchase_request_raising_date_by_month: form.plannedPrCreationDate,
+    dga_request_type: numberOrUndefined<Dga_procurement_plansBase['dga_request_type']>(form.requestType),
+    dga_solicitation_channel: numberOrUndefined<Dga_procurement_plansBase['dga_solicitation_channel']>(form.solicitationChannel),
+    dga_sourcing_method: numberOrUndefined<Dga_procurement_plansBase['dga_sourcing_method']>(form.tenderingMethod),
+    dga_tender_type: numberOrUndefined<Dga_procurement_plansBase['dga_tender_type']>(form.tenderType),
+    dga_total_project_budget: currencyToNumber(form.totalEstimatedValue),
+    statecode: 0,
+    statuscode: 1,
+  }
+
+  if (projectId) {
+    payload['dga_aop_project@odata.bind'] = `/dga_aop_projectses(${projectId.replace(/[{}]/g, '')})`
+  }
+
+  if (form.costCenter) {
+    payload['dga_aop_cost_centre@odata.bind'] = `/dga_aop_cost_centers(${form.costCenter.replace(/[{}]/g, '')})`
+  }
+
+  if (form.categoryDescription) {
+    payload['dga_category_code@odata.bind'] = `/dga_categories(${form.categoryDescription.replace(/[{}]/g, '')})`
+  }
+
+  return payload
+}
+
+function getDateRangeErrors(
+  form: ProcurementFormData,
+  activityPlannedStartDate: string,
+  activityPlannedEndDate: string,
+): FormErrors {
+  const errors: FormErrors = {}
+  const activityStart = toDateOnly(activityPlannedStartDate)
+  const activityEnd = toDateOnly(activityPlannedEndDate)
+
+  if (form.plannedPrCreationDate && activityStart && form.plannedPrCreationDate < activityStart) {
+    errors.plannedPrCreationDate = `Planned PR Creation Date must be on or after activity start date ${formatDate(activityStart)}.`
+  }
+
+  if (form.plannedPrCreationDate && activityEnd && form.plannedPrCreationDate > activityEnd) {
+    errors.plannedPrCreationDate = `Planned PR Creation Date must be on or before activity end date ${formatDate(activityEnd)}.`
+  }
+
+  if (form.expectedAwardingDate && activityStart && form.expectedAwardingDate < activityStart) {
+    errors.expectedAwardingDate = `Expected Awarding Date must be on or after activity start date ${formatDate(activityStart)}.`
+  }
+
+  if (form.expectedAwardingDate && activityEnd && form.expectedAwardingDate > activityEnd) {
+    errors.expectedAwardingDate = `Expected Awarding Date must be on or before activity end date ${formatDate(activityEnd)}.`
+  }
+
+  if (form.plannedPrCreationDate && form.expectedAwardingDate && form.expectedAwardingDate <= form.plannedPrCreationDate) {
+    errors.expectedAwardingDate = 'Expected Awarding Date must be after Planned PR Creation Date.'
+  }
+
+  return errors
+}
+
 // ── Component ──
 
-export function ProcurementTab() {
+export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDate, activityScope, projectId }: ProcurementTabProps) {
   const uid = useId()
 
   // ── Data state ──
   const [procurements, setProcurements] = useState<Procurement[]>([])
+  const [costCenters, setCostCenters] = useState<ProcurementCostCenter[]>([])
+  const [categories, setCategories] = useState<Dga_categories[]>([])
+  const [isLookupLoading, setIsLookupLoading] = useState(false)
+  const [lookupError, setLookupError] = useState('')
+  const [isProcurementsLoading, setIsProcurementsLoading] = useState(false)
+  const [isSavingProcurement, setIsSavingProcurement] = useState(false)
+  const [isDeletingProcurement, setIsDeletingProcurement] = useState(false)
+  const [procurementError, setProcurementError] = useState('')
+  const [procurementNotice, setProcurementNotice] = useState('')
 
   // ── CRUD state ──
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
@@ -235,8 +472,179 @@ export function ProcurementTab() {
   const [formErrors, setFormErrors] = useState<FormErrors>({})
   const [procurementToDelete, setProcurementToDelete] = useState<Procurement | null>(null)
 
+  const loadProcurementLookups = useCallback(async () => {
+    setIsLookupLoading(true)
+    setLookupError('')
+
+    try {
+      const [costCentersResult, categoriesResult] = await Promise.all([
+        Dga_aop_cost_centersService.getAll({
+          select: [
+            'dga_aop_cost_centerid',
+            'dga_name',
+            'dga_cost_center',
+            'dga_strategic_vs_operation',
+            'statuscode',
+            'statecode',
+            '_dga_divisional_hierarchy_value',
+          ],
+          filter: 'statecode eq 0',
+          orderBy: ['dga_name asc'],
+        }),
+        Dga_categoriesService.getAll({
+          select: [
+            'dga_categoryid',
+            'dga_name',
+            'dga_description',
+            'statuscode',
+            'statecode',
+          ],
+          filter: 'statecode eq 0',
+          orderBy: ['dga_name asc'],
+        }),
+      ])
+
+      assertOperationSuccess(costCentersResult, 'Unable to load cost centers.')
+      assertOperationSuccess(categoriesResult, 'Unable to load categories.')
+
+      setCostCenters(((costCentersResult.data ?? []) as ProcurementCostCenter[]).filter((costCenter) => costCenter.dga_aop_cost_centerid))
+      setCategories(((categoriesResult.data ?? []) as Dga_categories[]).filter((category) => category.dga_categoryid))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to load procurement lookups.'
+      setLookupError(message)
+      setCostCenters([])
+      setCategories([])
+    } finally {
+      setIsLookupLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void loadProcurementLookups()
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [loadProcurementLookups])
+
+  const loadProcurements = useCallback(async () => {
+    if (!projectId) {
+      setProcurements([])
+      setProcurementError('Activity id is missing from the edit URL.')
+      return
+    }
+
+    setIsProcurementsLoading(true)
+    setProcurementError('')
+
+    try {
+      const result = await Dga_procurement_plansService.getAll({
+        select: [
+          'dga_procurement_planid',
+          'dga_aligned_with_strategic_plan',
+          'dga_category_description',
+          'dga_current_procurement_status',
+          'dga_does_this_project_require_tender',
+          'dga_end_user_comments',
+          'dga_expected_awarding_by_quarter',
+          'dga_expected_awarding_date_by_month',
+          'dga_expected_contract_duration',
+          'dga_item_service_description',
+          'dga_name',
+          'dga_new_outcome',
+          'dga_opex_capex',
+          'dga_pr_expected_value_2024',
+          'dga_pr_ticket_number',
+          'dga_purchase_request_raising_by_quarter',
+          'dga_purchase_request_raising_date_by_month',
+          'dga_request_type',
+          'dga_solicitation_channel',
+          'dga_sourcing_method',
+          'dga_tender_type',
+          'dga_total_project_budget',
+          '_dga_aop_cost_centre_value',
+          '_dga_aop_project_value',
+          '_dga_category_code_value',
+        ],
+        filter: normalizeProjectLookupFilter(projectId),
+        orderBy: ['dga_purchase_request_raising_date_by_month asc'],
+      })
+
+      assertOperationSuccess(result, 'Unable to load procurement plans.')
+
+      const rows = (result.data ?? [])
+        .map((record) => planToProcurement(record as Dga_procurement_plans))
+        .filter((record): record is Procurement => Boolean(record))
+
+      setProcurements(rows)
+    } catch (error) {
+      setProcurementError(error instanceof Error ? error.message : 'Unable to load procurement plans.')
+      setProcurements([])
+    } finally {
+      setIsProcurementsLoading(false)
+    }
+  }, [projectId])
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void loadProcurements()
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [loadProcurements])
+
   // ── Derived ──
   const isTenderRequired = form.tenderRequired === '1'
+  const activityStartDate = toDateOnly(activityPlannedStartDate)
+  const activityEndDate = toDateOnly(activityPlannedEndDate)
+  const expectedAwardingMinDate = form.plannedPrCreationDate
+    ? addDaysToIsoDate(form.plannedPrCreationDate, 1)
+    : activityStartDate
+  const costCenterCodeById = useMemo(() => new Map(costCenters.map((costCenter) => [
+    normalizeId(costCenter.dga_aop_cost_centerid),
+    costCenter.dga_name ?? '',
+  ])), [costCenters])
+  const categoryCodeById = useMemo(() => new Map(categories.map((category) => [
+    normalizeId(category.dga_categoryid),
+    category.dga_name ?? '',
+  ])), [categories])
+  const scopedCostCenters = useMemo(() => (
+    costCenters.filter((costCenter) => isCostCenterInActivityScope(costCenter, activityScope))
+  ), [activityScope, costCenters])
+  const isSelectedCostCenterInScope = useMemo(() => {
+    if (!form.costCenter) return true
+    return scopedCostCenters.some((costCenter) =>
+      normalizeId(costCenter.dga_aop_cost_centerid) === normalizeId(form.costCenter),
+    )
+  }, [form.costCenter, scopedCostCenters])
+  const costCenterOptions = useMemo<LookupOption[]>(() => {
+    const options = scopedCostCenters
+      .map(buildCostCenterOption)
+      .filter((option): option is LookupOption => Boolean(option))
+
+    return [
+      {
+        disabled: isLookupLoading || Boolean(lookupError),
+        label: lookupError ? 'Unable to load cost centers' : isLookupLoading ? 'Loading cost centers...' : 'Select cost center',
+        value: '',
+      },
+      ...options,
+    ]
+  }, [isLookupLoading, lookupError, scopedCostCenters])
+  const categoryOptions = useMemo<LookupOption[]>(() => {
+    const options = categories
+      .map(buildCategoryOption)
+      .filter((option): option is LookupOption => Boolean(option))
+
+    return [
+      {
+        disabled: isLookupLoading || Boolean(lookupError),
+        label: lookupError ? 'Unable to load categories' : isLookupLoading ? 'Loading categories...' : 'Select category',
+        value: '',
+      },
+      ...options,
+    ]
+  }, [categories, isLookupLoading, lookupError])
 
   const procurementStatusOptions = useMemo(() => {
     if (isTenderRequired && form.tenderType === '1') return PROCUREMENT_STATUS_YES_RAISED
@@ -387,25 +795,44 @@ export function ProcurementTab() {
 
     // Auto-fill cost center code
     if (fields.costCenter !== undefined) {
-      next.costCenterCode = COST_CENTER_CODES[fields.costCenter] ?? ''
+      next.costCenterCode = costCenterCodeById.get(normalizeId(fields.costCenter)) ?? ''
     }
 
     // Auto-fill category code
     if (fields.categoryDescription !== undefined) {
-      next.categoryCode = CATEGORY_CODES[fields.categoryDescription] ?? ''
+      next.categoryCode = categoryCodeById.get(normalizeId(fields.categoryDescription)) ?? CATEGORY_CODES[fields.categoryDescription] ?? ''
+    }
+
+    const changedKeys = Object.keys(fields) as Array<keyof ProcurementFormData>
+    const dateErrors = getDateRangeErrors(next, activityPlannedStartDate, activityPlannedEndDate)
+    const pickedDateError = fields.plannedPrCreationDate !== undefined
+      ? dateErrors.plannedPrCreationDate
+      : fields.expectedAwardingDate !== undefined
+        ? dateErrors.expectedAwardingDate
+        : undefined
+
+    if (pickedDateError) {
+      setFormErrors((prev) => {
+        const copy = { ...prev }
+        changedKeys.forEach((key) => {
+          delete copy[key]
+        })
+        return { ...copy, ...dateErrors }
+      })
+      return
     }
 
     setForm(next)
 
-    // Clear error for changed field
-    const changedKey = Object.keys(fields)[0] as keyof ProcurementFormData
-    if (changedKey && formErrors[changedKey]) {
-      setFormErrors((prev) => {
-        const copy = { ...prev }
-        delete copy[changedKey]
-        return copy
+    setFormErrors((prev) => {
+      const copy = { ...prev }
+      changedKeys.forEach((key) => {
+        delete copy[key]
       })
-    }
+      delete copy.plannedPrCreationDate
+      delete copy.expectedAwardingDate
+      return { ...copy, ...dateErrors }
+    })
   }
 
   function handleCurrencyBlur(field: 'totalEstimatedValue' | 'prExpectedValue2026') {
@@ -419,6 +846,8 @@ export function ProcurementTab() {
     setEditingProcurement(null)
     setForm(EMPTY_FORM)
     setFormErrors({})
+    setProcurementError('')
+    setProcurementNotice('')
     setIsDrawerOpen(true)
   }
 
@@ -435,12 +864,12 @@ export function ProcurementTab() {
       tenderingMethod: procurement.tenderingMethod,
       solicitationChannel: procurement.solicitationChannel,
       costCenter: procurement.costCenter,
-      costCenterCode: procurement.costCenterCode,
+      costCenterCode: procurement.costCenterCode || costCenterCodeById.get(normalizeId(procurement.costCenter)) || '',
       opexCapex: procurement.opexCapex,
       alignedStrategicPlan: procurement.alignedStrategicPlan,
       outcome: procurement.outcome,
       categoryDescription: procurement.categoryDescription,
-      categoryCode: procurement.categoryCode,
+      categoryCode: procurement.categoryCode || categoryCodeById.get(normalizeId(procurement.categoryDescription)) || '',
       endUserComments: procurement.endUserComments,
       itemServiceDescription: procurement.itemServiceDescription,
       totalEstimatedValue: procurement.totalEstimatedValue,
@@ -452,6 +881,8 @@ export function ProcurementTab() {
       expectedAwardingQuarter: procurement.expectedAwardingQuarter,
     })
     setFormErrors({})
+    setProcurementError('')
+    setProcurementNotice('')
     setIsDrawerOpen(true)
   }
 
@@ -474,7 +905,11 @@ export function ProcurementTab() {
     if (!form.requestType) errs.requestType = 'Select request type'
     if (!form.tenderingMethod) errs.tenderingMethod = 'Select tendering method'
     if (!form.solicitationChannel) errs.solicitationChannel = 'Select solicitation channel'
-    if (!form.costCenter) errs.costCenter = 'Select cost center'
+    if (!form.costCenter || !isSelectedCostCenterInScope) {
+      errs.costCenter = activityScope
+        ? `Select a ${activityScope === '1' ? 'Strategic' : 'Operational'} cost center`
+        : 'Select cost center'
+    }
     if (!form.opexCapex) errs.opexCapex = 'Select Opex or Capex'
     if (!form.alignedStrategicPlan) errs.alignedStrategicPlan = 'Select alignment with strategic plan'
     if (!form.outcome) errs.outcome = 'Select outcome'
@@ -486,33 +921,67 @@ export function ProcurementTab() {
     if (!form.plannedPrCreationDate) errs.plannedPrCreationDate = 'Planned PR creation date is required'
     if (!form.expectedAwardingDate) errs.expectedAwardingDate = 'Expected awarding date is required'
 
-    setFormErrors(errs)
-    return Object.keys(errs).length === 0
+    const dateErrors = getDateRangeErrors(form, activityPlannedStartDate, activityPlannedEndDate)
+    const nextErrors = { ...errs, ...dateErrors }
+
+    setFormErrors(nextErrors)
+    return Object.keys(nextErrors).length === 0
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!validate()) return
-
-    if (editingProcurement) {
-      setProcurements((prev) =>
-        prev.map((p) =>
-          p.id === editingProcurement.id ? { ...p, ...form } : p,
-        ),
-      )
-    } else {
-      const newProcurement: Procurement = {
-        id: `proc-${Date.now()}`,
-        ...form,
-      }
-      setProcurements((prev) => [...prev, newProcurement])
+    if (!projectId) {
+      setProcurementError('Activity id is missing from the edit URL.')
+      return
     }
-    handleCloseDrawer()
+
+    setIsSavingProcurement(true)
+    setProcurementError('')
+    setProcurementNotice('')
+
+    try {
+      if (editingProcurement) {
+        const result = await Dga_procurement_plansService.update(
+          editingProcurement.id,
+          buildProcurementPayload(form) as Partial<Omit<Dga_procurement_plansBase, 'dga_procurement_planid'>>,
+        )
+        assertOperationSuccess(result, 'Unable to update procurement plan.')
+        setProcurementNotice('Procurement plan updated successfully.')
+      } else {
+        const result = await Dga_procurement_plansService.create(
+          buildProcurementPayload(form, projectId) as Omit<Dga_procurement_plansBase, 'dga_procurement_planid'>,
+        )
+        assertOperationSuccess(result, 'Unable to create procurement plan.')
+        setProcurementNotice('Procurement plan created successfully.')
+      }
+
+      handleCloseDrawer()
+      await loadProcurements()
+    } catch (error) {
+      setProcurementError(error instanceof Error ? error.message : 'Unable to save procurement plan.')
+    } finally {
+      setIsSavingProcurement(false)
+    }
   }
 
-  function handleConfirmDelete() {
+  async function handleConfirmDelete() {
     if (!procurementToDelete) return
-    setProcurements((prev) => prev.filter((p) => p.id !== procurementToDelete.id))
-    setProcurementToDelete(null)
+    if (isDeletingProcurement) return
+
+    setIsDeletingProcurement(true)
+    setProcurementError('')
+    setProcurementNotice('')
+
+    try {
+      await Dga_procurement_plansService.delete(procurementToDelete.id)
+      setProcurementToDelete(null)
+      setProcurementNotice('Procurement plan deleted successfully.')
+      await loadProcurements()
+    } catch (error) {
+      setProcurementError(error instanceof Error ? error.message : 'Unable to delete procurement plan.')
+    } finally {
+      setIsDeletingProcurement(false)
+    }
   }
 
   // ── Render helpers ──
@@ -527,8 +996,8 @@ export function ProcurementTab() {
             <Button onClick={handleCloseDrawer} variant="secondary">
               Cancel
             </Button>
-            <Button onClick={handleSave}>
-              {editingProcurement ? 'Update Procurement' : 'Create Procurement'}
+            <Button disabled={isSavingProcurement} onClick={handleSave}>
+              {isSavingProcurement ? 'Saving...' : editingProcurement ? 'Update Procurement' : 'Create Procurement'}
             </Button>
           </div>
         }
@@ -537,6 +1006,12 @@ export function ProcurementTab() {
         title={title}
       >
         <div className="edit-activity__procurement-drawer">
+          {lookupError ? (
+            <div className="edit-activity__members-modal-error">
+              {lookupError}
+            </div>
+          ) : null}
+
           {/* ── Tender Information ── */}
           <div className="edit-activity__procurement-section">
             <div className="create-activity__section-header">
@@ -672,15 +1147,15 @@ export function ProcurementTab() {
                 id={`${uid}-cost-center`}
                 label="Cost Center"
                 onChange={(value) => handleFieldChange({ costCenter: value })}
-                options={COST_CENTER_OPTIONS}
+                options={costCenterOptions}
                 required
-                value={form.costCenter}
+                value={isSelectedCostCenterInScope ? form.costCenter : ''}
               />
               <Input
                 disabled
                 label="Cost Center Code"
                 rightIcon={<LockKeyhole size={15} />}
-                value={form.costCenterCode}
+                value={isSelectedCostCenterInScope ? form.costCenterCode : ''}
               />
             </div>
 
@@ -723,7 +1198,7 @@ export function ProcurementTab() {
                 id={`${uid}-category-description`}
                 label="Category Description"
                 onChange={(value) => handleFieldChange({ categoryDescription: value })}
-                options={CATEGORY_DESCRIPTION_OPTIONS}
+                options={categoryOptions}
                 value={form.categoryDescription}
               />
               <Input
@@ -822,6 +1297,8 @@ export function ProcurementTab() {
                   error={formErrors.plannedPrCreationDate}
                   id={`${uid}-pr-creation-date`}
                   label="Planned PR Creation Date"
+                  max={activityEndDate}
+                  min={activityStartDate}
                   onChange={(value) => handleFieldChange({ plannedPrCreationDate: value })}
                   required
                   value={form.plannedPrCreationDate}
@@ -839,6 +1316,8 @@ export function ProcurementTab() {
                   error={formErrors.expectedAwardingDate}
                   id={`${uid}-awarding-date`}
                   label="Expected Awarding Date"
+                  max={activityEndDate}
+                  min={expectedAwardingMinDate}
                   onChange={(value) => handleFieldChange({ expectedAwardingDate: value })}
                   required
                   value={form.expectedAwardingDate}
@@ -875,13 +1354,29 @@ export function ProcurementTab() {
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
-        } onClick={handleOpenCreate}>
+        } disabled={!projectId || isProcurementsLoading} onClick={handleOpenCreate}>
           Add Procurement
         </Button>
       </div>
 
+      {procurementError ? (
+        <div className="edit-activity__members-modal-error">
+          {procurementError}
+        </div>
+      ) : procurementNotice ? (
+        <div className="edit-activity__members-modal-selected-header">
+          <span>{procurementNotice}</span>
+        </div>
+      ) : null}
+
       {/* Table */}
-      {procurements.length > 0 ? (
+      {isProcurementsLoading ? (
+        <div className="edit-activity__members-empty">
+          <FileText size={40} strokeWidth={1.2} />
+          <h3>Loading procurement plans...</h3>
+          <p>Fetching procurement records for this activity.</p>
+        </div>
+      ) : procurements.length > 0 ? (
         <div className="data-grid">
           <table>
             <thead>
@@ -915,7 +1410,7 @@ export function ProcurementTab() {
 
       {/* Delete Confirmation */}
       <ConfirmationDialog
-        confirmLabel="Delete Procurement"
+        confirmLabel={isDeletingProcurement ? 'Deleting...' : 'Delete Procurement'}
         danger
         description="This procurement record will be permanently removed. This action cannot be undone."
         isOpen={procurementToDelete !== null}

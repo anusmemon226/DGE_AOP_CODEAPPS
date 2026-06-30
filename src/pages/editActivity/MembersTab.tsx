@@ -19,6 +19,8 @@ import type { Dga_aop_projects_systemuserset } from '../../generated/models/Dga_
 import type { Systemusers } from '../../generated/models/SystemusersModel'
 import { SystemusersService } from '../../generated/services/SystemusersService'
 import { Dga_aop_projects_systemusersetService } from '../../generated/services/Dga_aop_projects_systemusersetService'
+import { Dga_custom_web_apiService } from '../../generated/services/Dga_custom_web_apiService'
+import { Dga_categoriesService } from '../../generated'
 
 // ── Types ──
 
@@ -41,7 +43,6 @@ type ActivityMember = MockUser & {
 
 const ITEMS_PER_PAGE = 12
 const LAZY_BATCH = 12
-const ACTIVITY_MEMBER_API_URL = 'https://orgb0eb9d4d.crm6.dynamics.com/api/data/v9.2/dga_WebApiForPortal'
 const ACTIVITY_MEMBER_TARGET_TABLE = 'dga_aop_projects'
 const ACTIVITY_MEMBER_RELATED_TABLE = 'systemuser'
 const ACTIVITY_MEMBER_RELATIONSHIP = 'dga_aop_projects_systemuser_systemuser'
@@ -58,48 +59,26 @@ type ActivityMemberApiResponse = {
   success?: boolean
 }
 
-function getCustomApiToken() {
-  const envToken = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_DGA_CUSTOM_API_TOKEN
-  return envToken
-    ?? window.localStorage.getItem('DGA_CUSTOM_API_TOKEN')
-    ?? window.localStorage.getItem('API_TOKEN')
-    ?? window.sessionStorage.getItem('DGA_CUSTOM_API_TOKEN')
-    ?? window.sessionStorage.getItem('API_TOKEN')
-    ?? ''
-}
-
 async function callActivityMemberApi(actionName: ActivityMemberApiAction, projectId: string, userId: string) {
-  const token = getCustomApiToken()
+  const result = await Dga_custom_web_apiService.dga_custom_web_api(
+    actionName,
+    ACTIVITY_MEMBER_TARGET_TABLE,
+    ACTIVITY_MEMBER_RELATED_TABLE,
+    projectId.replace(/[{}]/g, ''),
+    ACTIVITY_MEMBER_RELATIONSHIP,
+    undefined,
+    userId.replace(/[{}]/g, ''),
+  )
 
-  if (!token) {
-    throw new Error('Custom API token is missing. Set VITE_DGA_CUSTOM_API_TOKEN or store API_TOKEN in browser storage.')
+  assertOperationSuccess(result, `Failed to ${actionName} activity member.`)
+
+  const response = (result.data ?? {}) as ActivityMemberApiResponse
+
+  if (response.success === false) {
+    throw new Error(response.error?.message ?? response.message ?? `Failed to ${actionName} activity member.`)
   }
 
-  const response = await fetch(ACTIVITY_MEMBER_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      actionName,
-      isAdmin: true,
-      userId: '',
-      targetTableName: ACTIVITY_MEMBER_TARGET_TABLE,
-      relatedTableName: ACTIVITY_MEMBER_RELATED_TABLE,
-      targetId: projectId.replace(/[{}]/g, ''),
-      relatedId: userId.replace(/[{}]/g, ''),
-      relationship: ACTIVITY_MEMBER_RELATIONSHIP,
-    }),
-  })
-
-  const result = await response.json().catch(() => ({} as ActivityMemberApiResponse)) as ActivityMemberApiResponse
-
-  if (!response.ok || result.success === false) {
-    throw new Error(result.error?.message ?? result.message ?? `Failed to ${actionName} activity member.`)
-  }
-
-  return result
+  return response
 }
 
 function getOperationErrorMessage(result: unknown, fallbackMessage: string) {
@@ -213,6 +192,10 @@ export function MembersTab({ projectId }: MembersTabProps) {
   const sentinelRef = useRef<HTMLDivElement>(null)
 
   const loadMembersContext = useCallback(async () => {
+
+    const result = await Dga_categoriesService.getAll()
+    console.log(result)
+
     if (!projectId) {
       setUsersError('')
       setMembersError('Activity id is missing from the edit URL.')

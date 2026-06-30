@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   ChevronLeft,
   ChevronRight,
@@ -16,7 +16,10 @@ import {
   SideDrawer,
   Textarea,
 } from '../../components/ui'
-import { formatDate, getQuarter } from './helpers/sharedHelpers'
+import type { Dga_aop_project_milestone_detailses, Dga_aop_project_milestone_detailsesBase } from '../../generated/models/Dga_aop_project_milestone_detailsesModel'
+import { Dga_aop_project_milestone_detailsesService } from '../../generated/services/Dga_aop_project_milestone_detailsesService'
+import { formatDateDisplay } from '../../utils/formatting'
+import { getQuarter } from './helpers/sharedHelpers'
 
 // ── Types ──
 
@@ -74,13 +77,124 @@ const EMPTY_FORM: MilestoneFormData = {
 // ── Component ──
 
 interface MilestonesTabProps {
+  activityPlannedEndDate: string
+  activityPlannedStartDate: string
   isAdeoVisible: boolean
+  projectId: string
 }
 
-export function MilestonesTab({ isAdeoVisible }: MilestonesTabProps) {
+function getOperationErrorMessage(result: unknown, fallbackMessage: string) {
+  const error = (result as { error?: { message?: string } | string })?.error
+  const message = typeof error === 'string' ? error : error?.message
+
+  if (!message) return fallbackMessage
+
+  try {
+    const parsed = JSON.parse(message) as { error?: { message?: string } }
+    return parsed.error?.message ?? message
+  } catch {
+    return message
+  }
+}
+
+function assertOperationSuccess(result: unknown, fallbackMessage: string) {
+  if ((result as { success?: boolean })?.success === false) {
+    throw new Error(getOperationErrorMessage(result, fallbackMessage))
+  }
+}
+
+function normalizeId(id?: string | null) {
+  return id?.replace(/[{}]/g, '') ?? ''
+}
+
+function toDateOnly(value?: string | null) {
+  return value?.split('T')[0] ?? ''
+}
+
+function projectLookupFilter(projectId: string) {
+  return `_dga_aop_project_value eq '${normalizeId(projectId)}'`
+}
+
+function statusCodeToUi(statuscode?: number): MilestoneStatus {
+  switch (statuscode) {
+    case 776140001: return 'in-progress'
+    case 776140002: return 'delayed'
+    case 776140003: return 'completed'
+    default: return 'not-started'
+  }
+}
+
+function milestoneToUi(record: Dga_aop_project_milestone_detailses): Milestone | null {
+  if (!record.dga_aop_project_milestone_detailsid) return null
+  const plannedEndDate = toDateOnly(record.dga_planned_end_date)
+
+  return {
+    id: record.dga_aop_project_milestone_detailsid,
+    name: record.dga_name ?? '',
+    plannedStartDate: toDateOnly(record.dga_planned_start_date),
+    plannedEndDate,
+    quarter: getQuarter(plannedEndDate),
+    status: statusCodeToUi(record.statuscode),
+    assignee: '',
+    weightage: record.dga_weightage ?? 0,
+    makhrajAlMarhala: record.dga_milestone_description ?? '',
+    marhalaAlMashroua: record.dga_justification ?? '',
+    description: record.dga_description ?? '',
+  }
+}
+
+function sortMilestonesByEndDate(a: Milestone, b: Milestone) {
+  if (!a.plannedEndDate && !b.plannedEndDate) {
+    return a.name.localeCompare(b.name)
+  }
+
+  if (!a.plannedEndDate) return 1
+  if (!b.plannedEndDate) return -1
+
+  return a.plannedEndDate.localeCompare(b.plannedEndDate) || a.name.localeCompare(b.name)
+}
+
+function buildMilestoneCreatePayload(
+  form: MilestoneFormData,
+  projectId: string,
+): Omit<Dga_aop_project_milestone_detailsesBase, 'dga_aop_project_milestone_detailsid'> {
+  return {
+    'dga_aop_project@odata.bind': `/dga_aop_projectses(${normalizeId(projectId)})`,
+    dga_description: form.description,
+    dga_justification: form.marhalaAlMashroua,
+    dga_milestone_description: form.makhrajAlMarhala,
+    dga_name: form.name.trim(),
+    dga_planned_end_date: form.plannedEndDate,
+    dga_planned_start_date: form.plannedStartDate,
+    dga_start_date: form.plannedStartDate,
+    dga_weightage: form.weightage,
+    statecode: 0,
+    statuscode: 1,
+  }
+}
+
+function buildMilestoneUpdatePayload(form: MilestoneFormData): Partial<Omit<Dga_aop_project_milestone_detailsesBase, 'dga_aop_project_milestone_detailsid'>> {
+  return {
+    dga_description: form.description,
+    dga_justification: form.marhalaAlMashroua,
+    dga_milestone_description: form.makhrajAlMarhala,
+    dga_name: form.name.trim(),
+    dga_planned_end_date: form.plannedEndDate,
+    dga_planned_start_date: form.plannedStartDate,
+    dga_start_date: form.plannedStartDate,
+    dga_weightage: form.weightage,
+  }
+}
+
+export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate, isAdeoVisible, projectId }: MilestonesTabProps) {
   // ── Data state ──
   const [milestones, setMilestones] = useState<Milestone[]>([])
   const [currentPage, setCurrentPage] = useState(1)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
 
   // ── CRUD state ──
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
@@ -88,6 +202,59 @@ export function MilestonesTab({ isAdeoVisible }: MilestonesTabProps) {
   const [form, setForm] = useState<MilestoneFormData>(EMPTY_FORM)
   const [formErrors, setFormErrors] = useState<Partial<Record<keyof MilestoneFormData, string>>>({})
   const [milestoneToDelete, setMilestoneToDelete] = useState<Milestone | null>(null)
+
+  const loadMilestones = useCallback(async () => {
+    if (!projectId) {
+      setError('Activity id is missing from the edit URL.')
+      setMilestones([])
+      return
+    }
+
+    setIsLoading(true)
+    setError('')
+
+    try {
+      const result = await Dga_aop_project_milestone_detailsesService.getAll({
+        select: [
+          'dga_aop_project_milestone_detailsid',
+          'dga_name',
+          'dga_planned_start_date',
+          'dga_planned_end_date',
+          'dga_start_date',
+          'dga_description',
+          'dga_milestone_description',
+          'dga_justification',
+          'dga_weightage',
+          'statuscode',
+          '_dga_aop_project_value',
+        ],
+        filter: projectLookupFilter(projectId),
+        orderBy: ['dga_planned_end_date asc'],
+      })
+
+      assertOperationSuccess(result, 'Unable to load milestones.')
+
+      const mapped = (result.data ?? [])
+        .map((milestone) => milestoneToUi(milestone as Dga_aop_project_milestone_detailses))
+        .filter((milestone): milestone is Milestone => Boolean(milestone))
+        .sort(sortMilestonesByEndDate)
+
+      setMilestones(mapped)
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Unable to load milestones.')
+      setMilestones([])
+    } finally {
+      setIsLoading(false)
+    }
+  }, [projectId])
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void loadMilestones()
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [loadMilestones])
 
   // ── Derived ──
   const totalPages = Math.max(1, Math.ceil(milestones.length / ITEMS_PER_PAGE))
@@ -118,10 +285,41 @@ export function MilestonesTab({ isAdeoVisible }: MilestonesTabProps) {
     return getQuarter(formData.plannedEndDate)
   }
 
+  function getDateRangeErrors(nextForm: MilestoneFormData): Partial<Record<keyof MilestoneFormData, string>> {
+    const errors: Partial<Record<keyof MilestoneFormData, string>> = {}
+    const activityStart = toDateOnly(activityPlannedStartDate)
+    const activityEnd = toDateOnly(activityPlannedEndDate)
+
+    if (nextForm.plannedStartDate && activityStart && nextForm.plannedStartDate < activityStart) {
+      errors.plannedStartDate = `Milestone start date must be on or after activity start date ${formatDateDisplay(activityStart)}.`
+    }
+
+    if (nextForm.plannedStartDate && activityEnd && nextForm.plannedStartDate > activityEnd) {
+      errors.plannedStartDate = `Milestone start date must be on or before activity end date ${formatDateDisplay(activityEnd)}.`
+    }
+
+    if (nextForm.plannedEndDate && activityStart && nextForm.plannedEndDate < activityStart) {
+      errors.plannedEndDate = `Milestone end date must be on or after activity start date ${formatDateDisplay(activityStart)}.`
+    }
+
+    if (nextForm.plannedEndDate && activityEnd && nextForm.plannedEndDate > activityEnd) {
+      errors.plannedEndDate = `Milestone end date must be on or before activity end date ${formatDateDisplay(activityEnd)}.`
+    }
+
+    if (nextForm.plannedStartDate && nextForm.plannedEndDate && nextForm.plannedStartDate > nextForm.plannedEndDate) {
+      errors.plannedStartDate = 'Milestone start date must be on or before milestone end date.'
+      errors.plannedEndDate = 'Milestone end date must be on or after milestone start date.'
+    }
+
+    return errors
+  }
+
   function handleOpenCreate() {
     setEditingMilestone(null)
     setForm(EMPTY_FORM)
     setFormErrors({})
+    setError('')
+    setNotice('')
     setIsDrawerOpen(true)
   }
 
@@ -140,6 +338,8 @@ export function MilestonesTab({ isAdeoVisible }: MilestonesTabProps) {
       description: milestone.description,
     })
     setFormErrors({})
+    setError('')
+    setNotice('')
     setIsDrawerOpen(true)
   }
 
@@ -157,15 +357,17 @@ export function MilestonesTab({ isAdeoVisible }: MilestonesTabProps) {
       next.quarter = getQuarter(next.plannedEndDate)
     }
     setForm(next)
-    // Clear error for changed field
-    const changedKey = Object.keys(fields)[0] as keyof MilestoneFormData
-    if (changedKey && formErrors[changedKey]) {
-      setFormErrors((prev) => {
-        const copy = { ...prev }
-        delete copy[changedKey]
-        return copy
+    const changedKeys = Object.keys(fields) as Array<keyof MilestoneFormData>
+    const rangeErrors = getDateRangeErrors(next)
+    setFormErrors((prev) => {
+      const copy = { ...prev }
+      changedKeys.forEach((key) => {
+        delete copy[key]
       })
-    }
+      delete copy.plannedStartDate
+      delete copy.plannedEndDate
+      return { ...copy, ...rangeErrors }
+    })
   }
 
   function validate(): boolean {
@@ -183,36 +385,64 @@ export function MilestonesTab({ isAdeoVisible }: MilestonesTabProps) {
         ? `Maximum for this milestone is ${maxAllowedWeightage}%`
         : `Only ${remainingWeightage}% remaining`
     }
-    setFormErrors(errors)
-    return Object.keys(errors).length === 0
+    const rangeErrors = getDateRangeErrors(form)
+    const nextErrors = { ...errors, ...rangeErrors }
+    setFormErrors(nextErrors)
+    return Object.keys(nextErrors).length === 0
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!validate()) return
-
-    if (editingMilestone) {
-      setMilestones((prev) =>
-        prev.map((m) =>
-          m.id === editingMilestone.id
-            ? { ...m, ...form, quarter: calculateQuarter(form) }
-            : m,
-        ),
-      )
-    } else {
-      const newMilestone: Milestone = {
-        id: `ms-${Date.now()}`,
-        ...form,
-        quarter: calculateQuarter(form),
-      }
-      setMilestones((prev) => [...prev, newMilestone])
+    if (!projectId) {
+      setError('Activity id is missing from the edit URL.')
+      return
     }
-    handleCloseDrawer()
+
+    setIsSaving(true)
+    setError('')
+    setNotice('')
+
+    try {
+      if (editingMilestone) {
+        const result = await Dga_aop_project_milestone_detailsesService.update(
+          editingMilestone.id,
+          buildMilestoneUpdatePayload({ ...form, quarter: calculateQuarter(form) }),
+        )
+        assertOperationSuccess(result, 'Unable to update milestone.')
+        setNotice('Milestone updated successfully.')
+      } else {
+        const result = await Dga_aop_project_milestone_detailsesService.create(
+          buildMilestoneCreatePayload({ ...form, quarter: calculateQuarter(form) }, projectId),
+        )
+        assertOperationSuccess(result, 'Unable to create milestone.')
+        setNotice('Milestone created successfully.')
+      }
+
+      handleCloseDrawer()
+      await loadMilestones()
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Unable to save milestone.')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
-  function handleConfirmDelete() {
+  async function handleConfirmDelete() {
     if (!milestoneToDelete) return
-    setMilestones((prev) => prev.filter((m) => m.id !== milestoneToDelete.id))
-    setMilestoneToDelete(null)
+    setIsDeleting(true)
+    setError('')
+    setNotice('')
+
+    try {
+      await Dga_aop_project_milestone_detailsesService.delete(milestoneToDelete.id)
+      setMilestones((prev) => prev.filter((m) => m.id !== milestoneToDelete.id))
+      setMilestoneToDelete(null)
+      setNotice('Milestone deleted successfully.')
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Unable to delete milestone.')
+    } finally {
+      setIsDeleting(false)
+    }
   }
 
   // ── Render helpers ──
@@ -251,7 +481,7 @@ export function MilestonesTab({ isAdeoVisible }: MilestonesTabProps) {
         <div className="edit-activity__milestone-card">
           <div className="edit-activity__milestone-card-top">
             <div className="edit-activity__milestone-card-date">
-              {formatDate(milestone.plannedStartDate)} → {formatDate(milestone.plannedEndDate)}
+              {formatDateDisplay(milestone.plannedStartDate)} → {formatDateDisplay(milestone.plannedEndDate)}
             </div>
             <div className="edit-activity__milestone-card-badges">
               <Badge tone="neutral">{milestone.quarter}</Badge>
@@ -307,8 +537,8 @@ export function MilestonesTab({ isAdeoVisible }: MilestonesTabProps) {
             <Button onClick={handleCloseDrawer} variant="secondary">
               Cancel
             </Button>
-            <Button onClick={handleSave}>
-              {editingMilestone ? 'Update Milestone' : 'Create Milestone'}
+            <Button disabled={isSaving} onClick={handleSave}>
+              {isSaving ? 'Saving...' : editingMilestone ? 'Update Milestone' : 'Create Milestone'}
             </Button>
           </div>
         }
@@ -344,6 +574,8 @@ export function MilestonesTab({ isAdeoVisible }: MilestonesTabProps) {
                   error={formErrors.plannedStartDate}
                   id="ms-planned-start-date"
                   label="Planned Start Date"
+                  max={activityPlannedEndDate}
+                  min={activityPlannedStartDate}
                   onChange={(value) => handleFieldChange({ plannedStartDate: value })}
                   required
                   value={form.plannedStartDate}
@@ -357,6 +589,8 @@ export function MilestonesTab({ isAdeoVisible }: MilestonesTabProps) {
                   error={formErrors.plannedEndDate}
                   id="ms-planned-end-date"
                   label="Planned End Date"
+                  max={activityPlannedEndDate}
+                  min={form.plannedStartDate || activityPlannedStartDate}
                   onChange={(value) => handleFieldChange({ plannedEndDate: value })}
                   required
                   value={form.plannedEndDate}
@@ -488,16 +722,34 @@ export function MilestonesTab({ isAdeoVisible }: MilestonesTabProps) {
           </h2>
           <p>Track project milestones and key deliverables.</p>
         </div>
-        <Button icon={<Plus size={15} />} onClick={handleOpenCreate}>
+        <Button disabled={!projectId || isLoading} icon={<Plus size={15} />} onClick={handleOpenCreate}>
           Add Milestone
         </Button>
       </div>
+
+      {error ? (
+        <div className="edit-activity__members-modal-error">
+          <Flag size={13} />
+          {error}
+        </div>
+      ) : notice ? (
+        <div className="edit-activity__members-modal-selected-header">
+          <Flag size={14} />
+          <span>{notice}</span>
+        </div>
+      ) : null}
 
       {/* Progress bar */}
       {renderProgressBar()}
 
       {/* Timeline */}
-      {paginatedMilestones.length > 0 ? (
+      {isLoading ? (
+        <div className="edit-activity__members-empty">
+          <Flag size={40} strokeWidth={1.2} />
+          <h3>Loading milestones...</h3>
+          <p>Fetching milestones for this activity.</p>
+        </div>
+      ) : paginatedMilestones.length > 0 ? (
         <div className="edit-activity__milestones-timeline">
           {paginatedMilestones.map(renderTimelineCard)}
         </div>
@@ -517,7 +769,7 @@ export function MilestonesTab({ isAdeoVisible }: MilestonesTabProps) {
 
       {/* Delete Confirmation */}
       <ConfirmationDialog
-        confirmLabel="Delete Milestone"
+        confirmLabel={isDeleting ? 'Deleting...' : 'Delete Milestone'}
         danger
         description="This milestone will be permanently removed. This action cannot be undone."
         isOpen={milestoneToDelete !== null}

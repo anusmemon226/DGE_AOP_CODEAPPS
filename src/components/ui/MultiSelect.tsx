@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Check, ChevronDown, Search, X } from 'lucide-react'
 import type { SelectOption } from './Select'
 import './ui.css'
@@ -13,6 +14,7 @@ type MultiSelectProps<TValue extends string> = {
   options: readonly SelectOption<TValue>[]
   placeholder?: string
   required?: boolean
+  selectionDisplay?: 'chips' | 'count'
   value: TValue[]
 }
 
@@ -26,11 +28,14 @@ export function MultiSelect<TValue extends string>({
   options,
   placeholder = 'Select options',
   required = false,
+  selectionDisplay = 'chips',
   value,
 }: MultiSelectProps<TValue>) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchValue, setSearchValue] = useState('')
   const rootRef = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null)
   const selectedOptions = options.filter((option) => value.includes(option.value))
   const visibleOptions = useMemo(() => {
     const normalizedSearch = searchValue.trim().toLowerCase()
@@ -48,15 +53,51 @@ export function MultiSelect<TValue extends string>({
     }
 
     function handlePointerDown(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) {
+      if (!rootRef.current?.contains(event.target as Node) && !menuRef.current?.contains(event.target as Node)) {
         setIsOpen(false)
+        setMenuPos(null)
       }
     }
 
+    function handleKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setIsOpen(false)
+        setMenuPos(null)
+      }
+    }
+
+    function reposition() {
+      const control = rootRef.current?.querySelector('.multi-select__trigger') as HTMLElement | null
+      const menu = menuRef.current
+      if (!control) return
+
+      const rect = control.getBoundingClientRect()
+      const measuredMenuHeight = menu?.offsetHeight || 320
+      const spaceBelow = window.innerHeight - rect.bottom - 8
+      const spaceAbove = rect.top - 8
+      const openUp = measuredMenuHeight > spaceBelow && spaceAbove > spaceBelow
+      const availableSpace = Math.max(160, openUp ? spaceAbove : spaceBelow)
+      const maxHeight = Math.min(360, availableSpace)
+
+      setMenuPos({
+        top: openUp ? Math.max(8, rect.top - Math.min(measuredMenuHeight, maxHeight) - 4) : rect.bottom + 4,
+        left: rect.left,
+        width: rect.width,
+        maxHeight,
+      })
+    }
+
+    const rafId = requestAnimationFrame(reposition)
+
     document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    document.addEventListener('scroll', reposition, { capture: true })
 
     return () => {
+      cancelAnimationFrame(rafId)
       document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('scroll', reposition, { capture: true })
     }
   }, [isOpen])
 
@@ -82,11 +123,39 @@ export function MultiSelect<TValue extends string>({
         aria-labelledby={`${id}-label`}
         className="field__control multi-select__trigger"
         id={id}
-        onClick={() => setIsOpen((open) => !open)}
+        onClick={() => {
+          const nextOpen = !isOpen
+
+          if (nextOpen) {
+            const el = rootRef.current?.querySelector('.multi-select__trigger') as HTMLElement | null
+            if (el) {
+              const rect = el.getBoundingClientRect()
+              const estimatedHeight = 320
+              const spaceBelow = window.innerHeight - rect.bottom - 8
+              const spaceAbove = rect.top - 8
+              const openUp = estimatedHeight > spaceBelow && spaceAbove > spaceBelow
+              const maxHeight = Math.min(360, Math.max(160, openUp ? spaceAbove : spaceBelow))
+
+              setMenuPos({
+                top: openUp ? Math.max(8, rect.top - maxHeight - 4) : rect.bottom + 4,
+                left: rect.left,
+                width: rect.width,
+                maxHeight,
+              })
+            }
+          }
+
+          setIsOpen(nextOpen)
+          if (!nextOpen) {
+            setMenuPos(null)
+          }
+        }}
         type="button"
       >
         <span className="multi-select__chips">
-          {selectedOptions.length > 0
+          {selectedOptions.length > 0 && selectionDisplay === 'count'
+            ? `${selectedOptions.length} Selected`
+            : selectedOptions.length > 0
             ? selectedOptions.map((option) => (
                 <span className="multi-select__chip" key={option.value}>
                   {option.label}
@@ -100,8 +169,22 @@ export function MultiSelect<TValue extends string>({
       {hint ? <span className="field__hint">{hint}</span> : null}
       {error ? <span className="field__error">{error}</span> : null}
 
-      {isOpen ? (
-        <div className="multi-select__menu" role="listbox">
+      {isOpen && menuPos
+        ? createPortal(
+        <div
+          className="multi-select__menu"
+          ref={menuRef}
+          role="listbox"
+          style={{
+            left: menuPos.left,
+            maxHeight: menuPos.maxHeight,
+            minWidth: menuPos.width,
+            position: 'fixed',
+            top: menuPos.top,
+            width: 'max-content',
+            zIndex: 99999,
+          }}
+        >
           <label className="select-menu__search">
             <Search aria-hidden="true" size={15} />
             <input
@@ -128,7 +211,8 @@ export function MultiSelect<TValue extends string>({
               </button>
             )
           })}
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </div>
   )

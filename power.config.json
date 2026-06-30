@@ -68,6 +68,43 @@
         "dependencies": {
           "entitySetName": "dga_dependencies",
           "logicalName": "dga_dependency"
+        },
+        "environment_39a902ba": {
+          "entitySetName": "Environment",
+          "logicalName": "environment_39a902ba",
+          "isHidden": false
+        },
+        "aopprojectmilestonedetails": {
+          "entitySetName": "dga_aop_project_milestone_detailses",
+          "logicalName": "dga_aop_project_milestone_details"
+        },
+        "aopengagementplans": {
+          "entitySetName": "dga_aop_engagement_plans",
+          "logicalName": "dga_aop_engagement_plan"
+        },
+        "aopcostcenters": {
+          "entitySetName": "dga_aop_cost_centers",
+          "logicalName": "dga_aop_cost_center"
+        },
+        "categories": {
+          "entitySetName": "dga_categories",
+          "logicalName": "dga_category"
+        },
+        "procurementplans": {
+          "entitySetName": "dga_procurement_plans",
+          "logicalName": "dga_procurement_plan"
+        },
+        "engagementsubtypes": {
+          "entitySetName": "dga_engagement_sub_types",
+          "logicalName": "dga_engagement_sub_type"
+        },
+        "objectives": {
+          "entitySetName": "dga_objectives",
+          "logicalName": "dga_objective"
+        },
+        "accounts": {
+          "entitySetName": "accounts",
+          "logicalName": "account"
         }
       },
       "environmentVariableName": ""

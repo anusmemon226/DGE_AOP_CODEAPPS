@@ -32,7 +32,7 @@ import { ActivityInfoTab } from './editActivity/ActivityInfoTab'
 import { MembersTab } from './editActivity/MembersTab'
 import { DependenciesTab } from './editActivity/DependenciesTab'
 import { MilestonesTab } from './editActivity/MilestonesTab'
-import { ObjectivesTab } from './editActivity/ObjectivesTab'
+import { ObjectivesTab, type ObjectiveHeaderAction } from './editActivity/ObjectivesTab'
 import { ProcurementTab } from './editActivity/ProcurementTab'
 import { BudgetTab } from './editActivity/BudgetTab'
 import { ClarificationTab } from './editActivity/ClarificationTab'
@@ -111,6 +111,10 @@ const ACTIVITY_INFO_SELECT_FIELDS = [
   'dga_risks',
   '_dga_sector_value',
   '_dga_department_value',
+  '_dga_dge_corporate_strategy_pillar_value',
+  '_dga_govdigital_pillar_value',
+  '_dga_link_to_dge_strategic_objective_value',
+  '_dga_link_to_strategic_kpis_value',
   '_owningteam_value',
   '_owninguser_value',
   'statuscode',
@@ -188,6 +192,7 @@ export function EditActivity() {
   const [isSavingActivityInfo, setIsSavingActivityInfo] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
   const [pendingWith, setPendingWith] = useState('Loading...')
+  const [objectiveHeaderAction, setObjectiveHeaderAction] = useState<ObjectiveHeaderAction | null>(null)
 
   // ── Loaded activity data ──
   const activityName = activity?.dga_name || form.activityName || 'Edit Activity'
@@ -466,18 +471,44 @@ export function EditActivity() {
       case 'dependencies':
         return <DependenciesTab projectId={projectId} />
       case 'objectives':
-        return <ObjectivesTab />
+        return (
+          <ObjectivesTab
+            onHeaderActionChange={setObjectiveHeaderAction}
+            projectId={projectId}
+            statusCode={statusCode}
+          />
+        )
       case 'milestones':
-        return <MilestonesTab isAdeoVisible={isAdeoVisible} />
+        return (
+          <MilestonesTab
+            activityPlannedEndDate={form.plannedEndDate}
+            activityPlannedStartDate={form.plannedStartDate}
+            isAdeoVisible={isAdeoVisible}
+            projectId={projectId}
+          />
+        )
       case 'procurements':
-        return <ProcurementTab />
+        return (
+          <ProcurementTab
+            activityPlannedEndDate={form.plannedEndDate}
+            activityPlannedStartDate={form.plannedStartDate}
+            activityScope={form.activityScope}
+            projectId={projectId}
+          />
+        )
       case 'engagement-plans':
         return (
           <EngagementPlanTab
             activityLeadName={activityLeadName}
             activityName={activityName}
+            activityPlannedEndDate={form.plannedEndDate}
+            activityPlannedStartDate={form.plannedStartDate}
             activitySummary={form.summary}
+            currentHierarchyId={currentRoleDivisionalHierarchy?.hierarchyId}
             divisionName={form.divisionName}
+            hierarchies={allHierarchies}
+            projectId={projectId}
+            selectedRole={selectedRole}
             sectorName={form.sectorName}
           />
         )
@@ -759,6 +790,15 @@ export function EditActivity() {
                 onClick={handleSaveActivityInfo}
               >
                 {isSavingActivityInfo ? 'Saving...' : statusCode === 1 ? 'Save Draft' : 'Save Changes'}
+              </Button>
+            ) : null}
+            {activeTab === 'objectives' && objectiveHeaderAction ? (
+              <Button
+                disabled={!objectiveHeaderAction.canSave || objectiveHeaderAction.isSaving || Boolean(errors.context)}
+                icon={<Save size={16} />}
+                onClick={objectiveHeaderAction.onSave}
+              >
+                {objectiveHeaderAction.isSaving ? objectiveHeaderAction.savingLabel : objectiveHeaderAction.label}
               </Button>
             ) : null}
             {isDivisionMember ? (

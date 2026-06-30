@@ -40,7 +40,7 @@ export type ActivityForm = {
 export type FieldErrors = Partial<Record<keyof ActivityForm | 'submit' | 'context', string>>
 
 export type ActivityInfoUpdatePayload = Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid' | 'dga_project_categorized_under'>> & {
-  dga_project_categorized_under?: string
+  dga_project_categorized_under?: string | null
 }
 
 export type ActivityContext = {
@@ -408,6 +408,7 @@ export function projectToActivityForm(project: Dga_aop_projectses, fallbacks: Ac
 
 export function buildActivityInfoUpdatePayload(form: ActivityForm): ActivityInfoUpdatePayload {
   const normalizedForm = normalizeControlledRules(form)
+  const serializedStrategies = serializeStrategies(normalizedForm.strategies)
 
   return {
     dga_activity_classification: numberOrUndefined<Dga_aop_projectsesBase['dga_activity_classification']>(normalizedForm.activityClassification),
@@ -421,7 +422,7 @@ export function buildActivityInfoUpdatePayload(form: ActivityForm): ActivityInfo
     dga_name: normalizedForm.activityName.trim(),
     dga_planned_end_date: normalizedForm.plannedEndDate,
     dga_planned_start_date: normalizedForm.plannedStartDate,
-    dga_project_categorized_under: serializeStrategies(normalizedForm.strategies) ?? '',
+    dga_project_categorized_under: normalizedForm.activityScope === '1' ? serializedStrategies : null,
     dga_project_description: normalizedForm.adeoProjectDescription,
     dga_project_kpi: normalizedForm.activityKpi,
     dga_project_long_term_impact: normalizedForm.overallLongTermImpact,
