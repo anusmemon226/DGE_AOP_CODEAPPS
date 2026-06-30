@@ -15,8 +15,10 @@ import {
   X,
 } from 'lucide-react'
 import { Button, ConfirmationDialog, Modal, SearchInput } from '../../components/ui'
+import type { Dga_aop_projects_systemuserset } from '../../generated/models/Dga_aop_projects_systemusersetModel'
 import type { Systemusers } from '../../generated/models/SystemusersModel'
 import { SystemusersService } from '../../generated/services/SystemusersService'
+import { Dga_aop_projects_systemusersetService } from '../../generated/services/Dga_aop_projects_systemusersetService'
 
 // ── Types ──
 
@@ -32,6 +34,7 @@ type MockUser = {
 
 type ActivityMember = MockUser & {
   addedAt: string
+  associationId: string
 }
 
 // ── Mock data removed — ready for dynamic implementation ──
@@ -66,8 +69,6 @@ function getCustomApiToken() {
 }
 
 async function callActivityMemberApi(actionName: ActivityMemberApiAction, projectId: string, userId: string) {
-  console.log(projectId)
-  console.log(userId)
   const token = getCustomApiToken()
 
   if (!token) {
@@ -159,6 +160,33 @@ function normalizeId(id?: string | null) {
   return id?.replace(/[{}]/g, '').toLowerCase() ?? ''
 }
 
+function getProjectMemberFilter(projectId: string) {
+  return `dga_aop_projectsid eq '${projectId.replace(/[{}]/g, '')}'`
+}
+
+function mapAssociationsToMembers(
+  associations: Dga_aop_projects_systemuserset[],
+  users: MockUser[],
+): ActivityMember[] {
+  const userById = new Map(users.map((user) => [normalizeId(user.id), user]))
+
+  return associations
+    .filter((association) => association.dga_aop_projects_systemuserid && association.systemuserid)
+    .map((association) => {
+      const user = userById.get(normalizeId(association.systemuserid))
+
+      return {
+        avatarUrl: user?.avatarUrl ?? null,
+        email: user?.email ?? '',
+        id: association.systemuserid,
+        isDivisionMember: user?.isDivisionMember ?? false,
+        name: user?.name ?? `User ${association.systemuserid}`,
+        addedAt: '',
+        associationId: association.dga_aop_projects_systemuserid,
+      }
+    })
+}
+
 // ── Component ──
 
 export function MembersTab({ projectId }: MembersTabProps) {
@@ -200,30 +228,43 @@ export function MembersTab({ projectId }: MembersTabProps) {
     setMembersNotice('')
 
     try {
-      const usersResult = await SystemusersService.getAll({
-        select: [
-          'systemuserid',
-          'fullname',
-          'internalemailaddress',
-          'domainname',
-          'jobtitle',
-          'title',
-          'isdisabled',
-        ],
-        filter: 'isdisabled eq false',
-        orderBy: ['fullname asc'],
-      })
+      const [usersResult, associationsResult] = await Promise.all([
+        SystemusersService.getAll({
+          select: [
+            'systemuserid',
+            'fullname',
+            'internalemailaddress',
+            'domainname',
+            'jobtitle',
+            'title',
+            'isdisabled',
+          ],
+          orderBy: ['fullname asc'],
+        }),
+        Dga_aop_projects_systemusersetService.getAll(
+          {
+          select: [
+            'dga_aop_projects_systemuserid',
+            'dga_aop_projectsid',
+            'systemuserid',
+          ],
+          filter: getProjectMemberFilter(projectId),
+        }
+      ),
+      ])
 
       assertOperationSuccess(usersResult, 'Unable to load users.')
+      assertOperationSuccess(associationsResult, 'Unable to load associated activity members.')
 
       const users = (usersResult.data ?? [])
         .map((user) => mapSystemUserToMember(user as Systemusers))
         .filter((user): user is MockUser => Boolean(user))
+      const associations = (associationsResult.data ?? []) as Dga_aop_projects_systemuserset[]
 
       setAvailableUsers(users)
-      setMembers([])
+      setMembers(mapAssociationsToMembers(associations, users))
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to load users.'
+      const message = error instanceof Error ? error.message : 'Unable to load associated activity members.'
       setUsersError(message)
       setMembersError(message)
       setAvailableUsers([])
@@ -359,19 +400,12 @@ export function MembersTab({ projectId }: MembersTabProps) {
       return
     }
 
-    setMembers((prev) => {
-      const existingIds = new Set(prev.map((member) => normalizeId(member.id)))
-      const newMembers = availableUsers
-        .filter((user) => selectedUserIds.some((userId) => normalizeId(userId) === normalizeId(user.id)) && !existingIds.has(normalizeId(user.id)))
-        .map((user) => ({ ...user, addedAt: new Date().toISOString().slice(0, 10) }))
-
-      return [...prev, ...newMembers]
-    })
+    await loadMembersContext()
     setSelectedMemberIds(new Set())
     setMemberSelectionError('')
     setMembersNotice(`${selectedUserIds.length} member${selectedUserIds.length !== 1 ? 's' : ''} added successfully.`)
     setIsAddMembersModalOpen(false)
-  }, [availableUsers, isSavingMembers, members, projectId, selectedMemberIds])
+  }, [isSavingMembers, loadMembersContext, members, projectId, selectedMemberIds])
 
   const handleRemoveMember = useCallback((member: ActivityMember) => {
     setMemberToDelete(member)
@@ -392,7 +426,7 @@ export function MembersTab({ projectId }: MembersTabProps) {
 
     try {
       await callActivityMemberApi('disassociate', projectId, memberToDelete.id)
-      setMembers((prev) => prev.filter((m) => normalizeId(m.id) !== normalizeId(memberToDelete.id)))
+      await loadMembersContext()
       setMemberToDelete(null)
       setMembersNotice('Member removed successfully.')
     } catch (error) {
@@ -400,7 +434,7 @@ export function MembersTab({ projectId }: MembersTabProps) {
     } finally {
       setIsRemovingMember(false)
     }
-  }, [isRemovingMember, memberToDelete, projectId])
+  }, [isRemovingMember, loadMembersContext, memberToDelete, projectId])
 
   const handleCancelDeleteMember = useCallback(() => {
     setMemberToDelete(null)
@@ -483,7 +517,7 @@ export function MembersTab({ projectId }: MembersTabProps) {
               ]).map((filter) => {
                 const filterModClass = filter.value === 'division' ? 'edit-activity__members-modal-filter--division'
                   : filter.value === 'non-division' ? 'edit-activity__members-modal-filter--external'
-                  : ''
+                    : ''
                 return (
                   <button
                     key={filter.value}
