@@ -15,7 +15,10 @@ import { getAopRoleLabel, isAopRole } from '../constants/rolesMapping'
 // ── Types ──
 
 export type UserRole = {
+  /** Unique assignment id used by the UI; team roles use teamroleid, direct roles use systemuserroleid. */
   roleId: string
+  /** Actual Dataverse role id from the roles table. */
+  dataverseRoleId: string
   teamId: string
   roleName: string
   internalEmailAddress: string
@@ -75,9 +78,17 @@ export const initializeUserPipeline = createAsyncThunk(
       if (!systemUser?.systemuserid) return rejectWithValue('No system user found')
 
       const systemUserId = systemUser.systemuserid
+      console.log(systemUserId)
 
-      // 3. Collect all roleIds from direct assignments + team memberships
-      const roleUserMap = new Map<string, { roleId: string; teamId: string }>()
+      // 3. Collect all role assignments from direct assignments + team memberships.
+      // Use the assignment row id as the unique key so the same Dataverse role assigned
+      // through multiple teams does not collapse into one dropdown option.
+      type RoleAssignment = {
+        assignmentId: string
+        roleId: string
+        teamId: string
+      }
+      const roleAssignments = new Map<string, RoleAssignment>()
 
       // 3a. Direct role assignments
       const directRolesResponse = await SystemuserrolescollectionService.getAll({
@@ -85,7 +96,12 @@ export const initializeUserPipeline = createAsyncThunk(
       })
       ;(directRolesResponse.data ?? []).forEach((dr) => {
         if (dr.roleid) {
-          roleUserMap.set(dr.roleid, { roleId: dr.roleid, teamId: '' })
+          const assignmentId = dr.systemuserroleid || `direct:${systemUserId}:${dr.roleid}`
+          roleAssignments.set(assignmentId, {
+            assignmentId,
+            roleId: dr.roleid,
+            teamId: '',
+          })
         }
       })
 
@@ -104,12 +120,17 @@ export const initializeUserPipeline = createAsyncThunk(
         })
         ;(teamRolesResponse.data ?? []).forEach((tr) => {
           if (tr.roleid) {
-            roleUserMap.set(tr.roleid, { roleId: tr.roleid, teamId: tr.teamid })
+            const assignmentId = tr.teamroleid || `team:${tr.teamid}:${tr.roleid}`
+            roleAssignments.set(assignmentId, {
+              assignmentId,
+              roleId: tr.roleid,
+              teamId: tr.teamid,
+            })
           }
         })
       }
 
-      if (roleUserMap.size === 0) {
+      if (roleAssignments.size === 0) {
         return {
           systemUser,
           roles: [] as UserRole[],
@@ -118,27 +139,33 @@ export const initializeUserPipeline = createAsyncThunk(
       }
 
       // 4. Fetch role names
-      const roleIds = Array.from(roleUserMap.keys())
+      const roleIds = Array.from(
+        new Set(Array.from(roleAssignments.values()).map((assignment) => assignment.roleId)),
+      )
       const roleFilter = roleIds.map((id) => `roleid eq '${id}'`).join(' or ')
       const rolesResponse = await RolesService.getAll({
         select: ['roleid', 'name'],
         filter: roleFilter,
       })
       const rolesData = (rolesResponse.data ?? []) as Roles[]
+      const rolesById = new Map(rolesData.map((role) => [role.roleid, role]))
 
       // 5. Filter to AOP roles
-      const userRoles: UserRole[] = rolesData
-        .filter((role) => isAopRole(role.name))
-        .map((role) => {
-          const paired = roleUserMap.get(role.roleid)
+      const userRoles: UserRole[] = Array.from(roleAssignments.values())
+        .map((assignment) => {
+          const role = rolesById.get(assignment.roleId)
+          if (!role || !isAopRole(role.name)) return null
+
           return {
-            roleId: role.roleid,
-            teamId: paired?.teamId ?? '',
+            roleId: assignment.assignmentId,
+            dataverseRoleId: role.roleid,
+            teamId: assignment.teamId,
             roleName: getAopRoleLabel(role.name),
             internalEmailAddress: systemUser.internalemailaddress ?? '',
             entityImage: systemUser.entityimage ?? '',
           }
         })
+        .filter((role): role is UserRole => Boolean(role))
 
       // 6. Fetch divisional hierarchies
       const hierarchyResponse = await Dga_divisional_hierarchiesService.getAll({

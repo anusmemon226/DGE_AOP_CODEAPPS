@@ -599,7 +599,7 @@
 }
 
 .role-popover__item {
-  align-items: center;
+  align-items: flex-start;
   background: transparent;
   border: 1px solid transparent;
   border-radius: 0.65rem;
@@ -609,8 +609,8 @@
   font: inherit;
   gap: 0.55rem;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  min-height: 3.35rem;
-  padding: 0.55rem 0.65rem;
+  min-height: 3.75rem;
+  padding: 0.65rem 0.65rem;
   text-align: left;
 }
 
@@ -635,18 +635,22 @@
   border-radius: 0.5rem;
   color: var(--color-primary);
   display: inline-flex;
+  flex-shrink: 0;
   height: 1.95rem;
   justify-content: center;
+  margin-top: 0.05rem;
   width: 1.95rem;
 }
 
 .role-popover__item-copy {
   min-width: 0;
+  padding-right: 0.2rem;
 }
 
 .role-popover__item-copy strong {
   font-size: 0.8rem;
   font-weight: 800;
+  line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -656,7 +660,15 @@
   color: var(--color-text-secondary);
   font-size: 0.7rem;
   font-weight: 500;
+  line-height: 1.28;
   margin-top: 0.1rem;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.role-popover__item > svg {
+  flex-shrink: 0;
+  margin-top: 0.45rem;
 }
 
 .role-popover__item--selected .role-popover__item-copy small {

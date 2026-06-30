@@ -90,7 +90,7 @@ export function Sidebar() {
               <span className="sidebar__role-initials">{getInitials(displayName)}</span>
               <span className="sidebar__role-copy">
                 <strong>{displayName}</strong>
-                <small>{currentRolesDivisionalHierarchies.find((h) => h.roleId === currentRole?.roleId)?.hierarchyName ?? 'Org-wide role'}</small>
+                <small>{currentRolesDivisionalHierarchies.find((h) => h.roleId === currentRole?.roleId)?.hierarchyName ?? 'Organization role'}</small>
               </span>
             </span>
           </div>

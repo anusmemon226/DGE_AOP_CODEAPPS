@@ -379,7 +379,7 @@ export function Header() {
                         </span>
                         <span className="role-popover__item-copy">
                           <strong>{displayName}</strong>
-                          <small>{hierarchy?.hierarchyName ?? 'Org-wide role'}</small>
+                          <small>{hierarchy?.hierarchyName ?? 'Organization role'}</small>
                         </span>
                         {isSelected ? <Check size={16} /> : null}
                       </button>

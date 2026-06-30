@@ -12,19 +12,45 @@ export const AOP_ROLES_MAPPING: Record<string, string> = {
   'AOP - Director General': 'Director General',
 }
 
+const NORMALIZED_AOP_ROLES = Object.entries(AOP_ROLES_MAPPING).map(
+  ([dataverseName, displayName]) => ({
+    dataverseName,
+    displayName,
+    normalizedName: normalizeRoleName(dataverseName),
+  }),
+)
+
+function normalizeRoleName(roleName: string): string {
+  return roleName
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/\s+role$/i, '')
+    .trim()
+}
+
+function findAopRole(roleName: string) {
+  const normalizedRoleName = normalizeRoleName(roleName)
+
+  return NORMALIZED_AOP_ROLES.find(
+    (role) =>
+      normalizedRoleName === role.normalizedName ||
+      normalizedRoleName.includes(role.normalizedName),
+  )
+}
+
 /**
  * Returns true if the role name is an AOP role (excluding admin/sys roles).
  */
 export function isAopRole(roleName: string): boolean {
   const lower = roleName.toLowerCase()
-  return lower.includes('aop') && !lower.includes('admin')
+  return Boolean(findAopRole(roleName)) && !lower.includes('admin')
 }
 
 /**
  * Returns the short display label for a Dataverse role name.
  */
 export function getAopRoleLabel(roleName: string): string {
-  return AOP_ROLES_MAPPING[roleName] ?? roleName
+  return findAopRole(roleName)?.displayName ?? roleName
 }
 
 /**
