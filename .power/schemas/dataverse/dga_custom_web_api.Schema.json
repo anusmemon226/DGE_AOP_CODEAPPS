@@ -71,6 +71,22 @@
                 "type": "string",
                 "x-ms-dataverse-type": "StringType",
                 "x-ms-csdl-type": "Edm.String"
+              },
+              {
+                "name": "divisoinid",
+                "in": "body",
+                "required": false,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
+              },
+              {
+                "name": "sectorid",
+                "in": "body",
+                "required": false,
+                "type": "string",
+                "x-ms-dataverse-type": "StringType",
+                "x-ms-csdl-type": "Edm.String"
               }
             ],
             "responses": {

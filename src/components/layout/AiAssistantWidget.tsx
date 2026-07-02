@@ -60,6 +60,8 @@ function extractAssistantResponse(result: unknown) {
 export function AiAssistantWidget() {
   const dispatch = useAppDispatch()
   const isOpen = useAppSelector((state) => state.app.isAiAssistantOpen)
+  const selectedRole = useAppSelector((state) => state.app.selectedRole)
+  const currentRoleDivisionalHierarchy = useAppSelector((state) => state.user.currentRoleDivisionalHierarchy)
   const [messages, setMessages] = useState<ChatMessage[]>([
     createMessage(
       'assistant',
@@ -106,6 +108,13 @@ export function AiAssistantWidget() {
     setMessages((currentMessages) => [...currentMessages, createMessage('user', prompt)])
 
     try {
+      const roleHierarchyId = currentRoleDivisionalHierarchy?.hierarchyId ?? ''
+      const divisionId = selectedRole === 'AOP - Division Member' || selectedRole === 'AOP - Division Director'
+        ? roleHierarchyId
+        : ''
+      const sectorId = selectedRole === 'AOP - Executive Director'
+        ? roleHierarchyId
+        : ''
       const llmResponse = await Dga_custom_web_apiService.dga_custom_web_api(
         'openai',
         undefined,
@@ -113,6 +122,9 @@ export function AiAssistantWidget() {
         undefined,
         undefined,
         prompt,
+        undefined,
+        divisionId,
+        sectorId,
       )
       assertOperationSuccess(llmResponse, 'AI Assistant could not process your request.')
 

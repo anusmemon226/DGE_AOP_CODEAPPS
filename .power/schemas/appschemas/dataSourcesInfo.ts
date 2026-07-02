@@ -126,6 +126,18 @@ export const dataSourcesInfo = {
             "in": "body",
             "required": false,
             "type": "string"
+          },
+          {
+            "name": "divisoinid",
+            "in": "body",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "sectorid",
+            "in": "body",
+            "required": false,
+            "type": "string"
           }
         ],
         "responseInfo": {

@@ -20,10 +20,12 @@ export class Dga_custom_web_apiService {
    * @param relationshipname type: `String`
    * @param prompt type: `String`
    * @param relatedid type: `String`
+   * @param divisoinid type: `String`
+   * @param sectorid type: `String`
    */
-  public static async dga_custom_web_api(action: string, targettablename?: string, relatedtablename?: string, targetid?: string, relationshipname?: string, prompt?: string, relatedid?: string): Promise<IOperationResult<Record<string, unknown>>> {
-    const params: { action: string, targettablename?: string, relatedtablename?: string, targetid?: string, relationshipname?: string, prompt?: string, relatedid?: string } = { action, targettablename, relatedtablename, targetid, relationshipname, prompt, relatedid };
-    const result = await Dga_custom_web_apiService.client.executeAsync<{ action: string, targettablename?: string, relatedtablename?: string, targetid?: string, relationshipname?: string, prompt?: string, relatedid?: string }, Record<string, unknown>>(
+  public static async dga_custom_web_api(action: string, targettablename?: string, relatedtablename?: string, targetid?: string, relationshipname?: string, prompt?: string, relatedid?: string, divisoinid?: string, sectorid?: string): Promise<IOperationResult<Record<string, unknown>>> {
+    const params: { action: string, targettablename?: string, relatedtablename?: string, targetid?: string, relationshipname?: string, prompt?: string, relatedid?: string, divisoinid?: string, sectorid?: string } = { action, targettablename, relatedtablename, targetid, relationshipname, prompt, relatedid, divisoinid, sectorid };
+    const result = await Dga_custom_web_apiService.client.executeAsync<{ action: string, targettablename?: string, relatedtablename?: string, targetid?: string, relationshipname?: string, prompt?: string, relatedid?: string, divisoinid?: string, sectorid?: string }, Record<string, unknown>>(
       {
         dataverseRequest: {
           action: 'customapi',
