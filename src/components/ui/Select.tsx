@@ -66,7 +66,6 @@ export function Select<TValue extends string>({
 
   useEffect(() => {
     if (!isOpen) {
-      setMenuPos(null)
       return
     }
 
@@ -161,6 +160,8 @@ export function Select<TValue extends string>({
                 width: rect.width,
               })
             }
+          } else {
+            setMenuPos(null)
           }
           setIsOpen(nextOpen)
         }}

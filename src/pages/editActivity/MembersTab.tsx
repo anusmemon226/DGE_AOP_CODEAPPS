@@ -192,7 +192,6 @@ export function MembersTab({ projectId }: MembersTabProps) {
   const sentinelRef = useRef<HTMLDivElement>(null)
 
   const loadMembersContext = useCallback(async () => {
-
     const result = await Dga_categoriesService.getAll()
     console.log(result)
 

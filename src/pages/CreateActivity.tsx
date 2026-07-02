@@ -485,7 +485,7 @@ function buildProjectPayload(form: CreateActivityForm, context: ActivityContext)
     'dga_project_planning_instance@odata.bind': toEntityBind('dga_project_planning_instances', context.planningInstance.dga_project_planning_instanceid),
     dga_project_type: buildProjectType(form.activityType as ActivityTypeValue),
     'dga_record_creator@odata.bind': toEntityBind('systemusers', context.currentUserId),
-    'dga_record_creator_team_id@odata.bind': toEntityBind('systemusers', context.currentUserId),
+    'dga_record_creator_team@odata.bind': toEntityBind('teams', context.roleTeamId),
     dga_registered_or_will_be_registered_in_epm: form.activityClassification === '576610000',
     dga_risks: form.risks,
     dga_scope: form.scopeDescription,

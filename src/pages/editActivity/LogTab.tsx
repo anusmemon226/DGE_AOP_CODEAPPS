@@ -73,10 +73,6 @@ export function LogTab() {
   const rangeStart = filteredCount > 0 ? (currentPage - 1) * LOG_ITEMS_PER_PAGE + 1 : 0
   const rangeEnd = Math.min(currentPage * LOG_ITEMS_PER_PAGE, filteredCount)
 
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [searchQuery, selectedTypes])
-
   const allSelected = selectedTypes.size === LOG_TYPES.length
   const noneSelected = selectedTypes.size === 0
   const filterLabel = noneSelected
@@ -86,6 +82,7 @@ export function LogTab() {
       : `${selectedTypes.size} type${selectedTypes.size > 1 ? 's' : ''}`
 
   function toggleType(type: LogType) {
+    setCurrentPage(1)
     setSelectedTypes((prev) => {
       const next = new Set(prev)
       if (next.has(type)) {
@@ -98,6 +95,7 @@ export function LogTab() {
   }
 
   function handleSelectAll() {
+    setCurrentPage(1)
     if (allSelected) {
       setSelectedTypes(new Set())
     } else {
@@ -129,12 +127,18 @@ export function LogTab() {
             className="edit-activity__members-search-input"
             placeholder="Search logs..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value)
+              setCurrentPage(1)
+            }}
           />
           {searchQuery ? (
             <button
               className="edit-activity__members-search-clear"
-              onClick={() => setSearchQuery('')}
+              onClick={() => {
+                setSearchQuery('')
+                setCurrentPage(1)
+              }}
               type="button"
               aria-label="Clear search"
             >
