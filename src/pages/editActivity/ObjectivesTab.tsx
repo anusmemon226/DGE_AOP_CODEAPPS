@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import { Link2 } from 'lucide-react'
 import { Card, RadioGroup } from '../../components/ui'
 import type { Dga_aop_projectsesBase } from '../../generated/models/Dga_aop_projectsesModel'
@@ -20,6 +20,8 @@ type ObjectiveOption = {
   label: string
   value: string
 }
+
+type ObjectiveErrors = Partial<Record<keyof ObjectiveForm, string>>
 
 type ObjectivesTabProps = {
   onHeaderActionChange?: (action: ObjectiveHeaderAction | null) => void
@@ -73,8 +75,26 @@ function normalizeId(id?: string | null) {
   return id?.replace(/[{}]/g, '').toLowerCase() ?? ''
 }
 
-function hasCompleteObjectiveValue(form: ObjectiveForm) {
-  return Object.values(form).every(Boolean)
+function validateObjectiveForm(form: ObjectiveForm) {
+  const errors: ObjectiveErrors = {}
+
+  if (!form.corporateStrategyPillarId) {
+    errors.corporateStrategyPillarId = 'Select the DGE Corporate Strategy Pillar.'
+  }
+
+  if (!form.digitalPillarId) {
+    errors.digitalPillarId = 'Select the Digital Strategy Pillar.'
+  }
+
+  if (!form.digitalObjectiveId) {
+    errors.digitalObjectiveId = 'Select a Digital Strategy objective.'
+  }
+
+  if (!form.strategicKpiId) {
+    errors.strategicKpiId = 'Select a strategic KPI.'
+  }
+
+  return errors
 }
 
 function isSameForm(left: ObjectiveForm, right: ObjectiveForm) {
@@ -142,13 +162,13 @@ export function ObjectivesTab({ onHeaderActionChange, projectId, statusCode = 1 
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<ObjectiveErrors>({})
   const [notice, setNotice] = useState('')
-  const isSavingRef = useRef(false)
-  const hasAutoSavedInitialSelectionRef = useRef(false)
 
   const loadObjectivesContext = useCallback(async () => {
     if (!projectId) {
       setError('Activity id is missing from the edit URL.')
+      setFieldErrors({})
       setForm(EMPTY_FORM)
       setSavedForm(EMPTY_FORM)
       setObjectives([])
@@ -157,6 +177,7 @@ export function ObjectivesTab({ onHeaderActionChange, projectId, statusCode = 1 
 
     setIsLoading(true)
     setError('')
+    setFieldErrors({})
     setNotice('')
 
     try {
@@ -191,9 +212,9 @@ export function ObjectivesTab({ onHeaderActionChange, projectId, statusCode = 1 
 
       setForm(loadedForm)
       setSavedForm(loadedForm)
-      hasAutoSavedInitialSelectionRef.current = hasCompleteObjectiveValue(loadedForm)
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Unable to load objectives.')
+      setFieldErrors({})
       setForm(EMPTY_FORM)
       setSavedForm(EMPTY_FORM)
       setObjectives([])
@@ -236,16 +257,13 @@ export function ObjectivesTab({ onHeaderActionChange, projectId, statusCode = 1 
   const digitalObjectiveOptions = selectedDigitalPillar ? matchedDigitalObjectiveOptions : []
   const kpiOptions = selectedDigitalPillar ? matchedKpiOptions : []
   const activeCount = Object.values(form).filter(Boolean).length
-  const isComplete = hasCompleteObjectiveValue(form)
-  const hasSavedValues = hasCompleteObjectiveValue(savedForm)
   const hasUnsavedChanges = !isSameForm(form, savedForm)
-  const canSave = isComplete && hasSavedValues && hasUnsavedChanges && !isLoading
+  const canSave = !isLoading && !isSaving && !error
   const saveLabel = statusCode === 1 ? 'Save Draft' : 'Save Changes'
 
   const saveObjectives = useCallback(async (nextForm: ObjectiveForm, successMessage = 'Objectives saved successfully.') => {
-    if (!projectId || isSavingRef.current || !hasCompleteObjectiveValue(nextForm)) return
+    if (!projectId || isSaving) return
 
-    isSavingRef.current = true
     setIsSaving(true)
     setError('')
     setNotice('')
@@ -254,43 +272,63 @@ export function ObjectivesTab({ onHeaderActionChange, projectId, statusCode = 1 
       const result = await Dga_aop_projectsesService.update(projectId, buildProjectPayload(nextForm))
       assertOperationSuccess(result, 'Unable to save objective links.')
       setSavedForm(nextForm)
-      hasAutoSavedInitialSelectionRef.current = true
       setNotice(successMessage)
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Unable to save objective links.')
     } finally {
-      isSavingRef.current = false
       setIsSaving(false)
     }
-  }, [projectId])
+  }, [isSaving, projectId])
 
   const applyFormChange = useCallback((updater: (currentForm: ObjectiveForm) => ObjectiveForm) => {
     setForm((currentForm) => {
       const nextForm = updater(currentForm)
       setNotice('')
+      setFieldErrors((currentErrors) => {
+        const nextErrors = { ...currentErrors }
 
-      if (!hasAutoSavedInitialSelectionRef.current && !hasCompleteObjectiveValue(currentForm) && hasCompleteObjectiveValue(nextForm)) {
-        void saveObjectives(nextForm, 'Objective links saved successfully.')
-      }
+        Object.entries(nextForm).forEach(([key, value]) => {
+          if (value) delete nextErrors[key as keyof ObjectiveForm]
+        })
+
+        if (normalizeId(nextForm.digitalPillarId) !== normalizeId(currentForm.digitalPillarId)) {
+          delete nextErrors.digitalObjectiveId
+          delete nextErrors.strategicKpiId
+        }
+
+        return nextErrors
+      })
 
       return nextForm
     })
-  }, [saveObjectives])
+  }, [])
 
   const handleSave = useCallback(() => {
     if (!canSave) return
+
+    const nextErrors = validateObjectiveForm(form)
+    if (Object.keys(nextErrors).length > 0) {
+      setFieldErrors(nextErrors)
+      return
+    }
+
+    if (!hasUnsavedChanges) {
+      setNotice('No objective changes to save.')
+      return
+    }
+
     void saveObjectives(form)
-  }, [canSave, form, saveObjectives])
+  }, [canSave, form, hasUnsavedChanges, saveObjectives])
 
   useEffect(() => {
-    onHeaderActionChange?.(isComplete && !isLoading ? {
+    onHeaderActionChange?.(!isLoading ? {
       canSave,
       isSaving,
       label: saveLabel,
       onSave: handleSave,
       savingLabel: 'Saving...',
     } : null)
-  }, [canSave, handleSave, isComplete, isLoading, isSaving, onHeaderActionChange, saveLabel])
+  }, [canSave, handleSave, isLoading, isSaving, onHeaderActionChange, saveLabel])
 
   useEffect(() => {
     return () => onHeaderActionChange?.(null)
@@ -355,6 +393,7 @@ export function ObjectivesTab({ onHeaderActionChange, projectId, statusCode = 1 
             <div className="create-activity__form-stack">
               <RadioGroup
                 className="radio-group--corporate-strategy"
+                error={fieldErrors.corporateStrategyPillarId}
                 label="Select the DGE Corporate Strategy Pillar this activity aligns to"
                 name={`${uid}-dge-pillar`}
                 onChange={(value) => {
@@ -388,6 +427,7 @@ export function ObjectivesTab({ onHeaderActionChange, projectId, statusCode = 1 
             <div className="create-activity__form-stack">
               <RadioGroup
                 className="radio-group--digital-pillar"
+                error={fieldErrors.digitalPillarId}
                 label="Select the Digital Strategy Pillar this activity falls under"
                 name={`${uid}-digital-pillar`}
                 onChange={handleDigitalPillarChange}
@@ -399,6 +439,7 @@ export function ObjectivesTab({ onHeaderActionChange, projectId, statusCode = 1 
               {form.digitalPillarId && digitalObjectiveOptions.length > 0 ? (
                 <RadioGroup
                   className="radio-group--link-objective"
+                  error={fieldErrors.digitalObjectiveId}
                   label="Link to Digital Strategy objectives"
                   name={`${uid}-link-objective`}
                   onChange={(value) => {
@@ -421,6 +462,7 @@ export function ObjectivesTab({ onHeaderActionChange, projectId, statusCode = 1 
               {form.digitalPillarId && kpiOptions.length > 0 ? (
                 <RadioGroup
                   className="radio-group--link-kpi"
+                  error={fieldErrors.strategicKpiId}
                   label="Link to strategic KPIs"
                   name={`${uid}-link-kpi`}
                   onChange={(value) => {

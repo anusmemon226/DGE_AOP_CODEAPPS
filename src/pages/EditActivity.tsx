@@ -34,7 +34,7 @@ import { DependenciesTab } from './editActivity/DependenciesTab'
 import { MilestonesTab } from './editActivity/MilestonesTab'
 import { ObjectivesTab, type ObjectiveHeaderAction } from './editActivity/ObjectivesTab'
 import { ProcurementTab } from './editActivity/ProcurementTab'
-import { BudgetTab } from './editActivity/BudgetTab'
+import { BudgetTab, type BudgetHeaderAction } from './editActivity/BudgetTab'
 import { ClarificationTab } from './editActivity/ClarificationTab'
 import { EngagementPlanTab } from './editActivity/EngagementPlanTab'
 import { LogTab } from './editActivity/LogTab'
@@ -193,6 +193,7 @@ export function EditActivity() {
   const [successMessage, setSuccessMessage] = useState('')
   const [pendingWith, setPendingWith] = useState('Loading...')
   const [objectiveHeaderAction, setObjectiveHeaderAction] = useState<ObjectiveHeaderAction | null>(null)
+  const [budgetHeaderAction, setBudgetHeaderAction] = useState<BudgetHeaderAction | null>(null)
 
   // ── Loaded activity data ──
   const activityName = activity?.dga_name || form.activityName || 'Edit Activity'
@@ -280,29 +281,41 @@ export function EditActivity() {
 
         const ownerUserId = normalizeId(project._owninguser_value)
         const ownerTeamId = normalizeId(project._owningteam_value)
-        let ownerName = project.owneridname ?? ''
+        let ownerName = ''
 
-        if (!ownerName && ownerUserId) {
-          const ownerUser = users.find((user) => normalizeId(user.systemuserid) === ownerUserId)
-          ownerName = ownerUser?.fullname ?? ownerUser?.internalemailaddress ?? ''
+        if (ownerTeamId) {
+          if (project.owneridname && !ownerUserId) {
+            ownerName = project.owneridname
+          }
+
+          if (!ownerName) {
+            const teamResult = await TeamsService.get(ownerTeamId, {
+              select: ['teamid', 'name'],
+            })
+            assertOperationSuccess(teamResult, 'Failed to load activity owner team.')
+            const team = getResultValue<Teams>(teamResult)
+            ownerName = team?.name ?? ''
+          }
         }
 
         if (!ownerName && ownerUserId) {
-          const ownerUserResult = await SystemusersService.get(ownerUserId, {
-            select: ['systemuserid', 'fullname', 'internalemailaddress'],
-          })
-          assertOperationSuccess(ownerUserResult, 'Failed to load activity owner user.')
-          const ownerUser = getResultValue<Systemusers>(ownerUserResult)
-          ownerName = ownerUser?.fullname ?? ownerUser?.internalemailaddress ?? ''
-        }
+          if (project.owneridname) {
+            ownerName = project.owneridname
+          }
 
-        if (!ownerName && ownerTeamId) {
-          const teamResult = await TeamsService.get(ownerTeamId, {
-            select: ['teamid', 'name'],
-          })
-          assertOperationSuccess(teamResult, 'Failed to load activity owner team.')
-          const team = getResultValue<Teams>(teamResult)
-          ownerName = team?.name ?? ''
+          if (!ownerName) {
+            const ownerUser = users.find((user) => normalizeId(user.systemuserid) === ownerUserId)
+            ownerName = ownerUser?.fullname ?? ownerUser?.internalemailaddress ?? ''
+          }
+
+          if (!ownerName) {
+            const ownerUserResult = await SystemusersService.get(ownerUserId, {
+              select: ['systemuserid', 'fullname', 'internalemailaddress'],
+            })
+            assertOperationSuccess(ownerUserResult, 'Failed to load activity owner user.')
+            const ownerUser = getResultValue<Systemusers>(ownerUserResult)
+            ownerName = ownerUser?.fullname ?? ownerUser?.internalemailaddress ?? ''
+          }
         }
 
         if (!isMounted) return
@@ -515,8 +528,11 @@ export function EditActivity() {
       case 'budget':
         return (
           <BudgetTab
+            onHeaderActionChange={setBudgetHeaderAction}
             plannedEndDate={form.plannedEndDate}
             plannedStartDate={form.plannedStartDate}
+            projectId={projectId}
+            statusCode={statusCode}
           />
         )
       case 'clarifications':
@@ -799,6 +815,15 @@ export function EditActivity() {
                 onClick={objectiveHeaderAction.onSave}
               >
                 {objectiveHeaderAction.isSaving ? objectiveHeaderAction.savingLabel : objectiveHeaderAction.label}
+              </Button>
+            ) : null}
+            {activeTab === 'budget' && budgetHeaderAction ? (
+              <Button
+                disabled={!budgetHeaderAction.canSave || budgetHeaderAction.isSaving || Boolean(errors.context)}
+                icon={<Save size={16} />}
+                onClick={budgetHeaderAction.onSave}
+              >
+                {budgetHeaderAction.isSaving ? budgetHeaderAction.savingLabel : budgetHeaderAction.label}
               </Button>
             ) : null}
             {isDivisionMember ? (

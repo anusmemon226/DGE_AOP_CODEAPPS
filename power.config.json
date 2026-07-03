@@ -105,6 +105,14 @@
         "accounts": {
           "entitySetName": "accounts",
           "logicalName": "account"
+        },
+        "aopprojectbudgets": {
+          "entitySetName": "dga_aop_project_budgets",
+          "logicalName": "dga_aop_project_budget"
+        },
+        "aopprojectbudgetdetails": {
+          "entitySetName": "dga_aop_project_budget_detailses",
+          "logicalName": "dga_aop_project_budget_details"
         }
       },
       "environmentVariableName": ""

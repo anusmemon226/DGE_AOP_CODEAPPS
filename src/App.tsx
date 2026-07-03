@@ -4,6 +4,7 @@ import { AppLayout } from './components/layout/AppLayout'
 import { NAVIGATION_ITEMS } from './constants/app'
 import { DEFAULT_APP_ROUTE, APP_ROUTE_PATHS, UI_SHOWCASE_ROUTE } from './routes/appRoutes'
 import { ActivitiesList } from './pages/ActivitiesList'
+import { Approvals } from './pages/Approvals'
 import { CreateActivity } from './pages/CreateActivity'
 import { EditActivity } from './pages/EditActivity'
 import { UiShowcase } from './pages/UiShowcase'
@@ -46,7 +47,7 @@ function App() {
           <Route element={<EmptyScreen />} path={APP_ROUTE_PATHS.overview} />
           <Route element={<EmptyScreen />} path={APP_ROUTE_PATHS.activityLeads} />
           <Route element={<ActivitiesList />} path={APP_ROUTE_PATHS.activitiesList} />
-          <Route element={<EmptyScreen />} path={APP_ROUTE_PATHS.approvals} />
+          <Route element={<Approvals />} path={APP_ROUTE_PATHS.approvals} />
           <Route element={<EmptyScreen />} path={APP_ROUTE_PATHS.procurementPlan} />
           <Route element={<EmptyScreen />} path={APP_ROUTE_PATHS.engagementPlan} />
           <Route element={<EmptyScreen />} path={APP_ROUTE_PATHS.financialSpending} />

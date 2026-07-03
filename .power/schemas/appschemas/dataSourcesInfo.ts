@@ -26,6 +26,20 @@ export const dataSourcesInfo = {
     "dataSourceType": "Dataverse",
     "apis": {}
   },
+  "dga_aop_project_budget_detailses": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "dga_aop_project_budget_detailsid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
+  "dga_aop_project_budgets": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "dga_aop_project_budgetid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
   "dga_aop_project_logses": {
     "tableId": "",
     "version": "",
@@ -74,79 +88,6 @@ export const dataSourcesInfo = {
     "primaryKey": "dga_aop_projects_systemuserid",
     "dataSourceType": "Dataverse",
     "apis": {}
-  },
-  "dga_custom_web_api": {
-    "tableId": "",
-    "version": "",
-    "primaryKey": "",
-    "dataSourceType": "Dataverse",
-    "apis": {
-      "dga_custom_web_api": {
-        "path": "/api/data/v9.2/dga_custom_web_api",
-        "method": "POST",
-        "parameters": [
-          {
-            "name": "action",
-            "in": "body",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "targettablename",
-            "in": "body",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "relatedtablename",
-            "in": "body",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "targetid",
-            "in": "body",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "relationshipname",
-            "in": "body",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "prompt",
-            "in": "body",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "relatedid",
-            "in": "body",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "divisoinid",
-            "in": "body",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "sectorid",
-            "in": "body",
-            "required": false,
-            "type": "string"
-          }
-        ],
-        "responseInfo": {
-          "200": {
-            "type": "object"
-          }
-        }
-      }
-    }
   },
   "dga_divisional_hierarchies": {
     "tableId": "",

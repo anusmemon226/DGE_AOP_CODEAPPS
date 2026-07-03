@@ -961,12 +961,54 @@ th:hover .activities-list__col-filter-trigger {
   width: 100%;
 }
 
+.activities-list__cat-option input,
+.activities-list__cat-option span {
+  cursor: pointer;
+}
+
 .activities-list__cat-option:hover {
   background: var(--color-surface-hover);
 }
 
 .activities-list__cat-option input[type="checkbox"] {
   accent-color: var(--color-primary);
+}
+
+.activities-list .data-grid td.activities-list__category-cell {
+  max-width: none;
+  min-width: 22rem;
+  overflow: visible;
+  white-space: normal;
+}
+
+.activities-list__category-chips {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  min-width: 0;
+  width: 100%;
+}
+
+.activities-list__category-chip {
+  white-space: nowrap;
+  background: var(--color-primary-soft);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 22%, transparent);
+  border-radius: 999px;
+  color: var(--color-primary);
+  display: inline-flex;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1;
+  max-width: none;
+  padding: 0.28rem 0.45rem;
+  white-space: normal;
+}
+
+:root[data-theme='dark'] .activities-list__category-chip {
+  background: rgba(129, 140, 248, 0.16);
+  border-color: rgba(129, 140, 248, 0.34);
+  color: #c7d2fe;
 }
 
 /* ── Dark Mode ── */

@@ -115,6 +115,10 @@ export function AiAssistantWidget() {
       const sectorId = selectedRole === 'AOP - Executive Director'
         ? roleHierarchyId
         : ''
+      console.log("Division Id : ",divisionId)
+      console.log("Sector Id : ",sectorId)
+      console.log("Prompt : ",prompt)
+      console.log("Selected Role : ",selectedRole)
       const llmResponse = await Dga_custom_web_apiService.dga_custom_web_api(
         'openai',
         undefined,

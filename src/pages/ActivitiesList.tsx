@@ -23,16 +23,41 @@ import '../styles/activities-list.css'
 import {
   Dga_aop_projectsesService,
 } from '../generated/services/Dga_aop_projectsesService'
+import { SystemusersService } from '../generated/services/SystemusersService'
+import { TeamsService } from '../generated/services/TeamsService'
+import { Dga_aop_projectsesdga_project_categorized_under } from '../generated/models/Dga_aop_projectsesModel'
 import type { Dga_aop_projectses } from '../generated/models/Dga_aop_projectsesModel'
+import type { Systemusers } from '../generated/models/SystemusersModel'
+import type { Teams } from '../generated/models/TeamsModel'
 import { formatDate } from './editActivity/helpers/sharedHelpers'
 
 // ── Enum Helpers ──
 
-const CATEGORIZED_OPTIONS: SelectOption<string>[] = [
-  { label: 'Govt of the Future Strategy', value: '576610000' },
-  { label: 'DGE Corporate Strategy', value: '576610001' },
-  { label: 'Abu Dhabi Digital Strategy', value: '576610002' },
-]
+function readableEnumLabel(value: string) {
+  const labels: Record<string, string> = {
+    AbuDhabiGovernmentDigitalStrategy: 'Abu Dhabi Government Digital Strategy',
+    DGECorporateStrategy: 'DGE Corporate Strategy',
+    GovernmentoftheFutureStrategy: 'Government of the Future Strategy',
+  }
+
+  if (labels[value]) {
+    return labels[value]
+  }
+
+  return value.replace(/([a-z])([A-Z])/g, '$1 $2')
+}
+
+const CATEGORIZED_OPTIONS: SelectOption<string>[] = Object
+  .entries(Dga_aop_projectsesdga_project_categorized_under)
+  .map(([value, label]) => ({
+    label: readableEnumLabel(label),
+    value,
+  }))
+
+const CATEGORIZED_LABEL_BY_VALUE = CATEGORIZED_OPTIONS.reduce<Record<string, string>>((map, option) => {
+  map[option.value] = option.label
+  return map
+}, {})
 
 const AOP_ADEO_OPTIONS: SelectOption<string>[] = [
   { label: 'AOP / ADEO', value: '' },
@@ -97,6 +122,93 @@ function activityStatusTone(code: number): 'neutral' | 'info' | 'warning' | 'suc
 
 function phaseLabel(code: number): string {
   return PHASE_LABEL_MAP[code] ?? 'Unknown'
+}
+
+function normalizeId(id?: string | null) {
+  return id?.replace(/[{}]/g, '').toLowerCase() ?? ''
+}
+
+function getPendingWith(activity: Dga_aop_projectses, ownerNameById: Record<string, string> = {}): string {
+  const ownerTeamId = normalizeId(activity._owningteam_value)
+  const ownerUserId = normalizeId(activity._owninguser_value)
+
+  if (ownerTeamId) {
+    return ownerNameById[ownerTeamId] || 'Team'
+  }
+
+  if (ownerUserId) {
+    return ownerNameById[ownerUserId] || 'User'
+  }
+
+  return '—'
+}
+
+function getLookupName(lookupId: string | null | undefined, nameById: Record<string, string>) {
+  const id = normalizeId(lookupId)
+  return id ? nameById[id] || '—' : '—'
+}
+
+function parseCategorizedValues(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean)
+  }
+
+  return String(value ?? '')
+    .replace(/[[\]]/g, '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+function getCategorizedLabels(activity: Dga_aop_projectses): string[] {
+  return parseCategorizedValues(activity.dga_project_categorized_under)
+    .map((value) => CATEGORIZED_LABEL_BY_VALUE[value] ?? value)
+}
+
+function getCategorizedExportValue(activity: Dga_aop_projectses) {
+  const labels = getCategorizedLabels(activity)
+  return labels.length > 0 ? labels.join(' | ') : '—'
+}
+
+async function loadOwnerNameMap(activities: Dga_aop_projectses[]) {
+  const teamIds = Array.from(new Set(activities.map((activity) => normalizeId(activity._owningteam_value)).filter(Boolean)))
+  const userIds = Array.from(new Set(activities.map((activity) => normalizeId(activity._owninguser_value)).filter(Boolean)))
+  const ownerNameById: Record<string, string> = {}
+
+  try {
+    if (teamIds.length > 0) {
+      const teamsResult = await TeamsService.getAll({
+        filter: teamIds.map((id) => `teamid eq '${id}'`).join(' or '),
+        select: ['teamid', 'name'],
+      })
+
+      ;((teamsResult.data ?? []) as Teams[]).forEach((team) => {
+        const teamId = normalizeId(team.teamid)
+        if (teamId && team.name) {
+          ownerNameById[teamId] = team.name
+        }
+      })
+    }
+
+    if (userIds.length > 0) {
+      const usersResult = await SystemusersService.getAll({
+        filter: userIds.map((id) => `systemuserid eq '${id}'`).join(' or '),
+        select: ['systemuserid', 'fullname', 'internalemailaddress'],
+      })
+
+      ;((usersResult.data ?? []) as Systemusers[]).forEach((user) => {
+        const userId = normalizeId(user.systemuserid)
+        const userName = user.fullname || user.internalemailaddress
+        if (userId && userName) {
+          ownerNameById[userId] = userName
+        }
+      })
+    }
+  } catch (error) {
+    console.warn('Failed to resolve activity owner names:', error)
+  }
+
+  return ownerNameById
 }
 
 // ── Column Filter Types & Constants (DependenciesTab pattern) ──
@@ -253,6 +365,16 @@ export function ActivitiesList() {
     return divisions.map((d) => ({ label: d.dga_name ?? '', value: d.dga_divisional_hierarchyid }))
   }, [divisionalHierarchies, currentRoleDivisionalHierarchy, isDivisionRole, isExecutiveDirector])
 
+  const hierarchyNameById = useMemo(() => {
+    return divisionalHierarchies.reduce<Record<string, string>>((map, hierarchy) => {
+      const id = normalizeId(hierarchy.dga_divisional_hierarchyid)
+      if (id && hierarchy.dga_name) {
+        map[id] = hierarchy.dga_name
+      }
+      return map
+    }, {})
+  }, [divisionalHierarchies])
+
   // ── Planning instance IDs for cycle-based filtering ──
   const cyclePlanningInstanceIds = useMemo(() => {
     if (!selectedCycle || planningInstances.length === 0) return []
@@ -283,6 +405,7 @@ export function ActivitiesList() {
 
   // ── Activity state (all records, paginated client-side) ──
   const [allActivities, setAllActivities] = useState<Dga_aop_projectses[]>([])
+  const [ownerNameById, setOwnerNameById] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
@@ -419,11 +542,6 @@ export function ActivitiesList() {
       parts.push(`_dga_department_value eq ${divisionFilter}`)
     }
 
-    // Categorized under
-    if (categorizedFilter.length > 0) {
-      parts.push(`(${categorizedFilter.map((v) => `dga_project_categorized_under eq ${v}`).join(' or ')})`)
-    }
-
     // Strategic / Operational
     if (strategicFilter !== 'all') {
       parts.push(`dga_strategic_vs_operation eq ${strategicFilter}`)
@@ -435,7 +553,7 @@ export function ActivitiesList() {
     }
 
     return parts.join(' and ')
-  }, [debouncedSearch, phaseFilter, statusFilter, aopAdeoFilter, sectorFilter, divisionFilter, categorizedFilter, strategicFilter, cyclePlanningInstanceIds])
+  }, [debouncedSearch, phaseFilter, statusFilter, aopAdeoFilter, sectorFilter, divisionFilter, strategicFilter, cyclePlanningInstanceIds])
 
   // ── Fetch activities ──
   const fetchActivities = useCallback(async () => {
@@ -464,6 +582,8 @@ export function ActivitiesList() {
         'dga_planned_end_date',
         'dga_strategic_vs_operation',
         '_dga_project_planning_instance_value',
+        '_owningteam_value',
+        '_owninguser_value',
       ]
 
       const result = await Dga_aop_projectsesService.getAll({
@@ -473,10 +593,13 @@ export function ActivitiesList() {
       })
 
       const records = (result.data ?? []) as Dga_aop_projectses[]
+      const nextOwnerNameById = await loadOwnerNameMap(records)
+      setOwnerNameById(nextOwnerNameById)
       setAllActivities(records)
     } catch (err) {
       console.error('Failed to fetch activities:', err)
       setError(err instanceof Error ? err.message : 'Failed to load activities. Please try again.')
+      setOwnerNameById({})
       setAllActivities([])
     } finally {
       setIsLoading(false)
@@ -515,14 +638,14 @@ export function ActivitiesList() {
 
     const rows = activities.map((a) => [
       a.dga_name ?? '',
-      a.dga_sectorname ?? '',
-      a.dga_departmentname ?? '',
+      getLookupName(a._dga_sector_value, hierarchyNameById),
+      getLookupName(a._dga_department_value, hierarchyNameById),
       a.dga_registered_or_will_be_registered_in_epm ? 'Yes' : 'No',
       a.dga_adeo_review_required ? 'Yes' : 'No',
       a.dga_doesthisprojectrequirebudgetallocation ? 'Yes' : 'No',
       a.dga_does_this_project_require_procurement === 1 ? 'Yes' : 'No',
-      a.dga_project_categorized_undername ?? '',
-      '',
+      getCategorizedExportValue(a),
+      getPendingWith(a, ownerNameById),
       a.statuscodename ?? '',
       a.dga_project_phasename ?? '',
       a.dga_project_activity_statusname ?? '',
@@ -632,9 +755,12 @@ export function ActivitiesList() {
   }
 
   const getColumnValue = useCallback((act: Dga_aop_projectses, column: ActColumnKey) => {
-    if (column === 'pending_with') return statusCodeLabel(Number(act.statuscode))
+    if (column === 'pending_with') return getPendingWith(act, ownerNameById)
+    if (column === 'dga_sectorname') return getLookupName(act._dga_sector_value, hierarchyNameById)
+    if (column === 'dga_departmentname') return getLookupName(act._dga_department_value, hierarchyNameById)
+    if (column === 'dga_project_categorized_under') return parseCategorizedValues(act.dga_project_categorized_under).join(',')
     return (act as unknown as Record<string, unknown>)[column]
-  }, [])
+  }, [hierarchyNameById, ownerNameById])
 
   // Close filter popover on click outside / escape
   useEffect(() => {
@@ -670,10 +796,16 @@ export function ActivitiesList() {
 
   // ── Client-side column filter memo ──
   const columnFilteredActivities = useMemo(() => {
+    const categorizedFilteredActivities = categorizedFilter.length === 0
+      ? allActivities
+      : allActivities.filter((activity) => {
+        const values = parseCategorizedValues(activity.dga_project_categorized_under)
+        return categorizedFilter.some((filterValue) => values.includes(filterValue))
+      })
     const activeFilters = Object.entries(actFilters).filter(([, f]) => f.value !== '')
-    if (activeFilters.length === 0) return allActivities
+    if (activeFilters.length === 0) return categorizedFilteredActivities
 
-    return allActivities.filter((act) =>
+    return categorizedFilteredActivities.filter((act) =>
       activeFilters.every(([column, filter]) => {
         const colKey = column as ActColumnKey
         const config = COLUMN_FILTER_CONFIG[colKey]
@@ -726,7 +858,7 @@ export function ActivitiesList() {
         }
       })
     )
-  }, [allActivities, actFilters, getColumnValue])
+  }, [actFilters, allActivities, categorizedFilter, getColumnValue])
 
   // ── Client-side sort memo (applied after column filter) ──
   const sortedActivities = useMemo(() => {
@@ -904,34 +1036,26 @@ export function ActivitiesList() {
           </button>
           {categorizedOpen ? (
             <div className="activities-list__cat-dropdown">
-              <button
-                className="activities-list__cat-option"
-                onClick={handleSelectAllCategorized}
-                type="button"
-              >
+              <label className="activities-list__cat-option">
                 <input
                   checked={categorizedAllSelected}
                   onChange={handleSelectAllCategorized}
-                  readOnly
                   type="checkbox"
                 />
                 <span>Select All</span>
-              </button>
+              </label>
               {CATEGORIZED_OPTIONS.map(opt => (
-                <button
+                <label
                   key={opt.value}
                   className="activities-list__cat-option"
-                  onClick={() => toggleCategorized(opt.value)}
-                  type="button"
                 >
                   <input
                     checked={categorizedFilter.includes(opt.value)}
                     onChange={() => toggleCategorized(opt.value)}
-                    readOnly
                     type="checkbox"
                   />
                   <span>{opt.label}</span>
-                </button>
+                </label>
               ))}
             </div>
           ) : null}
@@ -1288,7 +1412,7 @@ export function ActivitiesList() {
             ) : (
               activities.map((act) => (
                 <tr key={act.dga_aop_projectsid}>
-                  <td>
+                  <td className="activities-list__category-cell">
                     <button
                       className="activities-list__name-link"
                       onClick={() => navigate(`${APP_ROUTE_PATHS.editActivity}?id=${act.dga_aop_projectsid}`)}
@@ -1297,8 +1421,8 @@ export function ActivitiesList() {
                       {act.dga_name}
                     </button>
                   </td>
-                  <td>{act.dga_sectorname ?? '—'}</td>
-                  <td>{act.dga_departmentname ?? '—'}</td>
+                  <td>{getLookupName(act._dga_sector_value, hierarchyNameById)}</td>
+                  <td>{getLookupName(act._dga_department_value, hierarchyNameById)}</td>
                   <td>
                     <Badge tone={act.dga_registered_or_will_be_registered_in_epm ? 'success' : 'neutral'}>
                       {act.dga_registered_or_will_be_registered_in_epm ? 'Yes' : 'No'}
@@ -1319,8 +1443,18 @@ export function ActivitiesList() {
                       {act.dga_does_this_project_require_procurement === 1 ? 'Yes' : 'No'}
                     </Badge>
                   </td>
-                  <td>{act.dga_project_categorized_undername ?? '—'}</td>
-                  <td>{statusCodeLabel(Number(act.statuscode))}</td>
+                  <td>
+                    {getCategorizedLabels(act).length > 0 ? (
+                      <div className="activities-list__category-chips">
+                        {getCategorizedLabels(act).map((label) => (
+                          <span className="activities-list__category-chip" key={label}>
+                            {label}
+                          </span>
+                        ))}
+                      </div>
+                    ) : '—'}
+                  </td>
+                  <td>{getPendingWith(act, ownerNameById)}</td>
                   <td>
                     <Badge tone={statusCodeTone(Number(act.statuscode))}>
                       {statusCodeLabel(Number(act.statuscode))}

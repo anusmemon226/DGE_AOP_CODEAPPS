@@ -2,7 +2,7 @@
 
 export type BudgetFormData = {
   budgetSource: '' | '1' | '2'
-  budgetType: '' | '776140000' | '776140001' | '776140003'
+  budgetType: '' | '1' | '2'
   totalActivityBudget: string
   totalPlannedBudget: string
   allocatedBudget: string
@@ -21,17 +21,16 @@ export const BUDGET_SOURCE_OPTIONS = [
 ] as const
 
 export const BUDGET_TYPE_OPTIONS = [
-  { label: 'Chapter 1 - HR', value: '776140000' },
-  { label: 'Chapter 2 - Opex', value: '776140001' },
-  { label: 'Chapter 3 - Capex', value: '776140003' },
+  { label: 'Opex', value: '1' },
+  { label: 'Capex', value: '2' },
 ] as const
 
 // ── Month labels ──
 
 export const MONTH_LABELS = [
-  'Jan', 'Feb', 'Mar', 'Apr',
-  'May', 'Jun', 'Jul', 'Aug',
-  'Sep', 'Oct', 'Nov', 'Dec',
+  'January', 'February', 'March', 'April',
+  'May', 'June', 'July', 'August',
+  'September', 'October', 'November', 'December',
 ] as const
 
 // ── Initial form state ──

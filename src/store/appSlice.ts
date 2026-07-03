@@ -50,6 +50,7 @@ export const fetchPlanningInstances = createAsyncThunk<
         select: [
           'dga_project_planning_instanceid',
           '_dga_assessment_cycle_value',
+          '_dga_division_member_team_value',
           '_dga_divisional_hierarchy_value',
         ],
       })

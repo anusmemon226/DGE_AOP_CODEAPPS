@@ -15,6 +15,7 @@ import {
   type SelectOption,
 } from '../components/ui'
 import { Dga_aop_projectsesService } from '../generated/services/Dga_aop_projectsesService'
+import { Dga_project_planning_instancesService } from '../generated/services/Dga_project_planning_instancesService'
 import { SystemusersService } from '../generated/services/SystemusersService'
 import type { Dga_aop_projectsesBase, Dga_aop_projectses } from '../generated/models/Dga_aop_projectsesModel'
 import type { Dga_divisional_hierarchies } from '../generated/models/Dga_divisional_hierarchiesModel'
@@ -99,6 +100,10 @@ type ActivityContext = {
 
 type DgaAopProjectCreatePayload = Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid' | 'dga_project_categorized_under' | 'ownerid' | 'owneridtype'> & {
   dga_project_categorized_under?: string
+  'ownerid@odata.bind': string
+}
+
+type OwnerAssignmentPayload = Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid' | 'ownerid'>> & {
   'ownerid@odata.bind': string
 }
 
@@ -500,6 +505,44 @@ function buildProjectPayload(form: CreateActivityForm, context: ActivityContext)
     timezoneruleversionnumber: undefined,
     utcconversiontimezonecode: undefined,
   })
+}
+
+async function getDivisionMemberTeamId(planningInstance: Dga_project_planning_instances) {
+  const existingTeamId = normalizeId(planningInstance._dga_division_member_team_value)
+
+  if (existingTeamId) {
+    return existingTeamId
+  }
+
+  if (!planningInstance.dga_project_planning_instanceid) {
+    return ''
+  }
+
+  const result = await Dga_project_planning_instancesService.get(planningInstance.dga_project_planning_instanceid, {
+    select: [
+      'dga_project_planning_instanceid',
+      '_dga_division_member_team_value',
+    ],
+  })
+  assertOperationSuccess(result, 'Unable to load Division Member team for the planning instance.')
+
+  return normalizeId(getResultValue<Dga_project_planning_instances>(result)?._dga_division_member_team_value)
+}
+
+async function assignActivityToDivisionMemberTeam(projectId: string, planningInstance: Dga_project_planning_instances) {
+  const divisionMemberTeamId = await getDivisionMemberTeamId(planningInstance)
+
+  if (!divisionMemberTeamId) {
+    throw new Error('Division Member team could not be resolved from the current planning instance.')
+  }
+
+  const payload: OwnerAssignmentPayload = {
+    'ownerid@odata.bind': toEntityBind('teams', divisionMemberTeamId),
+  }
+
+  console.log('Assign activity owner payload', payload)
+  const result = await Dga_aop_projectsesService.update(projectId, payload as unknown as Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>>)
+  assertOperationSuccess(result, 'Activity was created, but owner assignment to the Division Member team failed.')
 }
 
 function inferActivityType(prompt: string): ActivityTypeValue {
@@ -1208,6 +1251,7 @@ export function CreateActivity() {
       }
 
       setCreatedProjectId(projectId)
+      await assignActivityToDivisionMemberTeam(projectId, context!.planningInstance)
       
       setSuccessMessage('Activity created successfully.')
       navigate(`${APP_ROUTE_PATHS.editActivity}?id=${projectId}`)

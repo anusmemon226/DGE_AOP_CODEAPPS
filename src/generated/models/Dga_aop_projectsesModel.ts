@@ -52,9 +52,9 @@ export const Dga_aop_projectsesdga_project_activity_status = {
 } as const;
 export type Dga_aop_projectsesdga_project_activity_status = keyof typeof Dga_aop_projectsesdga_project_activity_status;
 export const Dga_aop_projectsesdga_project_categorized_under = {
-  576610000: 'GovernmentoftheFutureStrategy',
-  576610001: 'DGECorporateStrategy',
-  576610002: 'AbuDhabiGovernmentDigitalStrategy'
+  576610000: 'Government of the Future Strategy',
+  576610001: 'DGE Corporate Strategy',
+  576610002: 'Abu Dhabi Government Digital Strategy'
 } as const;
 export type Dga_aop_projectsesdga_project_categorized_under = keyof typeof Dga_aop_projectsesdga_project_categorized_under;
 export const Dga_aop_projectsesdga_project_phase = {

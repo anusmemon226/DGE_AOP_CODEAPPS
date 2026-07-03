@@ -3481,6 +3481,20 @@
   box-shadow: 0 0 0 3px var(--choice-focus-ring);
 }
 
+.edit-activity__budget-source.radio-group--invalid .choice:not(:has(input:checked)),
+.edit-activity__budget-type.radio-group--invalid .choice:not(:has(input:checked)) {
+  background: rgba(220, 38, 38, 0.035);
+  border-color: var(--color-error);
+  box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.1);
+}
+
+.edit-activity__budget-source.radio-group--invalid .choice:not(:has(input:checked)):hover,
+.edit-activity__budget-type.radio-group--invalid .choice:not(:has(input:checked)):hover {
+  background: rgba(220, 38, 38, 0.055);
+  border-color: var(--color-error);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+
 /* Dark mode overrides */
 :root[data-theme='dark'] .edit-activity__budget-source .choice {
   --choice-accent: #818cf8;
