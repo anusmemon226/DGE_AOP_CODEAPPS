@@ -1,7 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  ChevronLeft,
-  ChevronRight,
   Edit3,
   Flag,
   Plus,
@@ -50,7 +48,7 @@ const STATUS_CONFIG: Record<MilestoneStatus, { label: string; tone: 'neutral' | 
   delayed: { label: 'Delayed', tone: 'warning' },
 }
 
-const ITEMS_PER_PAGE = 5
+const QUARTERS = ['Quarter 1', 'Quarter 2', 'Quarter 3', 'Quarter 4'] as const
 
 function getStatusIcon(status: MilestoneStatus): string {
   switch (status) {
@@ -79,6 +77,7 @@ const EMPTY_FORM: MilestoneFormData = {
 interface MilestonesTabProps {
   activityPlannedEndDate: string
   activityPlannedStartDate: string
+  isReadOnly?: boolean
   isAdeoVisible: boolean
   projectId: string
 }
@@ -186,10 +185,9 @@ function buildMilestoneUpdatePayload(form: MilestoneFormData): Partial<Omit<Dga_
   }
 }
 
-export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate, isAdeoVisible, projectId }: MilestonesTabProps) {
+export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate, isReadOnly = false, isAdeoVisible, projectId }: MilestonesTabProps) {
   // ── Data state ──
   const [milestones, setMilestones] = useState<Milestone[]>([])
-  const [currentPage, setCurrentPage] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -257,13 +255,21 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
   }, [loadMilestones])
 
   // ── Derived ──
-  const totalPages = Math.max(1, Math.ceil(milestones.length / ITEMS_PER_PAGE))
-  const paginatedMilestones = milestones.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE,
-  )
   const completedCount = milestones.filter((m) => m.status === 'completed').length
   const progressPercent = milestones.length > 0 ? Math.round((completedCount / milestones.length) * 100) : 0
+  const milestonesByQuarter = useMemo(() => {
+    return QUARTERS.reduce<Record<(typeof QUARTERS)[number], Milestone[]>>((map, quarter) => {
+      map[quarter] = milestones
+        .filter((milestone) => milestone.quarter === quarter)
+        .sort(sortMilestonesByEndDate)
+      return map
+    }, {
+      'Quarter 1': [],
+      'Quarter 2': [],
+      'Quarter 3': [],
+      'Quarter 4': [],
+    })
+  }, [milestones])
 
   // ── Weightage calculation ──
   const sumOtherMilestones = editingMilestone
@@ -315,6 +321,7 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
   }
 
   function handleOpenCreate() {
+    if (isReadOnly) return
     setEditingMilestone(null)
     setForm(EMPTY_FORM)
     setFormErrors({})
@@ -324,6 +331,7 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
   }
 
   function handleOpenEdit(milestone: Milestone) {
+    if (isReadOnly) return
     setEditingMilestone(milestone)
     setForm({
       name: milestone.name,
@@ -351,6 +359,7 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
   }
 
   function handleFieldChange(fields: Partial<MilestoneFormData>) {
+    if (isReadOnly) return
     const next = { ...form, ...fields }
     // Auto-calculate quarter when plannedEndDate changes
     if (fields.plannedEndDate !== undefined) {
@@ -392,6 +401,7 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
   }
 
   async function handleSave() {
+    if (isReadOnly) return
     if (!validate()) return
     if (!projectId) {
       setError('Activity id is missing from the edit URL.')
@@ -428,6 +438,7 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
   }
 
   async function handleConfirmDelete() {
+    if (isReadOnly) return
     if (!milestoneToDelete) return
     setIsDeleting(true)
     setError('')
@@ -491,6 +502,7 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
           <h3 className="edit-activity__milestone-card-title">
             <button
               className="edit-activity__milestone-card-name-btn"
+              disabled={isReadOnly}
               onClick={() => handleOpenEdit(milestone)}
               type="button"
             >
@@ -504,27 +516,64 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
           )}
           <div className="edit-activity__milestone-card-bottom">
             <p className="edit-activity__milestone-card-desc">{milestone.description}</p>
-            <div className="edit-activity__milestone-card-actions">
-              <button
-                aria-label="Edit milestone"
-                className="edit-activity__milestone-action-btn"
-                onClick={() => handleOpenEdit(milestone)}
-                type="button"
-              >
-                <Edit3 size={14} />
-              </button>
-              <button
-                aria-label="Delete milestone"
-                className="edit-activity__milestone-action-btn edit-activity__milestone-action-btn--danger"
-                onClick={() => setMilestoneToDelete(milestone)}
-                type="button"
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
+            {!isReadOnly ? (
+              <div className="edit-activity__milestone-card-actions">
+                <button
+                  aria-label="Edit milestone"
+                  className="edit-activity__milestone-action-btn"
+                  onClick={() => handleOpenEdit(milestone)}
+                  type="button"
+                >
+                  <Edit3 size={14} />
+                </button>
+                <button
+                  aria-label="Delete milestone"
+                  className="edit-activity__milestone-action-btn edit-activity__milestone-action-btn--danger"
+                  onClick={() => setMilestoneToDelete(milestone)}
+                  type="button"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
+    )
+  }
+
+  function renderQuarterCard(quarter: (typeof QUARTERS)[number], index: number) {
+    const quarterMilestones = milestonesByQuarter[quarter]
+
+    return (
+      <section className="edit-activity__milestone-quarter" key={quarter}>
+        <div className="edit-activity__milestone-quarter-header">
+          <div>
+            <span className="edit-activity__milestone-quarter-number">Q{index + 1}</span>
+            <div>
+              <h3>{quarter}</h3>
+              <span className="edit-activity__milestone-quarter-range">
+                {quarterMilestones.length} milestone{quarterMilestones.length === 1 ? '' : 's'}
+              </span>
+            </div>
+          </div>
+          <Badge tone={quarterMilestones.length > 0 ? 'info' : 'neutral'}>
+            {quarterMilestones.length}
+          </Badge>
+        </div>
+
+        <div className="edit-activity__milestone-quarter-body">
+          {quarterMilestones.length > 0 ? (
+            quarterMilestones.map(renderTimelineCard)
+          ) : (
+            <div className="edit-activity__milestone-quarter-empty">
+              <Flag size={22} strokeWidth={1.5} />
+              <strong>No milestones yet</strong>
+              <span>Add a milestone with a planned end date in this quarter.</span>
+            </div>
+          )}
+        </div>
+      </section>
     )
   }
 
@@ -537,7 +586,7 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
             <Button onClick={handleCloseDrawer} variant="secondary">
               Cancel
             </Button>
-            <Button disabled={isSaving} onClick={handleSave}>
+            <Button disabled={isReadOnly || isSaving} onClick={handleSave}>
               {isSaving ? 'Saving...' : editingMilestone ? 'Update Milestone' : 'Create Milestone'}
             </Button>
           </div>
@@ -562,6 +611,7 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
 
             <div className="edit-activity__procurement-drawer-section">
               <Input
+                disabled={isReadOnly}
                 error={formErrors.name}
                 label="Name of Milestone"
                 onChange={(e) => handleFieldChange({ name: e.target.value })}
@@ -571,6 +621,7 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
 
               <div className="create-activity__date-range">
                 <DatePicker
+                  disabled={isReadOnly}
                   error={formErrors.plannedStartDate}
                   id="ms-planned-start-date"
                   label="Planned Start Date"
@@ -586,6 +637,7 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
                   </svg>
                 </span>
                 <DatePicker
+                  disabled={isReadOnly}
                   error={formErrors.plannedEndDate}
                   id="ms-planned-end-date"
                   label="Planned End Date"
@@ -604,6 +656,7 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
               />
 
               <Textarea
+                disabled={isReadOnly}
                 label="Description"
                 onChange={(e) => handleFieldChange({ description: e.target.value })}
                 rows={3}
@@ -628,6 +681,7 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
 
               <div className="edit-activity__procurement-drawer-section">
                 <Input
+                  disabled={isReadOnly}
                   error={formErrors.weightage}
                   label="Weightage (%)"
                   max={maxAllowedWeightage}
@@ -647,6 +701,7 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
                 </div>
 
                 <Input
+                  disabled={isReadOnly}
                   error={formErrors.makhrajAlMarhala}
                   label="مخرجات المرحلة"
                   onChange={(e) => handleFieldChange({ makhrajAlMarhala: e.target.value })}
@@ -655,6 +710,7 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
                 />
 
                 <Input
+                  disabled={isReadOnly}
                   error={formErrors.marhalaAlMashroua}
                   label="مرحلة المشروع"
                   onChange={(e) => handleFieldChange({ marhalaAlMashroua: e.target.value })}
@@ -666,46 +722,6 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
           ) : null}
         </div>
       </SideDrawer>
-    )
-  }
-
-  function renderPagination() {
-    if (totalPages <= 1) return null
-    return (
-      <div className="edit-activity__members-pagination">
-        <div className="edit-activity__members-pagination-controls">
-          <button
-            aria-label="Previous page"
-            className="edit-activity__members-page-btn"
-            disabled={currentPage <= 1}
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            type="button"
-          >
-            <ChevronLeft size={15} />
-          </button>
-          <div className="edit-activity__members-page-numbers">
-            {Array.from({ length: totalPages }, (_, i) => (
-              <button
-                key={i}
-                className={`edit-activity__members-page-num${currentPage === i + 1 ? ' edit-activity__members-page-num--active' : ''}`}
-                onClick={() => setCurrentPage(i + 1)}
-                type="button"
-              >
-                {i + 1}
-              </button>
-            ))}
-          </div>
-          <button
-            aria-label="Next page"
-            className="edit-activity__members-page-btn"
-            disabled={currentPage >= totalPages}
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            type="button"
-          >
-            <ChevronRight size={15} />
-          </button>
-        </div>
-      </div>
     )
   }
 
@@ -722,7 +738,7 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
           </h2>
           <p>Track project milestones and key deliverables.</p>
         </div>
-        <Button disabled={!projectId || isLoading} icon={<Plus size={15} />} onClick={handleOpenCreate}>
+        <Button disabled={isReadOnly || !projectId || isLoading} icon={<Plus size={15} />} onClick={handleOpenCreate}>
           Add Milestone
         </Button>
       </div>
@@ -742,27 +758,18 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
       {/* Progress bar */}
       {renderProgressBar()}
 
-      {/* Timeline */}
+      {/* Quarter grid */}
       {isLoading ? (
         <div className="edit-activity__members-empty">
           <Flag size={40} strokeWidth={1.2} />
           <h3>Loading milestones...</h3>
           <p>Fetching milestones for this activity.</p>
         </div>
-      ) : paginatedMilestones.length > 0 ? (
-        <div className="edit-activity__milestones-timeline">
-          {paginatedMilestones.map(renderTimelineCard)}
-        </div>
       ) : (
-        <div className="edit-activity__members-empty">
-          <Flag size={40} strokeWidth={1.2} />
-          <h3>No milestones added yet</h3>
-          <p>Click <strong>Add Milestone</strong> to create a milestone.</p>
+        <div className="edit-activity__milestone-quarter-grid">
+          {QUARTERS.map(renderQuarterCard)}
         </div>
       )}
-
-      {/* Pagination */}
-      {renderPagination()}
 
       {/* Create/Edit Drawer */}
       {renderDrawerForm()}

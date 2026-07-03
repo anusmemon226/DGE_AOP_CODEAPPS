@@ -192,7 +192,7 @@ export function DatePicker({
   }
 
   return (
-    <div className={`field date-picker ${className}`.trim()} ref={rootRef}>
+    <div className={`field date-picker ${disabled ? 'field--disabled' : ''} ${className}`.trim()} ref={rootRef}>
       <span className="field__label" id={`${id}-label`}>
         {label}
         {required ? <span aria-hidden="true" className="field__required"> *</span> : null}

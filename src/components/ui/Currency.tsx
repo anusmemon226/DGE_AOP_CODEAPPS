@@ -25,9 +25,10 @@ export function CurrencyDisplay({ className = '', value }: CurrencyDisplayProps)
 
 export function CurrencyInput({ className = '', error, hint, id, label, required, ...props }: CurrencyInputProps) {
   const inputId = id ?? label.toLowerCase().replace(/\s+/g, '-')
+  const isDisabled = Boolean(props.disabled)
 
   return (
-    <label className={`field currency-input ${className}`.trim()} htmlFor={inputId}>
+    <label className={`field currency-input ${isDisabled ? 'field--disabled' : ''} ${className}`.trim()} htmlFor={inputId}>
       <span className="field__label">
         {label}
         {required ? <span aria-hidden="true" className="field__required"> *</span> : null}

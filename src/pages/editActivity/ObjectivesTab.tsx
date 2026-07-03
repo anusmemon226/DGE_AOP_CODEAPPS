@@ -24,6 +24,7 @@ type ObjectiveOption = {
 type ObjectiveErrors = Partial<Record<keyof ObjectiveForm, string>>
 
 type ObjectivesTabProps = {
+  isReadOnly?: boolean
   onHeaderActionChange?: (action: ObjectiveHeaderAction | null) => void
   projectId: string
   statusCode?: number
@@ -154,7 +155,7 @@ function buildProjectPayload(form: ObjectiveForm): Partial<Omit<Dga_aop_projects
   return payload
 }
 
-export function ObjectivesTab({ onHeaderActionChange, projectId, statusCode = 1 }: ObjectivesTabProps) {
+export function ObjectivesTab({ isReadOnly = false, onHeaderActionChange, projectId, statusCode = 1 }: ObjectivesTabProps) {
   const uid = useId()
   const [form, setForm] = useState<ObjectiveForm>(EMPTY_FORM)
   const [savedForm, setSavedForm] = useState<ObjectiveForm>(EMPTY_FORM)
@@ -258,10 +259,11 @@ export function ObjectivesTab({ onHeaderActionChange, projectId, statusCode = 1 
   const kpiOptions = selectedDigitalPillar ? matchedKpiOptions : []
   const activeCount = Object.values(form).filter(Boolean).length
   const hasUnsavedChanges = !isSameForm(form, savedForm)
-  const canSave = !isLoading && !isSaving && !error
+  const canSave = !isReadOnly && !isLoading && !isSaving && !error
   const saveLabel = statusCode === 1 ? 'Save Draft' : 'Save Changes'
 
   const saveObjectives = useCallback(async (nextForm: ObjectiveForm, successMessage = 'Objectives saved successfully.') => {
+    if (isReadOnly) return
     if (!projectId || isSaving) return
 
     setIsSaving(true)
@@ -278,9 +280,10 @@ export function ObjectivesTab({ onHeaderActionChange, projectId, statusCode = 1 
     } finally {
       setIsSaving(false)
     }
-  }, [isSaving, projectId])
+  }, [isReadOnly, isSaving, projectId])
 
   const applyFormChange = useCallback((updater: (currentForm: ObjectiveForm) => ObjectiveForm) => {
+    if (isReadOnly) return
     setForm((currentForm) => {
       const nextForm = updater(currentForm)
       setNotice('')
@@ -301,7 +304,7 @@ export function ObjectivesTab({ onHeaderActionChange, projectId, statusCode = 1 
 
       return nextForm
     })
-  }, [])
+  }, [isReadOnly])
 
   const handleSave = useCallback(() => {
     if (!canSave) return
@@ -393,6 +396,7 @@ export function ObjectivesTab({ onHeaderActionChange, projectId, statusCode = 1 
             <div className="create-activity__form-stack">
               <RadioGroup
                 className="radio-group--corporate-strategy"
+                disabled={isReadOnly}
                 error={fieldErrors.corporateStrategyPillarId}
                 label="Select the DGE Corporate Strategy Pillar this activity aligns to"
                 name={`${uid}-dge-pillar`}
@@ -427,6 +431,7 @@ export function ObjectivesTab({ onHeaderActionChange, projectId, statusCode = 1 
             <div className="create-activity__form-stack">
               <RadioGroup
                 className="radio-group--digital-pillar"
+                disabled={isReadOnly}
                 error={fieldErrors.digitalPillarId}
                 label="Select the Digital Strategy Pillar this activity falls under"
                 name={`${uid}-digital-pillar`}
@@ -439,6 +444,7 @@ export function ObjectivesTab({ onHeaderActionChange, projectId, statusCode = 1 
               {form.digitalPillarId && digitalObjectiveOptions.length > 0 ? (
                 <RadioGroup
                   className="radio-group--link-objective"
+                  disabled={isReadOnly}
                   error={fieldErrors.digitalObjectiveId}
                   label="Link to Digital Strategy objectives"
                   name={`${uid}-link-objective`}
@@ -462,6 +468,7 @@ export function ObjectivesTab({ onHeaderActionChange, projectId, statusCode = 1 
               {form.digitalPillarId && kpiOptions.length > 0 ? (
                 <RadioGroup
                   className="radio-group--link-kpi"
+                  disabled={isReadOnly}
                   error={fieldErrors.strategicKpiId}
                   label="Link to strategic KPIs"
                   name={`${uid}-link-kpi`}

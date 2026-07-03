@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  AlertTriangle,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -10,19 +11,25 @@ import {
   Rows,
   Sparkles,
 } from 'lucide-react'
-import { Badge, Button, EmptyState, SearchInput, Select, type SelectOption } from '../components/ui'
+import { Badge, Button, ConfirmationDialog, EmptyState, SearchInput, Select, type SelectOption } from '../components/ui'
+import type { Dga_project_planning_instances } from '../generated/models/Dga_project_planning_instancesModel'
 import { Dga_aop_projectsesService } from '../generated/services/Dga_aop_projectsesService'
+import { Dga_project_planning_instancesService } from '../generated/services/Dga_project_planning_instancesService'
 import { SystemusersService } from '../generated/services/SystemusersService'
 import { TeamsService } from '../generated/services/TeamsService'
 import {
   Dga_aop_projectsesdga_project_categorized_under,
+  type Dga_aop_projectsesBase,
   type Dga_aop_projectses,
 } from '../generated/models/Dga_aop_projectsesModel'
 import type { Systemusers } from '../generated/models/SystemusersModel'
 import type { Teams } from '../generated/models/TeamsModel'
 import { APP_ROUTE_PATHS } from '../routes/appRoutes'
-import { useAppSelector } from '../store/hooks'
+import { fetchPlanningInstances } from '../store/appSlice'
+import { useAppDispatch, useAppSelector } from '../store/hooks'
+import { getResultValue } from './editActivity/helpers/activityInfoHelpers'
 import { formatDate } from './editActivity/helpers/sharedHelpers'
+import { getResultArray, validatePersistedActivitySubmission } from './editActivity/helpers/submissionValidation'
 import '../styles/approvals.css'
 
 type ApprovalPhase = 'Planning' | 'Execution'
@@ -30,6 +37,8 @@ type ApprovalBucket = 'to-approve' | 'approved'
 
 type ApprovalRecord = {
   id: string
+  planningInstanceId: string
+  statusCode: number
   activityName: string
   sector: string
   division: string
@@ -55,6 +64,10 @@ type ApprovalRecord = {
   modifiedOn: string
 }
 
+type ApprovalUpdatePayload = Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>> & {
+  'ownerid@odata.bind'?: string
+}
+
 const PAGE_SIZE = 8
 const LAZY_BATCH_SIZE = 8
 
@@ -69,6 +82,14 @@ const APPROVAL_OPTIONS: SelectOption<string>[] = [
   { label: 'To Approve', value: 'to-approve' },
   { label: 'Approved', value: 'approved' },
 ]
+
+const VALIDATION_SECTION_LABELS: Record<string, string> = {
+  'activity-info': 'Activity Information',
+  objectives: 'Objectives',
+  milestones: 'Milestones',
+  procurements: 'Procurement',
+  budget: 'Budget',
+}
 
 const APPROVAL_STATUS_BY_ROLE: Array<{ match: string; statusCode: number }> = [
   { match: 'division director', statusCode: 776140001 },
@@ -87,6 +108,7 @@ const APPROVAL_PROJECT_SELECT = [
   'statuscode',
   '_owningteam_value',
   '_owninguser_value',
+  '_dga_project_planning_instance_value',
   '_dga_activity_lead_value',
   'dga_registered_or_will_be_registered_in_epm',
   'dga_doesthisprojectrequirebudgetallocation',
@@ -168,6 +190,14 @@ function normalizeRoleName(roleName: string) {
     .replace(/\s+/g, ' ')
     .replace(/\s+role$/i, '')
     .trim()
+}
+
+function toEntityBind(entitySetName: string, id: string) {
+  return `/${entitySetName}(${normalizeId(id)})`
+}
+
+function escapeODataValue(value: string) {
+  return value.replace(/'/g, "''")
 }
 
 function getApprovalStatusForRole(roleName?: string) {
@@ -298,6 +328,8 @@ function mapProjectToApproval(
 
   return {
     id: project.dga_aop_projectsid,
+    planningInstanceId: normalizeId(project._dga_project_planning_instance_value),
+    statusCode,
     activityName: project.dga_name || project.dga_project_name || 'Untitled activity',
     sector: formatLookupName(project._dga_sector_value, hierarchyNameById),
     division: formatLookupName(project._dga_department_value, hierarchyNameById),
@@ -326,11 +358,20 @@ function mapProjectToApproval(
 
 export function Approvals() {
   const navigate = useNavigate()
+  const dispatch = useAppDispatch()
   const currentRole = useAppSelector((state) => state.user.currentRole)
   const divisionalHierarchies = useAppSelector((state) => state.user.divisionalHierarchies)
+  const currentRoleDivisionalHierarchy = useAppSelector((state) => state.user.currentRoleDivisionalHierarchy)
+  const selectedCycle = useAppSelector((state) => state.app.selectedCycle)
+  const planningInstances = useAppSelector((state) => state.app.planningInstances)
+  const planningInstancesCycleId = useAppSelector((state) => state.app.planningInstancesCycleId)
+  const planningInstancesLoading = useAppSelector((state) => state.app.planningInstancesLoading)
   const [approvals, setApprovals] = useState<ApprovalRecord[]>([])
   const [loading, setLoading] = useState(false)
+  const [isApprovalConfirmOpen, setIsApprovalConfirmOpen] = useState(false)
+  const [isApproving, setIsApproving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [phaseFilter, setPhaseFilter] = useState('')
   const [approvalFilter, setApprovalFilter] = useState('')
@@ -344,6 +385,45 @@ export function Approvals() {
 
   const roleApprovalStatus = useMemo(() => getApprovalStatusForRole(currentRole?.roleName), [currentRole?.roleName])
   const hasApprovalQueue = roleApprovalStatus != null
+  const hasSelectedCyclePlanningInstances = Boolean(
+    selectedCycle && normalizeId(planningInstancesCycleId) === normalizeId(selectedCycle),
+  )
+  const cyclePlanningInstanceIds = useMemo(() => {
+    if (!selectedCycle || !hasSelectedCyclePlanningInstances || planningInstances.length === 0) return []
+
+    return planningInstances
+      .filter((planningInstance) => normalizeId(planningInstance._dga_assessment_cycle_value) === normalizeId(selectedCycle))
+      .map((planningInstance) => normalizeId(planningInstance.dga_project_planning_instanceid))
+      .filter(Boolean)
+  }, [hasSelectedCyclePlanningInstances, planningInstances, selectedCycle])
+  const isCycleFilterReady = Boolean(
+    selectedCycle && hasSelectedCyclePlanningInstances && !planningInstancesLoading,
+  )
+  const roleHierarchyFilter = useMemo(() => {
+    const hierarchyId = normalizeId(currentRoleDivisionalHierarchy?.hierarchyId)
+    if (!hierarchyId) return ''
+
+    const normalizedRole = normalizeRoleName(currentRole?.roleName ?? '')
+    if (normalizedRole.includes('division member') || normalizedRole.includes('division director')) {
+      return `_dga_department_value eq ${hierarchyId}`
+    }
+    if (normalizedRole.includes('executive director')) {
+      return `_dga_sector_value eq ${hierarchyId}`
+    }
+
+    return ''
+  }, [currentRole?.roleName, currentRoleDivisionalHierarchy?.hierarchyId])
+  const requiresHierarchyScope = useMemo(() => {
+    const normalizedRole = normalizeRoleName(currentRole?.roleName ?? '')
+    return normalizedRole.includes('division member')
+      || normalizedRole.includes('division director')
+      || normalizedRole.includes('executive director')
+  }, [currentRole?.roleName])
+  const hasRequiredHierarchyScope = !requiresHierarchyScope || Boolean(normalizeId(currentRoleDivisionalHierarchy?.hierarchyId))
+  const selectedApprovals = useMemo(
+    () => approvals.filter((approval) => selectedIds.includes(approval.id)),
+    [approvals, selectedIds],
+  )
   const hierarchyNameById = useMemo(() => {
     return divisionalHierarchies.reduce<Record<string, string>>((map, hierarchy) => {
       const id = normalizeId(hierarchy.dga_divisional_hierarchyid)
@@ -360,12 +440,40 @@ export function Approvals() {
     setSelectedIds([])
     setExpandedIds([])
     setNotice('')
+    setActionError('')
   }, [])
+
+  useEffect(() => {
+    if (selectedCycle && normalizeId(planningInstancesCycleId) !== normalizeId(selectedCycle)) {
+      dispatch(fetchPlanningInstances(selectedCycle))
+    }
+  }, [dispatch, planningInstancesCycleId, selectedCycle])
 
   const loadApprovals = useCallback(async () => {
     resetGridView()
 
-    if (!roleApprovalStatus) {
+    if (!roleApprovalStatus || !selectedCycle) {
+      setApprovals([])
+      setError(null)
+      setLoading(false)
+      return
+    }
+
+    if (!hasRequiredHierarchyScope) {
+      setApprovals([])
+      setError(null)
+      setLoading(false)
+      return
+    }
+
+    if (!isCycleFilterReady) {
+      setApprovals([])
+      setError(null)
+      setLoading(true)
+      return
+    }
+
+    if (cyclePlanningInstanceIds.length === 0) {
       setApprovals([])
       setError(null)
       setLoading(false)
@@ -376,8 +484,17 @@ export function Approvals() {
     setError(null)
 
     try {
+      const filterParts = [
+        `statuscode eq ${roleApprovalStatus}`,
+        `(${cyclePlanningInstanceIds.map((id) => `_dga_project_planning_instance_value eq ${id}`).join(' or ')})`,
+      ]
+
+      if (roleHierarchyFilter) {
+        filterParts.push(roleHierarchyFilter)
+      }
+
       const result = await Dga_aop_projectsesService.getAll({
-        filter: `statuscode eq ${roleApprovalStatus}`,
+        filter: filterParts.join(' and '),
         orderBy: ['modifiedon desc'],
         select: APPROVAL_PROJECT_SELECT,
       })
@@ -393,7 +510,16 @@ export function Approvals() {
     } finally {
       setLoading(false)
     }
-  }, [hierarchyNameById, resetGridView, roleApprovalStatus])
+  }, [
+    cyclePlanningInstanceIds,
+    hasRequiredHierarchyScope,
+    hierarchyNameById,
+    isCycleFilterReady,
+    resetGridView,
+    roleApprovalStatus,
+    roleHierarchyFilter,
+    selectedCycle,
+  ])
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -458,6 +584,7 @@ export function Approvals() {
 
   function toggleSelected(id: string) {
     setNotice('')
+    setActionError('')
     setSelectedIds((current) =>
       current.includes(id) ? current.filter((selectedId) => selectedId !== id) : [...current, id],
     )
@@ -465,6 +592,7 @@ export function Approvals() {
 
   function toggleVisibleSelection() {
     setNotice('')
+    setActionError('')
     setSelectedIds((current) => {
       if (allVisibleSelected) {
         return current.filter((id) => !visibleIds.includes(id))
@@ -481,7 +609,130 @@ export function Approvals() {
   }
 
   function handleApproveSelected() {
-    setNotice(`${selectedIds.length} ${selectedIds.length === 1 ? 'activity is' : 'activities are'} ready for approval. Dynamic approval action will be wired in the next pass.`)
+    setNotice('')
+    setActionError('')
+    if (selectedIds.length > 0 && hasApprovalQueue) {
+      setIsApprovalConfirmOpen(true)
+    }
+  }
+
+  async function resolveTeamByName(teamName: string) {
+    const result = await TeamsService.getAll({
+      filter: `name eq '${escapeODataValue(teamName)}'`,
+      select: ['teamid', 'name'],
+      top: 1,
+    })
+    assertOperationSuccess(result, `Unable to resolve ${teamName} owner.`)
+
+    const team = getResultArray<Teams>(result)[0]
+    const teamId = normalizeId(team?.teamid)
+    if (!teamId) {
+      throw new Error(`${teamName} team could not be found.`)
+    }
+
+    return teamId
+  }
+
+  async function resolvePlanningTeam(planningInstanceId: string, teamField: '_dga_executive_director_team_value' | '_dga_division_member_team_value') {
+    if (!planningInstanceId) {
+      throw new Error('Planning instance could not be resolved for the selected activity.')
+    }
+
+    const result = await Dga_project_planning_instancesService.get(planningInstanceId, {
+      select: [
+        'dga_project_planning_instanceid',
+        teamField,
+      ],
+    })
+    assertOperationSuccess(result, 'Unable to load owner team from the planning instance.')
+
+    const planningInstance = getResultValue<Dga_project_planning_instances>(result)
+    const teamId = normalizeId(planningInstance?.[teamField])
+    if (!teamId) {
+      throw new Error('Required owner team could not be resolved from the planning instance.')
+    }
+
+    return teamId
+  }
+
+  async function buildApprovalPayload(approval: ApprovalRecord): Promise<ApprovalUpdatePayload> {
+    const normalizedRole = normalizeRoleName(currentRole?.roleName ?? '')
+
+    if (normalizedRole.includes('division director')) {
+      return {
+        statuscode: 776140003,
+        'ownerid@odata.bind': toEntityBind('teams', await resolveTeamByName('AOP - Strategy Team')),
+      }
+    }
+
+    if (normalizedRole.includes('strategy team')) {
+      return {
+        statuscode: 776140002,
+        'ownerid@odata.bind': toEntityBind('teams', await resolvePlanningTeam(approval.planningInstanceId, '_dga_executive_director_team_value')),
+      }
+    }
+
+    if (normalizedRole.includes('executive director')) {
+      return {
+        statuscode: 776140014,
+        'ownerid@odata.bind': toEntityBind('teams', await resolveTeamByName('AOP - Director General')),
+      }
+    }
+
+    if (normalizedRole.includes('director general')) {
+      return {
+        statuscode: 776140011,
+        dga_project_phase: 776140001,
+        'ownerid@odata.bind': toEntityBind('teams', await resolvePlanningTeam(approval.planningInstanceId, '_dga_division_member_team_value')),
+      }
+    }
+
+    throw new Error('No approval transition is configured for the current role.')
+  }
+
+  async function handleConfirmBulkApproval() {
+    if (isApproving) return
+    if (!roleApprovalStatus || selectedApprovals.length === 0) return
+
+    setIsApproving(true)
+    setNotice('')
+    setActionError('')
+
+    try {
+      for (const approval of selectedApprovals) {
+        if (approval.statusCode !== roleApprovalStatus) {
+          throw new Error(`${approval.activityName}: this activity is no longer in your current approval queue.`)
+        }
+
+        const validation = await validatePersistedActivitySubmission(approval.id)
+        if (!validation.valid) {
+          throw new Error(`${approval.activityName}: ${VALIDATION_SECTION_LABELS[validation.section] ?? 'Validation'} - ${validation.message}`)
+        }
+      }
+
+      const payloads = await Promise.all(selectedApprovals.map(async (approval) => ({
+        approval,
+        payload: await buildApprovalPayload(approval),
+      })))
+
+      for (const { approval, payload } of payloads) {
+        const result = await Dga_aop_projectsesService.update(approval.id, payload)
+        assertOperationSuccess(result, `Unable to approve ${approval.activityName}.`)
+      }
+
+      const approvedCount = selectedApprovals.length
+      setIsApprovalConfirmOpen(false)
+      setSelectedIds([])
+      setExpandedIds([])
+      await loadApprovals()
+      setNotice(`${approvedCount} project(s) approved successfully.`)
+    } catch (err) {
+      console.error('Failed to approve selected activities:', err)
+      setIsApprovalConfirmOpen(false)
+      setActionError(err instanceof Error ? err.message : 'Unable to approve selected project(s).')
+    } finally {
+      setIsApproving(false)
+    }
   }
 
   function renderSkeletonRows() {
@@ -515,11 +766,18 @@ export function Approvals() {
           {selectedIds.length > 0 ? (
             <span className="approvals-page__selected-count">{selectedIds.length} selected</span>
           ) : null}
-          <Button disabled={selectedIds.length === 0 || loading || !hasApprovalQueue} icon={<FileCheck2 size={16} />} onClick={handleApproveSelected}>
-            Approve
+          <Button disabled={selectedIds.length === 0 || loading || isApproving || !hasApprovalQueue} icon={<FileCheck2 size={16} />} onClick={handleApproveSelected}>
+            {isApproving ? 'Approving...' : 'Approve'}
           </Button>
         </div>
       </header>
+
+      {actionError ? (
+        <div className="approvals-page__notice approvals-page__notice--error">
+          <AlertTriangle size={15} />
+          <span>{actionError}</span>
+        </div>
+      ) : null}
 
       {notice ? (
         <div className="approvals-page__notice">
@@ -677,7 +935,6 @@ export function Approvals() {
                       type="button"
                     >
                       <strong>{approval.activityName}</strong>
-                      <small>{approval.activityLead}</small>
                     </button>
                     <span>{approval.sector}</span>
                     <span>{approval.division}</span>
@@ -813,6 +1070,17 @@ export function Approvals() {
           <span>All approvals loaded</span>
         </div>
       ) : null}
+
+      <ConfirmationDialog
+        confirmLabel={isApproving ? 'Approving...' : 'Approve'}
+        description={`This action will approve ${selectedIds.length} project(s) and move them to the next workflow owner for ${currentRole?.roleName ?? 'the current role'}. Are you sure you want to proceed?`}
+        isOpen={isApprovalConfirmOpen}
+        onCancel={() => {
+          if (!isApproving) setIsApprovalConfirmOpen(false)
+        }}
+        onConfirm={handleConfirmBulkApproval}
+        title="Approve Selected Projects"
+      />
     </div>
   )
 }

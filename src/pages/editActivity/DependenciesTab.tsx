@@ -39,6 +39,7 @@ type ColumnFilter = { operator: FilterOperator; value: string }
 type SortConfig = { column: DepColumnKey; direction: 'asc' | 'desc' } | null
 type DependenciesTabProps = {
   embedded?: boolean
+  isReadOnly?: boolean
   onDependencyCountChange?: (count: number) => void
   projectId: string
 }
@@ -130,7 +131,7 @@ function buildDependencyPayload(
 
 // ── Component ──
 
-export function DependenciesTab({ embedded = false, onDependencyCountChange, projectId }: DependenciesTabProps) {
+export function DependenciesTab({ embedded = false, isReadOnly = false, onDependencyCountChange, projectId }: DependenciesTabProps) {
   const systemUser = useAppSelector((state) => state.user.systemUser)
   // ── Data state ──
   const [dependencies, setDependencies] = useState<Dependency[]>([])
@@ -439,6 +440,7 @@ export function DependenciesTab({ embedded = false, onDependencyCountChange, pro
   // ── CRUD handlers ──
 
   function handleOpenDepModal(dep?: Dependency) {
+    if (isReadOnly) return
     if (dep) {
       setEditingDep(dep)
       setDepForm({ entityName: dep.entityName, dateOfSupport: dep.dateOfSupport, typeOfSupport: dep.typeOfSupport, applicable: dep.applicable })
@@ -458,6 +460,7 @@ export function DependenciesTab({ embedded = false, onDependencyCountChange, pro
   }
 
   function handleDepFormChange(field: keyof Omit<Dependency, 'id'>, value: string) {
+    if (isReadOnly) return
     setDepForm((prev) => ({ ...prev, [field]: value }))
     if (depFormErrors[field]) {
       setDepFormErrors((prev) => ({ ...prev, [field]: undefined }))
@@ -475,6 +478,7 @@ export function DependenciesTab({ embedded = false, onDependencyCountChange, pro
   }
 
   async function handleSaveDep() {
+    if (isReadOnly) return
     if (!validateDepForm()) return
 
     if (!projectId) {
@@ -525,6 +529,7 @@ export function DependenciesTab({ embedded = false, onDependencyCountChange, pro
   }
 
   async function handleConfirmDeleteDep() {
+    if (isReadOnly) return
     if (!depToDelete) return
     setIsDepDeleting(true)
     setDepError('')
@@ -544,6 +549,7 @@ export function DependenciesTab({ embedded = false, onDependencyCountChange, pro
   }
 
   async function handleBulkDelete() {
+    if (isReadOnly) return
     setIsDepDeleting(true)
     setDepError('')
     setDepNotice('')
@@ -624,7 +630,7 @@ export function DependenciesTab({ embedded = false, onDependencyCountChange, pro
           </div>
         )}
         <div className="edit-activity__dependencies-header-actions">
-          {selectedCount > 0 ? (
+          {!isReadOnly && selectedCount > 0 ? (
             <Button
               disabled={isDepDeleting}
               icon={<Trash2 size={16} />}
@@ -635,7 +641,7 @@ export function DependenciesTab({ embedded = false, onDependencyCountChange, pro
               Delete ({selectedCount})
             </Button>
           ) : null}
-          <Button disabled={!projectId || isDepsLoading} icon={<GitBranch size={16} />} onClick={() => handleOpenDepModal()}>
+          <Button disabled={isReadOnly || !projectId || isDepsLoading} icon={<GitBranch size={16} />} onClick={() => handleOpenDepModal()}>
             Create Dependency
           </Button>
         </div>
@@ -733,6 +739,7 @@ export function DependenciesTab({ embedded = false, onDependencyCountChange, pro
                   <input
                     checked={selectedDepIds.size === visibleDeps.length && visibleDeps.length > 0}
                     className="edit-activity__deps-check-input"
+                    disabled={isReadOnly}
                     onChange={handleToggleAllDepSelection}
                     type="checkbox"
                   />
@@ -787,6 +794,7 @@ export function DependenciesTab({ embedded = false, onDependencyCountChange, pro
                       <input
                         checked={isSelected}
                         className="edit-activity__deps-check-input"
+                        disabled={isReadOnly}
                         onChange={() => handleToggleDepSelection(dep.id)}
                         type="checkbox"
                       />
@@ -797,6 +805,7 @@ export function DependenciesTab({ embedded = false, onDependencyCountChange, pro
                   </div>
                   <button
                     className="edit-activity__deps-table-cell edit-activity__deps-table-cell--entity"
+                    disabled={isReadOnly}
                     onClick={() => handleOpenDepModal(dep)}
                     title={`Edit dependency: ${dep.entityName}`}
                     type="button"
@@ -815,22 +824,26 @@ export function DependenciesTab({ embedded = false, onDependencyCountChange, pro
                     </span>
                   </div>
                   <div className="edit-activity__deps-table-cell edit-activity__deps-table-cell--actions">
-                    <button
-                      className="edit-activity__deps-action-btn"
-                      onClick={() => handleOpenDepModal(dep)}
-                      title="Edit dependency"
-                      type="button"
-                    >
-                      <Edit3 size={14} />
-                    </button>
-                    <button
-                      className="edit-activity__deps-action-btn edit-activity__deps-action-btn--delete"
-                      onClick={() => setDepToDelete(dep)}
-                      title="Delete dependency"
-                      type="button"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    {!isReadOnly ? (
+                      <>
+                        <button
+                          className="edit-activity__deps-action-btn"
+                          onClick={() => handleOpenDepModal(dep)}
+                          title="Edit dependency"
+                          type="button"
+                        >
+                          <Edit3 size={14} />
+                        </button>
+                        <button
+                          className="edit-activity__deps-action-btn edit-activity__deps-action-btn--delete"
+                          onClick={() => setDepToDelete(dep)}
+                          title="Delete dependency"
+                          type="button"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </>
+                    ) : null}
                   </div>
                 </div>
               )
@@ -982,7 +995,7 @@ export function DependenciesTab({ embedded = false, onDependencyCountChange, pro
             <Button onClick={handleCloseDepModal} variant="secondary">
               Cancel
             </Button>
-            <Button disabled={isDepSaving} icon={<Check size={16} />} onClick={handleSaveDep}>
+            <Button disabled={isReadOnly || isDepSaving} icon={<Check size={16} />} onClick={handleSaveDep}>
               {isDepSaving ? 'Saving...' : editingDep ? 'Update Dependency' : 'Create Dependency'}
             </Button>
           </div>
@@ -1007,6 +1020,7 @@ export function DependenciesTab({ embedded = false, onDependencyCountChange, pro
 
             <div className="edit-activity__procurement-drawer-section">
               <Textarea
+                disabled={isReadOnly}
                 error={depFormErrors.entityName}
                 label="External Entity Name"
                 onChange={(e) => handleDepFormChange('entityName', e.target.value)}
@@ -1016,6 +1030,7 @@ export function DependenciesTab({ embedded = false, onDependencyCountChange, pro
                 value={depForm.entityName}
               />
               <DatePicker
+                disabled={isReadOnly}
                 error={depFormErrors.dateOfSupport}
                 id="dep-date-of-support"
                 label="Date of Support"
@@ -1024,6 +1039,7 @@ export function DependenciesTab({ embedded = false, onDependencyCountChange, pro
                 value={depForm.dateOfSupport}
               />
               <Textarea
+                disabled={isReadOnly}
                 error={depFormErrors.typeOfSupport}
                 label="Type of Support"
                 onChange={(e) => handleDepFormChange('typeOfSupport', e.target.value)}
@@ -1033,6 +1049,7 @@ export function DependenciesTab({ embedded = false, onDependencyCountChange, pro
                 value={depForm.typeOfSupport}
               />
               <RadioGroup
+                disabled={isReadOnly}
                 error={depFormErrors.applicable}
                 label="Applicable"
                 name="dep-applicable"

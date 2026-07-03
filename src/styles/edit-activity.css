@@ -1723,6 +1723,194 @@
   transition: width 350ms ease;
 }
 
+/* ── Milestone quarter grid ── */
+
+.edit-activity__milestone-quarter-grid {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.edit-activity__milestone-quarter {
+  --quarter-accent: var(--color-primary);
+  --quarter-soft: var(--color-primary-soft);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 0.9rem;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  min-height: 16rem;
+  overflow: hidden;
+  position: relative;
+  transition: border-color 200ms ease, box-shadow 250ms ease, transform 250ms ease;
+}
+
+.edit-activity__milestone-quarter::before {
+  /* background: var(--quarter-accent); */
+  content: '';
+  height: 3px;
+  inset: 0 0 auto;
+  position: absolute;
+}
+
+.edit-activity__milestone-quarter:nth-child(2) {
+  --quarter-accent: var(--color-info);
+  --quarter-soft: var(--color-info-soft);
+}
+
+.edit-activity__milestone-quarter:nth-child(3) {
+  --quarter-accent: var(--color-warning);
+  --quarter-soft: var(--color-warning-soft);
+}
+
+.edit-activity__milestone-quarter:nth-child(4) {
+  --quarter-accent: var(--color-success);
+  --quarter-soft: var(--color-success-soft);
+}
+
+.edit-activity__milestone-quarter:hover,
+.edit-activity__milestone-quarter:focus-within {
+  border-color: color-mix(in srgb, var(--quarter-accent) 45%, var(--color-border));
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--quarter-accent) 10%, transparent);
+  transform: translateY(-2px);
+}
+
+.edit-activity__milestone-quarter-header {
+  align-items: center;
+  background: var(--quarter-soft);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem 0.85rem 0.65rem;
+}
+
+.edit-activity__milestone-quarter-header > div:first-child {
+  align-items: center;
+  display: flex;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.edit-activity__milestone-quarter-header h3 {
+  color: var(--color-text-primary);
+  font-size: 0.92rem;
+  font-weight: 850;
+  margin: 0;
+}
+
+.edit-activity__milestone-quarter-number {
+  align-items: center;
+  background: var(--quarter-accent);
+  border-radius: 0.45rem;
+  color: var(--color-on-primary);
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+  font-weight: 900;
+  height: 1.65rem;
+  justify-content: center;
+  width: 2rem;
+}
+
+.edit-activity__milestone-quarter-range {
+  color: var(--color-text-secondary);
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
+.edit-activity__milestone-quarter-header .badge {
+  background: color-mix(in srgb, var(--quarter-accent) 12%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--quarter-accent) 22%, var(--color-border));
+  color: var(--quarter-accent);
+}
+
+.edit-activity__milestone-quarter-body {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.75rem;
+}
+
+.edit-activity__milestone-quarter-body .edit-activity__milestone-item {
+  display: block;
+  min-height: 0;
+}
+
+.edit-activity__milestone-quarter-body .edit-activity__milestone-line-connector {
+  display: none;
+}
+
+.edit-activity__milestone-quarter-body .edit-activity__milestone-card {
+  background: color-mix(in srgb, var(--quarter-soft) 26%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--quarter-accent) 18%, var(--color-border));
+  box-shadow: none;
+  margin: 0;
+  padding: 0.75rem;
+}
+
+.edit-activity__milestone-quarter-body .edit-activity__milestone-card:hover {
+  border-color: color-mix(in srgb, var(--quarter-accent) 35%, var(--color-border));
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--quarter-accent) 9%, transparent);
+}
+
+.edit-activity__milestone-quarter-body .edit-activity__milestone-card-badges .badge--neutral:first-child {
+  display: none;
+}
+
+.edit-activity__milestone-quarter-empty {
+  align-items: center;
+  background: color-mix(in srgb, var(--quarter-soft) 34%, var(--color-surface));
+  border: 1px dashed color-mix(in srgb, var(--quarter-accent) 30%, var(--color-border));
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  display: grid;
+  gap: 0.25rem;
+  justify-items: center;
+  min-height: 10.5rem;
+  padding: 1.2rem;
+  text-align: center;
+}
+
+.edit-activity__milestone-quarter-empty svg {
+  color: var(--quarter-accent);
+}
+
+.edit-activity__milestone-quarter-empty strong {
+  color: var(--color-text-primary);
+  font-size: 0.84rem;
+  font-weight: 850;
+}
+
+.edit-activity__milestone-quarter-empty span {
+  font-size: 0.72rem;
+  line-height: 1.45;
+  max-width: 14rem;
+}
+
+@media (max-width: 900px) {
+  .edit-activity__milestone-quarter-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .edit-activity__milestone-quarter-header {
+    align-items: flex-start;
+    gap: 0.65rem;
+  }
+
+  .edit-activity__milestone-card-top,
+  .edit-activity__milestone-card-bottom {
+    align-items: stretch;
+    display: grid;
+    gap: 0.55rem;
+  }
+
+  .edit-activity__milestone-card-actions {
+    justify-content: flex-end;
+  }
+}
+
 /* ── Timeline ── */
 
 .edit-activity__milestones-timeline {

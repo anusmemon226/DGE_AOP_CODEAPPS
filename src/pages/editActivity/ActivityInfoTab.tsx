@@ -38,8 +38,10 @@ import { DependenciesTab } from './DependenciesTab'
 
 interface ActivityInfoTabProps {
   activityLeadOptions: SelectOption<string>[]
+  editableFields?: Array<keyof ActivityForm>
   errors: FieldErrors
   form: ActivityForm
+  isReadOnly?: boolean
   isAdeoVisible: boolean
   isBudgetNo: boolean
   isPaymentOnly: boolean
@@ -65,8 +67,10 @@ function toggleStrategy(
 
 export function ActivityInfoTab({
   activityLeadOptions,
+  editableFields,
   errors,
   form,
+  isReadOnly = false,
   isAdeoVisible,
   isBudgetNo,
   isPaymentOnly,
@@ -78,6 +82,10 @@ export function ActivityInfoTab({
   const handleDependencyCountChange = useCallback((count: number) => {
     setDependencyCount(count)
   }, [])
+  const canEditField = useCallback((field: keyof ActivityForm) => {
+    if (!isReadOnly) return true
+    return editableFields?.includes(field) ?? false
+  }, [editableFields, isReadOnly])
 
   // ── Guidance Panel ──
   const guidancePanel = useMemo(() => {
@@ -300,6 +308,7 @@ export function ActivityInfoTab({
           <div className="create-activity__form-stack">
             <div className="create-activity__form-row create-activity__form-row--two">
               <Select
+                disabled={!canEditField('activityType')}
                 error={errors.activityType}
                 id="activity-type"
                 label="Activity Type"
@@ -309,6 +318,7 @@ export function ActivityInfoTab({
                 value={form.activityType}
               />
               <Input
+                disabled={!canEditField('activityName')}
                 error={errors.activityName}
                 label="Activity / Initiative Name"
                 onChange={(event) => updateForm({ activityName: event.target.value })}
@@ -326,6 +336,7 @@ export function ActivityInfoTab({
             <div className="create-activity__form-row">
               <RadioGroup
                 className="create-activity__radio create-activity__radio--scope"
+                disabled={!canEditField('activityScope')}
                 error={errors.activityScope}
                 label="Activity Scope"
                 name="activity-scope"
@@ -338,12 +349,13 @@ export function ActivityInfoTab({
 
             {isStrategic ? (
               <div className="create-activity__form-row">
-                <fieldset className="checkbox-group create-activity__strategy-group">
+                <fieldset className={`checkbox-group create-activity__strategy-group ${!canEditField('strategies') ? 'checkbox-group--disabled' : ''}`.trim()} disabled={!canEditField('strategies')}>
                   <legend className="field__label">What strategy is this project/activity categorized under?</legend>
                   <div className="checkbox-group__options">
                     {STRATEGY_OPTIONS.map((option) => (
                       <Checkbox
                         checked={form.strategies.includes(option.value)}
+                        disabled={!canEditField('strategies')}
                         key={option.value}
                         label={option.label}
                         onChange={() => toggleStrategy(option.value, form.strategies, (s) => updateForm({ strategies: s }))}
@@ -358,6 +370,7 @@ export function ActivityInfoTab({
             <div className="create-activity__form-row">
               <RadioGroup
                 className="create-activity__radio create-activity__radio--classification"
+                disabled={!canEditField('activityClassification')}
                 error={errors.activityClassification}
                 label="Activity Classification"
                 name="activity-classification"
@@ -372,6 +385,7 @@ export function ActivityInfoTab({
               {!isPaymentOnly ? (
                 <RadioGroup
                   className="create-activity__radio create-activity__radio--yes-no"
+                  disabled={!canEditField('budgetRequired')}
                   error={errors.budgetRequired}
                   label="Does this project require Budget?"
                   name="budget-required"
@@ -388,6 +402,7 @@ export function ActivityInfoTab({
               ) : (
                 <RadioGroup
                   className="create-activity__radio create-activity__radio--yes-no"
+                  disabled={!canEditField('procurementRequired')}
                   error={errors.procurementRequired}
                   label="Does this project require procurement?"
                   name="procurement-required"
@@ -399,6 +414,7 @@ export function ActivityInfoTab({
               )}
               <RadioGroup
                 className="create-activity__radio create-activity__radio--yes-no"
+                disabled={!canEditField('adeoReported')}
                 error={errors.adeoReported}
                 label="Execution plan project reported in ADEO"
                 name="adeo-reported"
@@ -411,6 +427,7 @@ export function ActivityInfoTab({
 
             <div className="create-activity__form-row">
               <Select
+                disabled={!canEditField('activityLeadId')}
                 error={errors.activityLeadId}
                 id="activity-lead"
                 label="Activity Lead / PM Name"
@@ -425,6 +442,7 @@ export function ActivityInfoTab({
 
             <div className="create-activity__date-range" role="group" aria-label="Activity timeline">
               <DatePicker
+                disabled={!canEditField('plannedStartDate')}
                 error={errors.plannedStartDate}
                 id="planned-start-date"
                 label="Planned Start Date"
@@ -438,6 +456,7 @@ export function ActivityInfoTab({
                 </svg>
               </span>
               <DatePicker
+                disabled={!canEditField('plannedEndDate')}
                 error={errors.plannedEndDate}
                 id="planned-end-date"
                 label="Planned End Date"
@@ -450,6 +469,7 @@ export function ActivityInfoTab({
 
             <div className="create-activity__form-row create-activity__form-row--two">
               <Textarea
+                disabled={!canEditField('scopeDescription')}
                 error={errors.scopeDescription}
                 label="Activity Scope Description"
                 onChange={(event) => updateForm({ scopeDescription: event.target.value })}
@@ -458,6 +478,7 @@ export function ActivityInfoTab({
                 value={form.scopeDescription}
               />
               <Textarea
+                disabled={!canEditField('summary')}
                 error={errors.summary}
                 label="Summary"
                 onChange={(event) => updateForm({ summary: event.target.value })}
@@ -486,6 +507,7 @@ export function ActivityInfoTab({
             <div className="create-activity__form-stack">
               <div className="create-activity__form-row create-activity__form-row--two">
                 <Input
+                  disabled={!canEditField('adeoProjectName')}
                   error={errors.adeoProjectName}
                   label="اسم المشروع"
                   onChange={(event) => updateForm({ adeoProjectName: event.target.value })}
@@ -494,6 +516,7 @@ export function ActivityInfoTab({
                   value={form.adeoProjectName}
                 />
                 <Input
+                  disabled={!canEditField('adeoProjectDescription')}
                   error={errors.adeoProjectDescription}
                   label="وصف المشروع"
                   onChange={(event) => updateForm({ adeoProjectDescription: event.target.value })}
@@ -505,6 +528,7 @@ export function ActivityInfoTab({
 
               <div className="create-activity__form-row create-activity__form-row--two">
                 <Textarea
+                  disabled={!canEditField('longTermImpact')}
                   error={errors.longTermImpact}
                   label="Long Term Impact"
                   onChange={(event) => updateForm({ longTermImpact: event.target.value })}
@@ -513,6 +537,7 @@ export function ActivityInfoTab({
                   value={form.longTermImpact}
                 />
                 <Textarea
+                  disabled={!canEditField('overallLongTermImpact')}
                   error={errors.overallLongTermImpact}
                   label="طويلة المدى / اهداف المشروع العامة"
                   onChange={(event) => updateForm({ overallLongTermImpact: event.target.value })}
@@ -524,6 +549,7 @@ export function ActivityInfoTab({
 
               <div className="create-activity__form-row create-activity__form-row--two">
                 <Input
+                  disabled={!canEditField('stakeholder')}
                   error={errors.stakeholder}
                   label="Stakeholder"
                   onChange={(event) => updateForm({ stakeholder: event.target.value })}
@@ -532,6 +558,7 @@ export function ActivityInfoTab({
                   value={form.stakeholder}
                 />
                 <Input
+                  disabled={!canEditField('activityKpi')}
                   error={errors.activityKpi}
                   label="Activity KPI"
                   onChange={(event) => updateForm({ activityKpi: event.target.value })}
@@ -543,12 +570,14 @@ export function ActivityInfoTab({
 
               <div className="create-activity__form-row create-activity__form-row--two">
                 <Input
+                  disabled={!canEditField('activityPlan')}
                   label="Activity Plan (If any)"
                   onChange={(event) => updateForm({ activityPlan: event.target.value })}
                   placeholder="Enter the activity plan reference, if available"
                   value={form.activityPlan}
                 />
                 <Textarea
+                  disabled={!canEditField('risks')}
                   error={errors.risks}
                   label="Risks"
                   onChange={(event) => updateForm({ risks: event.target.value })}
@@ -561,9 +590,9 @@ export function ActivityInfoTab({
           </Card>
         ) : null}
 
-        <MembersTab embedded projectId={projectId} />
+        <MembersTab embedded isReadOnly={isReadOnly} projectId={projectId} />
         {isAdeoVisible ? (
-          <DependenciesTab embedded onDependencyCountChange={handleDependencyCountChange} projectId={projectId} />
+          <DependenciesTab embedded isReadOnly={isReadOnly} onDependencyCountChange={handleDependencyCountChange} projectId={projectId} />
         ) : null}
       </>
     )
@@ -577,6 +606,8 @@ export function ActivityInfoTab({
     isBudgetNo,
     isAdeoVisible,
     projectId,
+    isReadOnly,
+    canEditField,
     handleDependencyCountChange,
   ])
 

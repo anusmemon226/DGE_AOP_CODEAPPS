@@ -92,6 +92,12 @@
   padding: 0.75rem 0.9rem;
 }
 
+.approvals-page__notice--error {
+  background: var(--color-error-soft);
+  border-color: color-mix(in srgb, var(--color-error) 24%, transparent);
+  color: var(--color-error);
+}
+
 .approvals-page__toolbar {
   align-items: end;
   display: flex;
@@ -345,8 +351,7 @@
   text-align: left;
 }
 
-.approvals-grid__name strong,
-.approvals-grid__name small {
+.approvals-grid__name strong {
   overflow-wrap: anywhere;
   white-space: normal;
 }
@@ -355,12 +360,6 @@
   color: var(--color-primary);
   font-size: 0.78rem;
   font-weight: 700;
-}
-
-.approvals-grid__name small {
-  color: var(--color-text-tertiary);
-  font-size: 0.66rem;
-  font-weight: 600;
 }
 
 .approvals-grid__expand {

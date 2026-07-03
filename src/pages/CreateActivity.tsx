@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
-import { Bot, Check, CheckCircle2, ClipboardList, FileText, Lightbulb, LockKeyhole, Paperclip, RefreshCcw, Save, Send, Sparkles, Trash2, UserRound, WandSparkles } from 'lucide-react'
+import { Bot, Check, CheckCircle2, ClipboardList, FileText, Lightbulb, LockKeyhole, Paperclip, RefreshCcw, Save, Send, Sparkles, Trash2, WandSparkles } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import {
   Badge,
@@ -1494,13 +1494,6 @@ export function CreateActivity() {
               <span className="create-activity__chip">
                 <span className="create-activity__chip-label">Phase</span>
                 <Badge tone="info">Planning</Badge>
-              </span>
-              <span className="create-activity__chip create-activity__chip--user">
-                <span className="create-activity__chip-label">Pending with</span>
-                <strong>
-                  <UserRound size={14} />
-                  {context?.currentUserName ?? 'Division Member'}
-                </strong>
               </span>
             </div>
             <Button disabled={isSaving || Boolean(errors.context)} icon={<Save size={16} />} onClick={saveDraft}>

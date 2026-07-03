@@ -15,11 +15,17 @@ import {
   UserRound,
   Wallet,
 } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Badge, Button, type SelectOption } from '../components/ui'
-import type { Dga_aop_projectses, Dga_aop_projectsesBase } from '../generated/models/Dga_aop_projectsesModel'
+import { Badge, Button, ConfirmationDialog, type SelectOption } from '../components/ui'
+import {
+  Dga_aop_projectsesstatuscode,
+  type Dga_aop_projectses,
+  type Dga_aop_projectsesBase,
+} from '../generated/models/Dga_aop_projectsesModel'
+import type { Dga_project_planning_instances } from '../generated/models/Dga_project_planning_instancesModel'
 import { Dga_aop_projectsesService } from '../generated/services/Dga_aop_projectsesService'
+import { Dga_project_planning_instancesService } from '../generated/services/Dga_project_planning_instancesService'
 import { SystemusersService } from '../generated/services/SystemusersService'
 import { TeamsService } from '../generated/services/TeamsService'
 import type { Systemusers } from '../generated/models/SystemusersModel'
@@ -46,6 +52,7 @@ import {
   type ActivityForm,
   type FieldErrors,
 } from './editActivity/helpers/activityInfoHelpers'
+import { validateActivitySubmissionRequirements as validateSubmissionRequirements } from './editActivity/helpers/submissionValidation'
 
 // ── Types ──
 
@@ -112,26 +119,25 @@ const ACTIVITY_INFO_SELECT_FIELDS = [
   'statuscode',
   'dga_project_phase',
   'dga_project_activity_status',
+  '_dga_project_planning_instance_value',
 ]
 
 // ── Status helpers ──
 
-function getStatusTone(status: string): 'neutral' | 'info' | 'warning' | 'success' {
-  switch (status) {
-    case 'Submitted':
-    case 'SubmittedtoDivisionDirector':
+function getStatusTone(statusCode: number): 'neutral' | 'info' | 'warning' | 'success' {
+  switch (statusCode) {
+    case 776140001:
+    case 776140002:
+    case 776140003:
+    case 776140004:
+    case 776140014:
       return 'info'
-    case 'ApprovedByDivisionDirector':
-    case 'ApprovedByStrategyTeam':
-    case 'ApprovedByExecutiveDirector':
-    case 'ApprovedByDirectorGeneral':
-    case 'Active':
+    case 776140011:
       return 'success'
-    case 'ClarificationNeeded':
-    case 'InProgress_Delayed_':
+    case 776140012:
       return 'warning'
-    case 'Cancelled':
-    case 'Inactive':
+    case 2:
+    case 776140015:
       return 'neutral'
     default:
       return 'neutral'
@@ -148,21 +154,53 @@ function getTabLockReason(tabId: TabId): string {
 }
 
 function formatStatusCode(code: number): string {
-  const labels: Record<number, string> = {
-    1: 'Draft',
-    776140001: 'Submitted to Division Director',
-    776140002: 'Approved by Executive Director',
-    776140003: 'Approved by Division Director',
-    776140004: 'Approved by Strategy Team',
-    776140011: 'Active',
-    776140012: 'Clarification Needed',
-    776140014: 'Approved by Director General',
+  const generatedLabel = (Dga_aop_projectsesstatuscode as Record<number, string>)[code]
+
+  if (!generatedLabel) {
+    return 'Unknown'
   }
-  return labels[code] ?? 'Unknown'
+
+  return generatedLabel
+    .replace(/_/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 function normalizeId(id?: string | null) {
   return id?.replace(/[{}]/g, '').toLowerCase() ?? ''
+}
+
+function getResultArray<T>(result: unknown): T[] {
+  const value = getResultValue<T[]>(result)
+
+  if (Array.isArray(value)) {
+    return value
+  }
+
+  if (Array.isArray(result)) {
+    return result as T[]
+  }
+
+  return []
+}
+
+function toEntityBind(entitySetName: string, id: string) {
+  return `/${entitySetName}(${normalizeId(id)})`
+}
+
+function escapeODataValue(value: string) {
+  return value.replace(/'/g, "''")
+}
+
+function buildPmoActivityInfoUpdatePayload(form: ActivityForm): Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>> {
+  return {
+    dga_activity_classification: form.activityClassification
+      ? Number(form.activityClassification) as Dga_aop_projectsesBase['dga_activity_classification']
+      : undefined,
+    dga_registered_or_will_be_registered_in_epm: form.activityClassification === '576610000',
+  }
 }
 
 
@@ -173,7 +211,7 @@ export function EditActivity() {
   const [searchParams] = useSearchParams()
   const projectId = searchParams.get('id') ?? ''
   const selectedRole = useAppSelector((state) => state.app.selectedRole)
-  const { currentRoleDivisionalHierarchy, divisionalHierarchies: allHierarchies } = useAppSelector((state) => state.user)
+  const { currentRole, currentRoleDivisionalHierarchy, divisionalHierarchies: allHierarchies } = useAppSelector((state) => state.user)
   const [activeTab, setActiveTab] = useState<TabId>('activity-info')
   const [activity, setActivity] = useState<Dga_aop_projectses | null>(null)
   const [form, setForm] = useState<ActivityForm>(INITIAL_FORM)
@@ -185,6 +223,16 @@ export function EditActivity() {
   const [pendingWith, setPendingWith] = useState('Loading...')
   const [objectiveHeaderAction, setObjectiveHeaderAction] = useState<ObjectiveHeaderAction | null>(null)
   const [budgetHeaderAction, setBudgetHeaderAction] = useState<BudgetHeaderAction | null>(null)
+  const [isSubmitConfirmOpen, setIsSubmitConfirmOpen] = useState(false)
+  const [isSubmittingToDirector, setIsSubmittingToDirector] = useState(false)
+  const [isStrategySubmitConfirmOpen, setIsStrategySubmitConfirmOpen] = useState(false)
+  const [isSubmittingToStrategyTeam, setIsSubmittingToStrategyTeam] = useState(false)
+  const [isExecutiveSubmitConfirmOpen, setIsExecutiveSubmitConfirmOpen] = useState(false)
+  const [isSubmittingToExecutiveDirector, setIsSubmittingToExecutiveDirector] = useState(false)
+  const [isDirectorGeneralSubmitConfirmOpen, setIsDirectorGeneralSubmitConfirmOpen] = useState(false)
+  const [isSubmittingToDirectorGeneral, setIsSubmittingToDirectorGeneral] = useState(false)
+  const [isDirectorGeneralApproveConfirmOpen, setIsDirectorGeneralApproveConfirmOpen] = useState(false)
+  const [isApprovingAsDirectorGeneral, setIsApprovingAsDirectorGeneral] = useState(false)
 
   // ── Loaded activity data ──
   const activityName = activity?.dga_name || form.activityName || 'Edit Activity'
@@ -206,6 +254,51 @@ export function EditActivity() {
   const activityLeadName = activityLeadOptions.find((o) => o.value === form.activityLeadId)?.label ?? ''
   const isDivisionMember = selectedRole === 'AOP - Division Member'
   const isDivisionDirector = selectedRole === 'AOP - Division Director'
+  const isStrategyTeam = selectedRole === 'AOP - Strategy Team'
+  const isExecutiveDirector = selectedRole === 'AOP - Executive Director'
+  const isDirectorGeneral = selectedRole === 'AOP - Director General'
+  const editPermissions = useMemo(() => {
+    const ownerTeamId = normalizeId(activity?._owningteam_value)
+    const currentRoleTeamId = normalizeId(currentRole?.teamId)
+    const isOwnedByCurrentRoleTeam = Boolean(ownerTeamId && currentRoleTeamId && ownerTeamId === currentRoleTeamId)
+    const hasFullEdit = (
+      selectedRole === 'AOP - Strategy Team'
+      || (
+        selectedRole === 'AOP - Division Member'
+        && isOwnedByCurrentRoleTeam
+        && (statusCode === 1 || statusCode === 776140012)
+      )
+      || (
+        selectedRole === 'AOP - Division Director'
+        && isOwnedByCurrentRoleTeam
+        && statusCode === 776140001
+      )
+    )
+    const isProcurementOnly = selectedRole === 'AOP - Procurement Team'
+    const isPmoClassificationOnly = selectedRole === 'AOP - PMO'
+
+    return {
+      activityInfoCanSave: hasFullEdit || isPmoClassificationOnly,
+      activityInfoEditableFields: isPmoClassificationOnly ? ['activityClassification'] as Array<keyof ActivityForm> : undefined,
+      activityInfoReadOnly: !hasFullEdit && !isPmoClassificationOnly,
+      budgetReadOnly: !hasFullEdit,
+      canSubmitToDivisionDirector: selectedRole === 'AOP - Division Member' && hasFullEdit,
+      canSubmitToStrategyTeam: selectedRole === 'AOP - Division Director' && hasFullEdit,
+      canSubmitToExecutiveDirector: selectedRole === 'AOP - Strategy Team' && isOwnedByCurrentRoleTeam && statusCode === 776140003,
+      canSubmitToDirectorGeneral: selectedRole === 'AOP - Executive Director' && isOwnedByCurrentRoleTeam && statusCode === 776140002,
+      canApproveAsDirectorGeneral: selectedRole === 'AOP - Director General' && isOwnedByCurrentRoleTeam && statusCode === 776140014,
+      canStartActivity: selectedRole === 'AOP - Division Member' && isOwnedByCurrentRoleTeam && statusCode === 776140011 && projectPhase === 776140001,
+      milestonesReadOnly: !hasFullEdit,
+      objectivesReadOnly: !hasFullEdit,
+      procurementReadOnly: !hasFullEdit && !isProcurementOnly,
+      isPmoClassificationOnly,
+    }
+  }, [activity?._owningteam_value, currentRole?.teamId, projectPhase, selectedRole, statusCode])
+  const canShowDivisionMemberEditActions = !isDivisionMember || editPermissions.canSubmitToDivisionDirector
+  const canShowDivisionDirectorReviewActions = !isDivisionDirector || editPermissions.canSubmitToStrategyTeam
+  const canShowExecutiveDirectorReviewActions = !isExecutiveDirector
+  const canShowDirectorGeneralReviewActions = !isDirectorGeneral
+  const canShowHeaderSaveActions = canShowDivisionMemberEditActions && canShowDivisionDirectorReviewActions && canShowExecutiveDirectorReviewActions && canShowDirectorGeneralReviewActions
 
   // ── Context loading ──
 
@@ -310,19 +403,21 @@ export function EditActivity() {
 
         if (!isMounted) return
 
-        const division = currentRoleDivisionalHierarchy
-          ? allHierarchies.find((h) => h.dga_divisional_hierarchyid === currentRoleDivisionalHierarchy.hierarchyId)
+        const projectSectorId = normalizeId(project._dga_sector_value)
+        const projectDivisionId = normalizeId(project._dga_department_value)
+        const sector = projectSectorId
+          ? allHierarchies.find((h) => normalizeId(h.dga_divisional_hierarchyid) === projectSectorId)
           : undefined
-        const sector = division?._dga_parent_divisional_hierarchy_value
-          ? allHierarchies.find((h) => h.dga_divisional_hierarchyid === division._dga_parent_divisional_hierarchy_value)
+        const division = projectDivisionId
+          ? allHierarchies.find((h) => normalizeId(h.dga_divisional_hierarchyid) === projectDivisionId)
           : undefined
         setActivityLeadOptions(activityLeadUsers)
         setPendingWith(ownerName || 'Not assigned')
         setActivity(project)
         setForm(projectToActivityForm(project, {
-          sectorId: sector?.dga_divisional_hierarchyid ?? '',
+          sectorId: project._dga_sector_value ?? sector?.dga_divisional_hierarchyid ?? '',
           sectorName: sector?.dga_name ?? '',
-          divisionId: division?.dga_divisional_hierarchyid ?? '',
+          divisionId: project._dga_department_value ?? division?.dga_divisional_hierarchyid ?? '',
           divisionName: division?.dga_name ?? '',
         }))
       } catch (error) {
@@ -389,6 +484,14 @@ export function EditActivity() {
   async function handleSaveActivityInfo() {
     setSuccessMessage('')
 
+    if (!editPermissions.activityInfoCanSave) {
+      setErrors((currentErrors) => ({
+        ...currentErrors,
+        submit: 'You do not have permission to edit Activity Information for this activity.',
+      }))
+      return
+    }
+
     if (!projectId) {
       setErrors((currentErrors) => ({
         ...currentErrors,
@@ -397,7 +500,9 @@ export function EditActivity() {
       return
     }
 
-    const nextErrors = validateForm(form)
+    const nextErrors = editPermissions.isPmoClassificationOnly
+      ? getRuntimeErrors(form, ['activityClassification'])
+      : validateForm(form)
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors)
       setActiveTab('activity-info')
@@ -406,7 +511,9 @@ export function EditActivity() {
 
     setIsSavingActivityInfo(true)
     try {
-      const payload = buildActivityInfoUpdatePayload(form)
+      const payload = editPermissions.isPmoClassificationOnly
+        ? buildPmoActivityInfoUpdatePayload(form)
+        : buildActivityInfoUpdatePayload(form)
       console.log('Edit activity information payload', payload)
       const result = await Dga_aop_projectsesService.update(
         projectId,
@@ -427,6 +534,7 @@ export function EditActivity() {
         dga_planned_end_date: form.plannedEndDate,
         dga_planned_start_date: form.plannedStartDate,
         dga_project_kpi: form.activityKpi,
+        dga_registered_or_will_be_registered_in_epm: payload.dga_registered_or_will_be_registered_in_epm ?? currentActivity.dga_registered_or_will_be_registered_in_epm,
         dga_scope: form.scopeDescription,
         dga_strategic_vs_operation: payload.dga_strategic_vs_operation ?? currentActivity.dga_strategic_vs_operation,
       } : currentActivity)
@@ -442,14 +550,595 @@ export function EditActivity() {
     }
   }
 
-  const handleSubmitToDivisionDirector = useCallback(() => {
-    // TODO: Implement submit logic
-    console.log('Submit to Division Director')
+  const validateActivitySubmissionRequirements = useCallback(async () => {
+    setSuccessMessage('')
+
+    if (!projectId) {
+      setErrors((currentErrors) => ({
+        ...currentErrors,
+        context: 'Activity id is missing from the edit URL.',
+      }))
+      return false
+    }
+
+    try {
+      const validationResult = await validateSubmissionRequirements({
+        form,
+        projectId,
+        tabLocks: {
+          budget: tabLocked.budget,
+          milestones: tabLocked.milestones,
+          procurements: tabLocked.procurements,
+        },
+      })
+
+      if (!validationResult.valid) {
+        setErrors({
+          ...(validationResult.fieldErrors ?? {}),
+          submit: validationResult.message,
+        })
+        setActiveTab(validationResult.section)
+        return false
+      }
+
+      setErrors((currentErrors) => ({ ...currentErrors, submit: undefined }))
+      return true
+    } catch (error) {
+      setErrors((currentErrors) => ({
+        ...currentErrors,
+        submit: error instanceof Error ? error.message : 'Unable to validate activity submission requirements.',
+      }))
+      return false
+    }
+  }, [form, projectId, tabLocked.budget, tabLocked.milestones, tabLocked.procurements])
+
+  const validateSubmitToDivisionDirector = useCallback(async () => {
+    if (!isDivisionMember || !editPermissions.canSubmitToDivisionDirector) {
+      setErrors((currentErrors) => ({
+        ...currentErrors,
+        submit: 'You can submit this activity only when it is assigned to your Division Member team and is editable.',
+      }))
+      return false
+    }
+
+    return validateActivitySubmissionRequirements()
+  }, [
+    editPermissions.canSubmitToDivisionDirector,
+    isDivisionMember,
+    validateActivitySubmissionRequirements,
+  ])
+
+  const validateSubmitToStrategyTeam = useCallback(async () => {
+    if (!isDivisionDirector || !editPermissions.canSubmitToStrategyTeam) {
+      setErrors((currentErrors) => ({
+        ...currentErrors,
+        submit: 'You can submit this activity only when it is assigned to your Division Director team and is in Division Director Review.',
+      }))
+      return false
+    }
+
+    return validateActivitySubmissionRequirements()
+  }, [
+    editPermissions.canSubmitToStrategyTeam,
+    isDivisionDirector,
+    validateActivitySubmissionRequirements,
+  ])
+
+  const validateSubmitToExecutiveDirector = useCallback(async () => {
+    if (!isStrategyTeam || !editPermissions.canSubmitToExecutiveDirector) {
+      setErrors((currentErrors) => ({
+        ...currentErrors,
+        submit: 'You can submit this activity only when it is assigned to your Strategy Team and is in Strategy Team Review.',
+      }))
+      return false
+    }
+
+    return validateActivitySubmissionRequirements()
+  }, [
+    editPermissions.canSubmitToExecutiveDirector,
+    isStrategyTeam,
+    validateActivitySubmissionRequirements,
+  ])
+
+  const validateSubmitToDirectorGeneral = useCallback(async () => {
+    if (!isExecutiveDirector || !editPermissions.canSubmitToDirectorGeneral) {
+      setErrors((currentErrors) => ({
+        ...currentErrors,
+        submit: 'You can submit this activity only when it is assigned to your Executive Director team and is in Executive Director Review.',
+      }))
+      return false
+    }
+
+    return validateActivitySubmissionRequirements()
+  }, [
+    editPermissions.canSubmitToDirectorGeneral,
+    isExecutiveDirector,
+    validateActivitySubmissionRequirements,
+  ])
+
+  const validateApproveAsDirectorGeneral = useCallback(async () => {
+    if (!isDirectorGeneral || !editPermissions.canApproveAsDirectorGeneral) {
+      setErrors((currentErrors) => ({
+        ...currentErrors,
+        submit: 'You can approve this activity only when it is assigned to your Director General team and is in Director General Review.',
+      }))
+      return false
+    }
+
+    return validateActivitySubmissionRequirements()
+  }, [
+    editPermissions.canApproveAsDirectorGeneral,
+    isDirectorGeneral,
+    validateActivitySubmissionRequirements,
+  ])
+
+  const handleSubmitToDivisionDirector = useCallback(async () => {
+    if (isSubmittingToDirector) return
+
+    const canSubmit = await validateSubmitToDivisionDirector()
+    if (canSubmit) {
+      setIsSubmitConfirmOpen(true)
+    }
+  }, [isSubmittingToDirector, validateSubmitToDivisionDirector])
+
+  const handleConfirmSubmitToDivisionDirector = useCallback(async () => {
+    if (isSubmittingToDirector) return
+
+    const canSubmit = await validateSubmitToDivisionDirector()
+    if (!canSubmit) {
+      setIsSubmitConfirmOpen(false)
+      return
+    }
+
+    const planningInstanceId = normalizeId(activity?._dga_project_planning_instance_value)
+    if (!planningInstanceId) {
+      setErrors((currentErrors) => ({
+        ...currentErrors,
+        submit: 'Planning instance could not be resolved for this activity.',
+      }))
+      setIsSubmitConfirmOpen(false)
+      return
+    }
+
+    setIsSubmittingToDirector(true)
+    setSuccessMessage('')
+
+    try {
+      const planningInstanceResult = await Dga_project_planning_instancesService.get(planningInstanceId, {
+        select: [
+          'dga_project_planning_instanceid',
+          '_dga_division_director_team_value',
+        ],
+      })
+      assertOperationSuccess(planningInstanceResult, 'Unable to load Division Director team from the planning instance.')
+
+      const planningInstance = getResultValue<Dga_project_planning_instances>(planningInstanceResult)
+      const divisionDirectorTeamId = normalizeId(planningInstance?._dga_division_director_team_value)
+
+      if (!divisionDirectorTeamId) {
+        throw new Error('Division Director team could not be resolved from the current planning instance.')
+      }
+
+      const payload = {
+        statuscode: 776140001 as Dga_aop_projectsesBase['statuscode'],
+        'ownerid@odata.bind': toEntityBind('teams', divisionDirectorTeamId),
+      }
+
+      console.log('Submit to Division Director payload', payload)
+      const submitResult = await Dga_aop_projectsesService.update(
+        projectId,
+        payload as unknown as Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>>,
+      )
+      assertOperationSuccess(submitResult, 'Failed to submit activity to Division Director.')
+
+      let nextPendingWith = 'Division Director'
+      try {
+        const teamResult = await TeamsService.get(divisionDirectorTeamId, {
+          select: ['teamid', 'name'],
+        })
+        assertOperationSuccess(teamResult, 'Unable to load Division Director team name.')
+        nextPendingWith = getResultValue<Teams>(teamResult)?.name || nextPendingWith
+      } catch {
+        // Owner assignment succeeded; pending-with display can safely fall back.
+      }
+
+      setActivity((currentActivity) => currentActivity ? {
+        ...currentActivity,
+        _owningteam_value: divisionDirectorTeamId,
+        _owninguser_value: undefined,
+        owneridname: nextPendingWith,
+        statuscode: 776140001,
+      } : currentActivity)
+      setPendingWith(nextPendingWith)
+      setErrors((currentErrors) => ({ ...currentErrors, submit: undefined }))
+      setSuccessMessage('Activity submitted to Division Director successfully.')
+      setIsSubmitConfirmOpen(false)
+    } catch (error) {
+      setErrors((currentErrors) => ({
+        ...currentErrors,
+        submit: error instanceof Error ? error.message : 'Failed to submit activity to Division Director.',
+      }))
+      setIsSubmitConfirmOpen(false)
+    } finally {
+      setIsSubmittingToDirector(false)
+    }
+  }, [
+    activity?._dga_project_planning_instance_value,
+    isSubmittingToDirector,
+    projectId,
+    validateSubmitToDivisionDirector,
+  ])
+
+  const resolveStrategyTeam = useCallback(async () => {
+    const strategyTeamResult = await TeamsService.getAll({
+      filter: `name eq '${escapeODataValue('AOP - Strategy Team')}'`,
+      select: ['teamid', 'name'],
+      top: 1,
+    })
+    assertOperationSuccess(strategyTeamResult, 'Unable to resolve Strategy Team owner.')
+
+    const strategyTeam = getResultArray<Teams>(strategyTeamResult)[0]
+    const strategyTeamId = normalizeId(strategyTeam?.teamid)
+
+    if (!strategyTeamId) {
+      throw new Error('AOP - Strategy Team team could not be found.')
+    }
+
+    return {
+      id: strategyTeamId,
+      name: strategyTeam.name || 'AOP - Strategy Team',
+    }
   }, [])
+
+  const handleSubmitToStrategyTeam = useCallback(async () => {
+    if (isSubmittingToStrategyTeam) return
+
+    const canSubmit = await validateSubmitToStrategyTeam()
+    if (canSubmit) {
+      setIsStrategySubmitConfirmOpen(true)
+    }
+  }, [isSubmittingToStrategyTeam, validateSubmitToStrategyTeam])
+
+  const handleConfirmSubmitToStrategyTeam = useCallback(async () => {
+    if (isSubmittingToStrategyTeam) return
+
+    const canSubmit = await validateSubmitToStrategyTeam()
+    if (!canSubmit) {
+      setIsStrategySubmitConfirmOpen(false)
+      return
+    }
+
+    setIsSubmittingToStrategyTeam(true)
+    setSuccessMessage('')
+
+    try {
+      const strategyTeam = await resolveStrategyTeam()
+      const payload = {
+        statuscode: 776140003 as Dga_aop_projectsesBase['statuscode'],
+        'ownerid@odata.bind': toEntityBind('teams', strategyTeam.id),
+      }
+
+      console.log('Submit to Strategy Team payload', payload)
+      const submitResult = await Dga_aop_projectsesService.update(
+        projectId,
+        payload as unknown as Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>>,
+      )
+      assertOperationSuccess(submitResult, 'Failed to submit activity to Strategy Team.')
+
+      setActivity((currentActivity) => currentActivity ? {
+        ...currentActivity,
+        _owningteam_value: strategyTeam.id,
+        _owninguser_value: undefined,
+        owneridname: strategyTeam.name,
+        statuscode: 776140003,
+      } : currentActivity)
+      setPendingWith(strategyTeam.name)
+      setErrors((currentErrors) => ({ ...currentErrors, submit: undefined }))
+      setSuccessMessage('Activity submitted to Strategy Team successfully.')
+      setIsStrategySubmitConfirmOpen(false)
+    } catch (error) {
+      setErrors((currentErrors) => ({
+        ...currentErrors,
+        submit: error instanceof Error ? error.message : 'Failed to submit activity to Strategy Team.',
+      }))
+      setIsStrategySubmitConfirmOpen(false)
+    } finally {
+      setIsSubmittingToStrategyTeam(false)
+    }
+  }, [
+    isSubmittingToStrategyTeam,
+    projectId,
+    resolveStrategyTeam,
+    validateSubmitToStrategyTeam,
+  ])
+
+  const handleSubmitToExecutiveDirector = useCallback(async () => {
+    if (isSubmittingToExecutiveDirector) return
+
+    const canSubmit = await validateSubmitToExecutiveDirector()
+    if (canSubmit) {
+      setIsExecutiveSubmitConfirmOpen(true)
+    }
+  }, [isSubmittingToExecutiveDirector, validateSubmitToExecutiveDirector])
+
+  const handleConfirmSubmitToExecutiveDirector = useCallback(async () => {
+    if (isSubmittingToExecutiveDirector) return
+
+    const canSubmit = await validateSubmitToExecutiveDirector()
+    if (!canSubmit) {
+      setIsExecutiveSubmitConfirmOpen(false)
+      return
+    }
+
+    const planningInstanceId = normalizeId(activity?._dga_project_planning_instance_value)
+    if (!planningInstanceId) {
+      setErrors((currentErrors) => ({
+        ...currentErrors,
+        submit: 'Planning instance could not be resolved for this activity.',
+      }))
+      setIsExecutiveSubmitConfirmOpen(false)
+      return
+    }
+
+    setIsSubmittingToExecutiveDirector(true)
+    setSuccessMessage('')
+
+    try {
+      const planningInstanceResult = await Dga_project_planning_instancesService.get(planningInstanceId, {
+        select: [
+          'dga_project_planning_instanceid',
+          '_dga_executive_director_team_value',
+        ],
+      })
+      assertOperationSuccess(planningInstanceResult, 'Unable to load Executive Director team from the planning instance.')
+
+      const planningInstance = getResultValue<Dga_project_planning_instances>(planningInstanceResult)
+      const executiveDirectorTeamId = normalizeId(planningInstance?._dga_executive_director_team_value)
+
+      if (!executiveDirectorTeamId) {
+        throw new Error('Executive Director team could not be resolved from the current planning instance.')
+      }
+
+      const payload = {
+        statuscode: 776140002 as Dga_aop_projectsesBase['statuscode'],
+        'ownerid@odata.bind': toEntityBind('teams', executiveDirectorTeamId),
+      }
+
+      console.log('Submit to Executive Director payload', payload)
+      const submitResult = await Dga_aop_projectsesService.update(
+        projectId,
+        payload as unknown as Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>>,
+      )
+      assertOperationSuccess(submitResult, 'Failed to submit activity to Executive Director.')
+
+      let nextPendingWith = 'Executive Director'
+      try {
+        const teamResult = await TeamsService.get(executiveDirectorTeamId, {
+          select: ['teamid', 'name'],
+        })
+        assertOperationSuccess(teamResult, 'Unable to load Executive Director team name.')
+        nextPendingWith = getResultValue<Teams>(teamResult)?.name || nextPendingWith
+      } catch {
+        // Owner assignment succeeded; pending-with display can safely fall back.
+      }
+
+      setActivity((currentActivity) => currentActivity ? {
+        ...currentActivity,
+        _owningteam_value: executiveDirectorTeamId,
+        _owninguser_value: undefined,
+        owneridname: nextPendingWith,
+        statuscode: 776140002,
+      } : currentActivity)
+      setPendingWith(nextPendingWith)
+      setErrors((currentErrors) => ({ ...currentErrors, submit: undefined }))
+      setSuccessMessage('Activity submitted to Executive Director successfully.')
+      setIsExecutiveSubmitConfirmOpen(false)
+    } catch (error) {
+      setErrors((currentErrors) => ({
+        ...currentErrors,
+        submit: error instanceof Error ? error.message : 'Failed to submit activity to Executive Director.',
+      }))
+      setIsExecutiveSubmitConfirmOpen(false)
+    } finally {
+      setIsSubmittingToExecutiveDirector(false)
+    }
+  }, [
+    activity?._dga_project_planning_instance_value,
+    isSubmittingToExecutiveDirector,
+    projectId,
+    validateSubmitToExecutiveDirector,
+  ])
+
+  const resolveDirectorGeneralTeam = useCallback(async () => {
+    const directorGeneralTeamResult = await TeamsService.getAll({
+      filter: `name eq '${escapeODataValue('AOP - Director General')}'`,
+      select: ['teamid', 'name'],
+      top: 1,
+    })
+    assertOperationSuccess(directorGeneralTeamResult, 'Unable to resolve Director General owner.')
+
+    const directorGeneralTeam = getResultArray<Teams>(directorGeneralTeamResult)[0]
+    const directorGeneralTeamId = normalizeId(directorGeneralTeam?.teamid)
+
+    if (!directorGeneralTeamId) {
+      throw new Error('AOP - Director General team could not be found.')
+    }
+
+    return {
+      id: directorGeneralTeamId,
+      name: directorGeneralTeam.name || 'AOP - Director General',
+    }
+  }, [])
+
+  const handleSubmitToDirectorGeneral = useCallback(async () => {
+    if (isSubmittingToDirectorGeneral) return
+
+    const canSubmit = await validateSubmitToDirectorGeneral()
+    if (canSubmit) {
+      setIsDirectorGeneralSubmitConfirmOpen(true)
+    }
+  }, [isSubmittingToDirectorGeneral, validateSubmitToDirectorGeneral])
+
+  const handleConfirmSubmitToDirectorGeneral = useCallback(async () => {
+    if (isSubmittingToDirectorGeneral) return
+
+    const canSubmit = await validateSubmitToDirectorGeneral()
+    if (!canSubmit) {
+      setIsDirectorGeneralSubmitConfirmOpen(false)
+      return
+    }
+
+    setIsSubmittingToDirectorGeneral(true)
+    setSuccessMessage('')
+
+    try {
+      const directorGeneralTeam = await resolveDirectorGeneralTeam()
+      const payload = {
+        statuscode: 776140014 as Dga_aop_projectsesBase['statuscode'],
+        'ownerid@odata.bind': toEntityBind('teams', directorGeneralTeam.id),
+      }
+
+      console.log('Submit to Director General payload', payload)
+      const submitResult = await Dga_aop_projectsesService.update(
+        projectId,
+        payload as unknown as Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>>,
+      )
+      assertOperationSuccess(submitResult, 'Failed to submit activity to Director General.')
+
+      setActivity((currentActivity) => currentActivity ? {
+        ...currentActivity,
+        _owningteam_value: directorGeneralTeam.id,
+        _owninguser_value: undefined,
+        owneridname: directorGeneralTeam.name,
+        statuscode: 776140014,
+      } : currentActivity)
+      setPendingWith(directorGeneralTeam.name)
+      setErrors((currentErrors) => ({ ...currentErrors, submit: undefined }))
+      setSuccessMessage('Activity submitted to Director General successfully.')
+      setIsDirectorGeneralSubmitConfirmOpen(false)
+    } catch (error) {
+      setErrors((currentErrors) => ({
+        ...currentErrors,
+        submit: error instanceof Error ? error.message : 'Failed to submit activity to Director General.',
+      }))
+      setIsDirectorGeneralSubmitConfirmOpen(false)
+    } finally {
+      setIsSubmittingToDirectorGeneral(false)
+    }
+  }, [
+    isSubmittingToDirectorGeneral,
+    projectId,
+    resolveDirectorGeneralTeam,
+    validateSubmitToDirectorGeneral,
+  ])
+
+  const handleApproveAsDirectorGeneral = useCallback(async () => {
+    if (isApprovingAsDirectorGeneral) return
+
+    const canApprove = await validateApproveAsDirectorGeneral()
+    if (canApprove) {
+      setIsDirectorGeneralApproveConfirmOpen(true)
+    }
+  }, [isApprovingAsDirectorGeneral, validateApproveAsDirectorGeneral])
+
+  const handleConfirmApproveAsDirectorGeneral = useCallback(async () => {
+    if (isApprovingAsDirectorGeneral) return
+
+    const canApprove = await validateApproveAsDirectorGeneral()
+    if (!canApprove) {
+      setIsDirectorGeneralApproveConfirmOpen(false)
+      return
+    }
+
+    const planningInstanceId = normalizeId(activity?._dga_project_planning_instance_value)
+    if (!planningInstanceId) {
+      setErrors((currentErrors) => ({
+        ...currentErrors,
+        submit: 'Planning instance could not be resolved for this activity.',
+      }))
+      setIsDirectorGeneralApproveConfirmOpen(false)
+      return
+    }
+
+    setIsApprovingAsDirectorGeneral(true)
+    setSuccessMessage('')
+
+    try {
+      const planningInstanceResult = await Dga_project_planning_instancesService.get(planningInstanceId, {
+        select: [
+          'dga_project_planning_instanceid',
+          '_dga_division_member_team_value',
+        ],
+      })
+      assertOperationSuccess(planningInstanceResult, 'Unable to load Division Member team from the planning instance.')
+
+      const planningInstance = getResultValue<Dga_project_planning_instances>(planningInstanceResult)
+      const divisionMemberTeamId = normalizeId(planningInstance?._dga_division_member_team_value)
+
+      if (!divisionMemberTeamId) {
+        throw new Error('Division Member team could not be resolved from the current planning instance.')
+      }
+
+      const payload = {
+        dga_project_phase: 776140001 as Dga_aop_projectsesBase['dga_project_phase'],
+        statuscode: 776140011 as Dga_aop_projectsesBase['statuscode'],
+        'ownerid@odata.bind': toEntityBind('teams', divisionMemberTeamId),
+      }
+
+      console.log('Director General approve payload', payload)
+      const approveResult = await Dga_aop_projectsesService.update(
+        projectId,
+        payload as unknown as Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>>,
+      )
+      assertOperationSuccess(approveResult, 'Failed to approve activity.')
+
+      let nextPendingWith = 'Division Member'
+      try {
+        const teamResult = await TeamsService.get(divisionMemberTeamId, {
+          select: ['teamid', 'name'],
+        })
+        assertOperationSuccess(teamResult, 'Unable to load Division Member team name.')
+        nextPendingWith = getResultValue<Teams>(teamResult)?.name || nextPendingWith
+      } catch {
+        // Approval succeeded; pending-with display can safely fall back.
+      }
+
+      setActivity((currentActivity) => currentActivity ? {
+        ...currentActivity,
+        _owningteam_value: divisionMemberTeamId,
+        _owninguser_value: undefined,
+        dga_project_phase: 776140001,
+        owneridname: nextPendingWith,
+        statuscode: 776140011,
+      } : currentActivity)
+      setPendingWith(nextPendingWith)
+      setErrors((currentErrors) => ({ ...currentErrors, submit: undefined }))
+      setSuccessMessage('Activity approved successfully.')
+      setIsDirectorGeneralApproveConfirmOpen(false)
+    } catch (error) {
+      setErrors((currentErrors) => ({
+        ...currentErrors,
+        submit: error instanceof Error ? error.message : 'Failed to approve activity.',
+      }))
+      setIsDirectorGeneralApproveConfirmOpen(false)
+    } finally {
+      setIsApprovingAsDirectorGeneral(false)
+    }
+  }, [
+    activity?._dga_project_planning_instance_value,
+    isApprovingAsDirectorGeneral,
+    projectId,
+    validateApproveAsDirectorGeneral,
+  ])
 
   const handleRequestClarification = useCallback(() => {
     // TODO: Implement clarification request logic
     console.log('Request Clarification')
+  }, [])
+
+  const handleStartActivity = useCallback(() => {
+    // TODO: Implement start activity logic
+    console.log('Start Activity')
   }, [])
 
   // ── Tab content ──
@@ -460,8 +1149,10 @@ export function EditActivity() {
         return (
           <ActivityInfoTab
             activityLeadOptions={activityLeadOptions}
+            editableFields={editPermissions.activityInfoEditableFields}
             errors={errors}
             form={form}
+            isReadOnly={editPermissions.activityInfoReadOnly}
             isAdeoVisible={isAdeoVisible}
             isBudgetNo={isBudgetNo}
             isPaymentOnly={isPaymentOnly}
@@ -473,6 +1164,7 @@ export function EditActivity() {
       case 'objectives':
         return (
           <ObjectivesTab
+            isReadOnly={editPermissions.objectivesReadOnly}
             onHeaderActionChange={setObjectiveHeaderAction}
             projectId={projectId}
             statusCode={statusCode}
@@ -483,6 +1175,7 @@ export function EditActivity() {
           <MilestonesTab
             activityPlannedEndDate={form.plannedEndDate}
             activityPlannedStartDate={form.plannedStartDate}
+            isReadOnly={editPermissions.milestonesReadOnly}
             isAdeoVisible={isAdeoVisible}
             projectId={projectId}
           />
@@ -493,6 +1186,7 @@ export function EditActivity() {
             activityPlannedEndDate={form.plannedEndDate}
             activityPlannedStartDate={form.plannedStartDate}
             activityScope={form.activityScope}
+            isReadOnly={editPermissions.procurementReadOnly}
             projectId={projectId}
           />
         )
@@ -515,6 +1209,7 @@ export function EditActivity() {
       case 'budget':
         return (
           <BudgetTab
+            isReadOnly={editPermissions.budgetReadOnly}
             onHeaderActionChange={setBudgetHeaderAction}
             plannedEndDate={form.plannedEndDate}
             plannedStartDate={form.plannedStartDate}
@@ -748,25 +1443,24 @@ export function EditActivity() {
           </Button>
         </div>
 
-        <div className="create-activity__hero-body">
-          <div className="create-activity__hero-icon" aria-hidden="true">
-            <Edit3 size={22} />
+        <div className="edit-activity__hero-main">
+          <div className="edit-activity__hero-title-row">
+            <div className="create-activity__hero-icon" aria-hidden="true">
+              <Edit3 size={22} />
+            </div>
+            <div className="create-activity__hero-content">
+              <span>Edit Activity</span>
+              <h1>{activityName}</h1>
+              <p className="edit-activity__ai-summary">
+                <Sparkles size={14} />
+                {aiSummary}
+              </p>
+            </div>
           </div>
-          <div className="create-activity__hero-content">
-            <span>Edit Activity</span>
-            <h1>{activityName}</h1>
-            <p className="edit-activity__ai-summary">
-              <Sparkles size={14} />
-              {aiSummary}
-            </p>
-          </div>
-        </div>
-
-        <div className="create-activity__hero-footer">
-          <div className="create-activity__hero-chips">
+          <div className="create-activity__hero-chips edit-activity__status-cluster">
             <span className="create-activity__chip">
               <span className="create-activity__chip-label">Status</span>
-              <Badge tone={getStatusTone(formatStatusCode(statusCode))}>
+              <Badge tone={getStatusTone(statusCode)}>
                 {formatStatusCode(statusCode)}
               </Badge>
             </span>
@@ -784,43 +1478,109 @@ export function EditActivity() {
               </strong>
             </span>
           </div>
+        </div>
 
+        <div className="edit-activity__command-bar">
+          <div className="edit-activity__command-label">
+            <span>Workflow Actions</span>
+            <strong>{activeTab.replace(/-/g, ' ')}</strong>
+          </div>
           <div className="edit-activity__actions">
-            {activeTab === 'activity-info' ? (
+            {activeTab === 'activity-info' && canShowHeaderSaveActions ? (
               <Button
-                disabled={isSavingActivityInfo || Boolean(errors.context)}
+                disabled={!editPermissions.activityInfoCanSave || isSavingActivityInfo || Boolean(errors.context)}
                 icon={<Save size={16} />}
                 onClick={handleSaveActivityInfo}
               >
                 {isSavingActivityInfo ? 'Saving...' : statusCode === 1 ? 'Save Draft' : 'Save Changes'}
               </Button>
             ) : null}
-            {activeTab === 'objectives' && objectiveHeaderAction ? (
+            {activeTab === 'objectives' && objectiveHeaderAction && canShowHeaderSaveActions ? (
               <Button
-                disabled={!objectiveHeaderAction.canSave || objectiveHeaderAction.isSaving || Boolean(errors.context)}
+                disabled={editPermissions.objectivesReadOnly || !objectiveHeaderAction.canSave || objectiveHeaderAction.isSaving || Boolean(errors.context)}
                 icon={<Save size={16} />}
                 onClick={objectiveHeaderAction.onSave}
               >
                 {objectiveHeaderAction.isSaving ? objectiveHeaderAction.savingLabel : objectiveHeaderAction.label}
               </Button>
             ) : null}
-            {activeTab === 'budget' && budgetHeaderAction ? (
+            {activeTab === 'budget' && budgetHeaderAction && canShowHeaderSaveActions ? (
               <Button
-                disabled={!budgetHeaderAction.canSave || budgetHeaderAction.isSaving || Boolean(errors.context)}
+                disabled={editPermissions.budgetReadOnly || !budgetHeaderAction.canSave || budgetHeaderAction.isSaving || Boolean(errors.context)}
                 icon={<Save size={16} />}
                 onClick={budgetHeaderAction.onSave}
               >
                 {budgetHeaderAction.isSaving ? budgetHeaderAction.savingLabel : budgetHeaderAction.label}
               </Button>
             ) : null}
-            {isDivisionMember ? (
-              <Button icon={<Send size={16} />} onClick={handleSubmitToDivisionDirector}>
-                Submit to Division Director
+            {isDivisionMember && editPermissions.canSubmitToDivisionDirector ? (
+              <Button
+                disabled={isSubmittingToDirector || Boolean(errors.context)}
+                icon={<Send size={16} />}
+                onClick={handleSubmitToDivisionDirector}
+              >
+                {isSubmittingToDirector ? 'Submitting...' : 'Submit to Division Director'}
               </Button>
             ) : null}
-            {isDivisionDirector ? (
+            {isDivisionDirector && editPermissions.canSubmitToStrategyTeam ? (
+              <Button
+                disabled={isSubmittingToStrategyTeam || Boolean(errors.context)}
+                icon={<Send size={16} />}
+                onClick={handleSubmitToStrategyTeam}
+              >
+                {isSubmittingToStrategyTeam ? 'Submitting...' : 'Submit to Strategy Team'}
+              </Button>
+            ) : null}
+            {isDivisionDirector && editPermissions.canSubmitToStrategyTeam ? (
               <Button icon={<HelpCircle size={16} />} onClick={handleRequestClarification} variant="secondary">
                 Request Clarification
+              </Button>
+            ) : null}
+            {isStrategyTeam && editPermissions.canSubmitToExecutiveDirector ? (
+              <Button
+                disabled={isSubmittingToExecutiveDirector || Boolean(errors.context)}
+                icon={<Send size={16} />}
+                onClick={handleSubmitToExecutiveDirector}
+              >
+                {isSubmittingToExecutiveDirector ? 'Submitting...' : 'Submit to Executive Director'}
+              </Button>
+            ) : null}
+            {isStrategyTeam && editPermissions.canSubmitToExecutiveDirector ? (
+              <Button icon={<HelpCircle size={16} />} onClick={handleRequestClarification} variant="secondary">
+                Request Clarification
+              </Button>
+            ) : null}
+            {isExecutiveDirector && editPermissions.canSubmitToDirectorGeneral ? (
+              <Button
+                disabled={isSubmittingToDirectorGeneral || Boolean(errors.context)}
+                icon={<Send size={16} />}
+                onClick={handleSubmitToDirectorGeneral}
+              >
+                {isSubmittingToDirectorGeneral ? 'Submitting...' : 'Submit to Director General'}
+              </Button>
+            ) : null}
+            {isExecutiveDirector && editPermissions.canSubmitToDirectorGeneral ? (
+              <Button icon={<HelpCircle size={16} />} onClick={handleRequestClarification} variant="secondary">
+                Request Clarification
+              </Button>
+            ) : null}
+            {isDirectorGeneral && editPermissions.canApproveAsDirectorGeneral ? (
+              <Button
+                disabled={isApprovingAsDirectorGeneral || Boolean(errors.context)}
+                icon={<Send size={16} />}
+                onClick={handleApproveAsDirectorGeneral}
+              >
+                {isApprovingAsDirectorGeneral ? 'Approving...' : 'Approve'}
+              </Button>
+            ) : null}
+            {isDirectorGeneral && editPermissions.canApproveAsDirectorGeneral ? (
+              <Button icon={<HelpCircle size={16} />} onClick={handleRequestClarification} variant="secondary">
+                Request Clarification
+              </Button>
+            ) : null}
+            {isDivisionMember && editPermissions.canStartActivity ? (
+              <Button icon={<Send size={16} />} onClick={handleStartActivity}>
+                Start Activity
               </Button>
             ) : null}
             <Button icon={<FileText size={16} />} variant="ghost" className="edit-activity__card-btn">
@@ -876,6 +1636,61 @@ export function EditActivity() {
       <div className="edit-activity__stage-content" role="tabpanel">
         {renderTabContent()}
       </div>
+
+      <ConfirmationDialog
+        confirmLabel={isSubmittingToDirector ? 'Submitting...' : 'Submit'}
+        description="This action will submit the project to the Division Director for review and approval. Once submitted, you will no longer be able to edit the project. Are you sure you want to proceed?"
+        isOpen={isSubmitConfirmOpen}
+        onCancel={() => {
+          if (!isSubmittingToDirector) setIsSubmitConfirmOpen(false)
+        }}
+        onConfirm={handleConfirmSubmitToDivisionDirector}
+        title="Submit for Approval"
+      />
+
+      <ConfirmationDialog
+        confirmLabel={isSubmittingToStrategyTeam ? 'Submitting...' : 'Submit'}
+        description="This action will submit the project to the Strategy Team for review and approval. Once submitted, you will no longer be able to edit the project. Are you sure you want to proceed?"
+        isOpen={isStrategySubmitConfirmOpen}
+        onCancel={() => {
+          if (!isSubmittingToStrategyTeam) setIsStrategySubmitConfirmOpen(false)
+        }}
+        onConfirm={handleConfirmSubmitToStrategyTeam}
+        title="Submit for Approval"
+      />
+
+      <ConfirmationDialog
+        confirmLabel={isSubmittingToExecutiveDirector ? 'Submitting...' : 'Submit'}
+        description="This action will submit the project to the Executive Director for review and approval. Once submitted, you will no longer be able to edit the project. Are you sure you want to proceed?"
+        isOpen={isExecutiveSubmitConfirmOpen}
+        onCancel={() => {
+          if (!isSubmittingToExecutiveDirector) setIsExecutiveSubmitConfirmOpen(false)
+        }}
+        onConfirm={handleConfirmSubmitToExecutiveDirector}
+        title="Submit for Approval"
+      />
+
+      <ConfirmationDialog
+        confirmLabel={isSubmittingToDirectorGeneral ? 'Submitting...' : 'Submit'}
+        description="This action will submit the project to the Director General for review and approval. Once submitted, you will no longer be able to edit the project. Are you sure you want to proceed?"
+        isOpen={isDirectorGeneralSubmitConfirmOpen}
+        onCancel={() => {
+          if (!isSubmittingToDirectorGeneral) setIsDirectorGeneralSubmitConfirmOpen(false)
+        }}
+        onConfirm={handleConfirmSubmitToDirectorGeneral}
+        title="Submit for Approval"
+      />
+
+      <ConfirmationDialog
+        confirmLabel={isApprovingAsDirectorGeneral ? 'Approving...' : 'Approve'}
+        description="This action will approve the project and move it to execution. Ownership will return to the Division Member team. Are you sure you want to proceed?"
+        isOpen={isDirectorGeneralApproveConfirmOpen}
+        onCancel={() => {
+          if (!isApprovingAsDirectorGeneral) setIsDirectorGeneralApproveConfirmOpen(false)
+        }}
+        onConfirm={handleConfirmApproveAsDirectorGeneral}
+        title="Approve Activity"
+      />
     </div>
   )
 }

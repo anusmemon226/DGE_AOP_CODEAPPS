@@ -75,6 +75,7 @@ type ProcurementTabProps = {
   activityScope: ActivityScopeValue
   activityPlannedEndDate: string
   activityPlannedStartDate: string
+  isReadOnly?: boolean
   projectId: string
 }
 
@@ -450,7 +451,7 @@ function getDateRangeErrors(
 
 // ── Component ──
 
-export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDate, activityScope, projectId }: ProcurementTabProps) {
+export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDate, activityScope, isReadOnly = false, projectId }: ProcurementTabProps) {
   const uid = useId()
 
   // ── Data state ──
@@ -737,28 +738,32 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
       header: 'Actions',
       render: (row: Procurement) => (
         <div className="edit-activity__procurement-actions">
-          <button
-            aria-label="Edit procurement"
-            className="edit-activity__procurement-action-btn"
-            onClick={() => handleOpenEdit(row)}
-            type="button"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-            </svg>
-          </button>
-          <button
-            aria-label="Delete procurement"
-            className="edit-activity__procurement-action-btn edit-activity__procurement-action-btn--danger"
-            onClick={() => setProcurementToDelete(row)}
-            type="button"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="3 6 5 6 21 6" />
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-            </svg>
-          </button>
+          {!isReadOnly ? (
+            <>
+              <button
+                aria-label="Edit procurement"
+                className="edit-activity__procurement-action-btn"
+                onClick={() => handleOpenEdit(row)}
+                type="button"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+              </button>
+              <button
+                aria-label="Delete procurement"
+                className="edit-activity__procurement-action-btn edit-activity__procurement-action-btn--danger"
+                onClick={() => setProcurementToDelete(row)}
+                type="button"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+              </button>
+            </>
+          ) : null}
         </div>
       ),
     },
@@ -767,6 +772,7 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
   // ── Helpers ──
 
   function handleFieldChange(fields: Partial<ProcurementFormData>) {
+    if (isReadOnly) return
     const next = { ...form, ...fields }
 
     // Reset dependent fields
@@ -843,6 +849,7 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
   }
 
   function handleOpenCreate() {
+    if (isReadOnly) return
     setEditingProcurement(null)
     setForm(EMPTY_FORM)
     setFormErrors({})
@@ -852,6 +859,7 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
   }
 
   function handleOpenEdit(procurement: Procurement) {
+    if (isReadOnly) return
     setEditingProcurement(procurement)
     setForm({
       tenderRequired: procurement.tenderRequired,
@@ -929,6 +937,7 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
   }
 
   async function handleSave() {
+    if (isReadOnly) return
     if (!validate()) return
     if (!projectId) {
       setProcurementError('Activity id is missing from the edit URL.')
@@ -965,6 +974,7 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
   }
 
   async function handleConfirmDelete() {
+    if (isReadOnly) return
     if (!procurementToDelete) return
     if (isDeletingProcurement) return
 
@@ -996,7 +1006,7 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
             <Button onClick={handleCloseDrawer} variant="secondary">
               Cancel
             </Button>
-            <Button disabled={isSavingProcurement} onClick={handleSave}>
+            <Button disabled={isReadOnly || isSavingProcurement} onClick={handleSave}>
               {isSavingProcurement ? 'Saving...' : editingProcurement ? 'Update Procurement' : 'Create Procurement'}
             </Button>
           </div>
@@ -1033,6 +1043,7 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
             <div className="edit-activity__procurement-drawer-section">
               <RadioGroup
                 className="radio-group--tender-required"
+                disabled={isReadOnly}
                 error={formErrors.tenderRequired}
                 label="Tender Required"
                 name={`${uid}-tender-required`}
@@ -1045,6 +1056,7 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
               {isTenderRequired && (
                 <RadioGroup
                   className="radio-group--tender-type"
+                  disabled={isReadOnly}
                   error={formErrors.tenderType}
                   label="Tender Type"
                   name={`${uid}-tender-type`}
@@ -1058,6 +1070,7 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
               {procurementStatusOptions.length > 0 && (
                 <RadioGroup
                   className="create-activity__radio--status"
+                  disabled={isReadOnly}
                   error={formErrors.procurementStatus}
                   label="Procurement Status"
                   name={`${uid}-procurement-status`}
@@ -1090,6 +1103,7 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
 
             <div className="edit-activity__procurement-drawer-section">
             <Input
+              disabled={isReadOnly}
               error={formErrors.procurementName}
               label="Procurement Name"
               onChange={(e) => handleFieldChange({ procurementName: e.target.value })}
@@ -1098,6 +1112,7 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
             />
 
             <Select
+              disabled={isReadOnly}
               error={formErrors.requestType}
               id={`${uid}-request-type`}
               label="Request Type"
@@ -1109,11 +1124,13 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
 
             <div className="create-activity__form-row create-activity__form-row--two">
               <Input
+                disabled={isReadOnly}
                 label="Contract Number (if applicable)"
                 onChange={(e) => handleFieldChange({ contractNumber: e.target.value })}
                 value={form.contractNumber}
               />
               <Input
+                disabled={isReadOnly}
                 label="Recommended Suppliers"
                 onChange={(e) => handleFieldChange({ recommendedSuppliers: e.target.value })}
                 value={form.recommendedSuppliers}
@@ -1122,6 +1139,7 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
 
             <div className="create-activity__form-row create-activity__form-row--two">
               <Select
+                disabled={isReadOnly}
                 error={formErrors.tenderingMethod}
                 id={`${uid}-tendering-method`}
                 label="Tendering Method"
@@ -1131,6 +1149,7 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
                 value={form.tenderingMethod}
               />
               <Select
+                disabled={isReadOnly}
                 error={formErrors.solicitationChannel}
                 id={`${uid}-solicitation-channel`}
                 label="Solicitation Channel"
@@ -1143,6 +1162,7 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
 
             <div className="create-activity__form-row create-activity__form-row--two">
               <Select
+                disabled={isReadOnly}
                 error={formErrors.costCenter}
                 id={`${uid}-cost-center`}
                 label="Cost Center"
@@ -1162,6 +1182,7 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
             <div className="create-activity__form-row create-activity__form-row--two">
               <RadioGroup
                 className="radio-group--opex-capex"
+                disabled={isReadOnly}
                 error={formErrors.opexCapex}
                 label="Opex/Capex"
                 name={`${uid}-opex-capex`}
@@ -1172,6 +1193,7 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
               />
               <RadioGroup
                 className="radio-group--strategic-plan"
+                disabled={isReadOnly}
                 error={formErrors.alignedStrategicPlan}
                 label="Aligned with Strategic Plan"
                 name={`${uid}-strategic-plan`}
@@ -1184,6 +1206,7 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
 
             <RadioGroup
               className="radio-group--outcome"
+              disabled={isReadOnly}
               error={formErrors.outcome}
               label="Outcome"
               name={`${uid}-outcome`}
@@ -1195,6 +1218,7 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
 
             <div className="create-activity__form-row create-activity__form-row--two">
               <Select
+                disabled={isReadOnly}
                 id={`${uid}-category-description`}
                 label="Category Description"
                 onChange={(value) => handleFieldChange({ categoryDescription: value })}
@@ -1231,6 +1255,7 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
 
             <div className="edit-activity__procurement-drawer-section">
               <Textarea
+                disabled={isReadOnly}
                 error={formErrors.endUserComments}
                 label="End User Comments"
                 onChange={(e) => handleFieldChange({ endUserComments: e.target.value })}
@@ -1240,6 +1265,7 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
               />
 
               <Textarea
+                disabled={isReadOnly}
                 error={formErrors.itemServiceDescription}
                 label="Item/Service Description"
                 onChange={(e) => handleFieldChange({ itemServiceDescription: e.target.value })}
@@ -1250,6 +1276,7 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
 
               <div className="create-activity__form-row create-activity__form-row--two">
                 <CurrencyInput
+                  disabled={isReadOnly}
                   error={formErrors.totalEstimatedValue}
                   label="Total Activity Estimated Value"
                   onBlur={() => handleCurrencyBlur('totalEstimatedValue')}
@@ -1258,6 +1285,7 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
                   value={form.totalEstimatedValue}
                 />
                 <CurrencyInput
+                  disabled={isReadOnly}
                   error={formErrors.prExpectedValue2026}
                   label="PR Expected Value in 2026"
                   onBlur={() => handleCurrencyBlur('prExpectedValue2026')}
@@ -1268,6 +1296,7 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
               </div>
 
               <Input
+                disabled={isReadOnly}
                 error={formErrors.expectedContractDuration}
                 hint="Duration in months"
                 label="Expected Contract Duration (in months)"
@@ -1294,6 +1323,7 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
 
               <div className="create-activity__form-row create-activity__form-row--two">
                 <DatePicker
+                  disabled={isReadOnly}
                   error={formErrors.plannedPrCreationDate}
                   id={`${uid}-pr-creation-date`}
                   label="Planned PR Creation Date"
@@ -1313,6 +1343,7 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
 
               <div className="create-activity__form-row create-activity__form-row--two">
                 <DatePicker
+                  disabled={isReadOnly}
                   error={formErrors.expectedAwardingDate}
                   id={`${uid}-awarding-date`}
                   label="Expected Awarding Date"
@@ -1354,7 +1385,7 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
-        } disabled={!projectId || isProcurementsLoading} onClick={handleOpenCreate}>
+        } disabled={isReadOnly || !projectId || isProcurementsLoading} onClick={handleOpenCreate}>
           Add Procurement
         </Button>
       </div>

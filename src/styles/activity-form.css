@@ -67,6 +67,76 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.edit-activity__hero-main {
+  align-items: start;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 0;
+}
+
+.edit-activity__hero-title-row {
+  align-items: center;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-width: 0;
+}
+
+.edit-activity__status-cluster {
+  align-content: start;
+  justify-content: flex-end;
+  justify-self: end;
+  max-width: min(44vw, 36rem);
+  padding-top: 0.1rem;
+}
+
+.edit-activity__command-bar {
+  align-items: center;
+  background:
+    linear-gradient(135deg, rgba(55, 94, 251, 0.08), rgba(255, 255, 255, 0.5) 42%, rgba(55, 94, 251, 0.04)),
+    rgba(255, 255, 255, 0.56);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 0.85rem;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 0.65rem 0.7rem;
+}
+
+:root[data-theme='dark'] .edit-activity__command-bar {
+  background:
+    linear-gradient(135deg, rgba(129, 140, 248, 0.13), rgba(15, 23, 42, 0.44) 45%, rgba(56, 189, 248, 0.06)),
+    rgba(15, 23, 42, 0.38);
+  border-color: rgba(148, 163, 184, 0.16);
+}
+
+.edit-activity__command-label {
+  border-left: 3px solid var(--color-primary);
+  display: grid;
+  flex: 0 0 auto;
+  gap: 0.08rem;
+  min-width: 9.5rem;
+  padding-left: 0.6rem;
+}
+
+.edit-activity__command-label span {
+  color: var(--color-primary);
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.edit-activity__command-label strong {
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: capitalize;
 }
 
 /* Activity Card button — matches stage tab active style */
@@ -206,6 +276,13 @@
   font-weight: 800;
   gap: 0.3rem;
   min-width: 0;
+}
+
+.create-activity__chip--user strong {
+  max-width: 15rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .create-activity__chip strong svg {
@@ -1972,6 +2049,31 @@
     width: 100%;
   }
 
+  .edit-activity__hero-main {
+    grid-template-columns: 1fr;
+  }
+
+  .edit-activity__status-cluster {
+    justify-content: flex-start;
+    justify-self: stretch;
+    max-width: none;
+  }
+
+  .edit-activity__command-bar {
+    align-items: stretch;
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .edit-activity__actions {
+    justify-content: flex-start;
+  }
+
+  .edit-activity__actions .button {
+    flex: 1 1 13rem;
+    min-width: 0;
+  }
+
   .copilot-composer__footer {
     align-items: stretch;
     display: grid;
@@ -2012,6 +2114,16 @@
 
   .create-activity__hero-chips {
     justify-content: start;
+    justify-self: stretch;
+    max-width: none;
+  }
+
+  .edit-activity__hero-title-row {
+    grid-template-columns: 1fr;
+  }
+
+  .edit-activity__command-label {
+    min-width: 0;
   }
 
   .create-activity__chip {

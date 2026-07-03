@@ -46,6 +46,32 @@ const REVERSE_ROLE_MAP: Record<string, AopRole> = {
   'Director General': 'AOP - Director General',
 }
 
+const SELECTED_ROLE_STORAGE_KEY = 'aop:selectedRoleAssignmentId'
+
+function getStoredRoleAssignmentId() {
+  try {
+    return window.localStorage.getItem(SELECTED_ROLE_STORAGE_KEY)
+  } catch {
+    return null
+  }
+}
+
+function setStoredRoleAssignmentId(roleId: string) {
+  try {
+    window.localStorage.setItem(SELECTED_ROLE_STORAGE_KEY, roleId)
+  } catch {
+    // Ignore storage errors; role selection should still work for the active session.
+  }
+}
+
+function clearStoredRoleAssignmentId() {
+  try {
+    window.localStorage.removeItem(SELECTED_ROLE_STORAGE_KEY)
+  } catch {
+    // Ignore storage errors; invalid persisted role will simply be ignored.
+  }
+}
+
 function getRoleDisplayName(
   role: UserRole,
   hierarchies: DivisionalHierarchyRef[],
@@ -117,6 +143,28 @@ export function Header() {
       dispatch(fetchPlanningInstances(selectedCycle))
     }
   }, [dispatch, selectedCycle])
+
+  // Restore the last selected role after user roles are loaded.
+  useEffect(() => {
+    if (currentUserRoles.length === 0) {
+      return
+    }
+
+    const storedRoleId = getStoredRoleAssignmentId()
+    if (!storedRoleId) {
+      return
+    }
+
+    const storedRole = currentUserRoles.find((role) => role.roleId === storedRoleId)
+    if (!storedRole) {
+      clearStoredRoleAssignmentId()
+      return
+    }
+
+    if (currentRole?.roleId !== storedRole.roleId) {
+      dispatch(setCurrentRole(storedRole))
+    }
+  }, [currentRole?.roleId, currentUserRoles, dispatch])
 
   // Sync selectedRole in appSlice with currentRole in userSlice after pipeline completes
   useEffect(() => {
@@ -364,6 +412,7 @@ export function Header() {
                         className={`role-popover__item ${isSelected ? 'role-popover__item--selected' : ''}`}
                         key={role.roleId}
                         onClick={() => {
+                          setStoredRoleAssignmentId(role.roleId)
                           dispatch(setCurrentRole(role))
                           // Backward compat: set old-style selectedRole for other pages
                           const mapped = REVERSE_ROLE_MAP[role.roleName]

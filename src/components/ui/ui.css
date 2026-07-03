@@ -26,8 +26,26 @@
   padding: 0.5rem 0.85rem;
 }
 
-.button:hover {
+.button:hover:not(:disabled) {
   transform: translateY(-1px);
+}
+
+.button:disabled {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+  box-shadow: none;
+  color: var(--color-text-tertiary);
+  cursor: not-allowed;
+  opacity: 0.72;
+  transform: none;
+}
+
+.button:disabled:hover {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+  box-shadow: none;
+  color: var(--color-text-tertiary);
+  transform: none;
 }
 
 .button:focus-visible,
@@ -42,7 +60,7 @@
   color: var(--color-on-primary);
 }
 
-.button--primary:hover {
+.button--primary:hover:not(:disabled) {
   background: var(--color-primary-hover);
 }
 
@@ -52,8 +70,8 @@
   color: var(--color-text-primary);
 }
 
-.button--secondary:hover,
-.button--ghost:hover,
+.button--secondary:hover:not(:disabled),
+.button--ghost:hover:not(:disabled),
 .icon-button:hover {
   background: var(--control-bg-hover);
   border-color: var(--control-border-hover);
@@ -139,6 +157,32 @@
   border-color: var(--control-border-hover);
   box-shadow: var(--control-shadow-hover);
   transform: translateY(-1px);
+}
+
+.select-field--disabled {
+  cursor: not-allowed;
+}
+
+.select-field--disabled .select-field__label {
+  cursor: not-allowed;
+}
+
+.select-field--disabled .select-field__control,
+.select-field__control:disabled {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
+  cursor: not-allowed;
+  opacity: 0.82;
+  transform: none;
+}
+
+.select-field--disabled .select-field__control:hover,
+.select-field__control:disabled:hover {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+  box-shadow: var(--control-shadow);
+  transform: none;
 }
 
 .select-field__value {
@@ -414,7 +458,25 @@
   opacity: 0.82;
 }
 
+.field--disabled .currency-input__control {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
+  cursor: not-allowed;
+  opacity: 0.82;
+}
+
+.field--disabled .currency-input__control input {
+  color: var(--color-text-secondary);
+  cursor: not-allowed;
+}
+
 .field--disabled .field__control:hover {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+}
+
+.field--disabled .currency-input__control:hover {
   background: var(--color-surface-muted);
   border-color: var(--color-border);
 }
@@ -823,6 +885,38 @@
 .radio-group--invalid .choice:has(input:checked) {
   background: var(--color-primary-soft);
   border-color: var(--color-primary);
+}
+
+.radio-group--disabled .choice,
+.checkbox-group--disabled .choice,
+.choice:has(input:disabled) {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
+  cursor: not-allowed;
+  opacity: 0.82;
+}
+
+.radio-group--disabled .choice:hover,
+.checkbox-group--disabled .choice:hover,
+.choice:has(input:disabled):hover {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+  box-shadow: var(--control-shadow);
+}
+
+.radio-group--disabled .choice:has(input:checked),
+.checkbox-group--disabled .choice:has(input:checked),
+.choice:has(input:disabled:checked) {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+  box-shadow: var(--control-shadow);
+}
+
+.radio-group--disabled .choice:has(input:checked) .choice__box,
+.choice:has(input:disabled:checked) .choice__box {
+  background: var(--color-text-tertiary);
+  border-color: var(--color-text-tertiary);
 }
 
 .choice input:focus-visible + .choice__box {

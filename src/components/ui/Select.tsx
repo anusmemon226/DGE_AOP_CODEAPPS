@@ -22,6 +22,7 @@ type SelectProps<TValue extends string> = {
   value: TValue
   onChange: (value: TValue) => void
   className?: string
+  disabled?: boolean
   error?: string
   hideLabel?: boolean
   menuHeader?: ReactNode
@@ -32,6 +33,7 @@ type SelectProps<TValue extends string> = {
 
 export function Select<TValue extends string>({
   className = '',
+  disabled = false,
   error,
   hideLabel = false,
   id,
@@ -113,6 +115,10 @@ export function Select<TValue extends string>({
   }, [isOpen])
 
   function selectOption(nextValue: TValue) {
+    if (disabled) {
+      return
+    }
+
     const nextOption = options.find((option) => option.value === nextValue)
 
     if (nextOption?.disabled) {
@@ -132,7 +138,7 @@ export function Select<TValue extends string>({
   }
 
   return (
-    <div className={`select-field ${className}`.trim()} ref={rootRef}>
+    <div className={`select-field ${disabled ? 'select-field--disabled' : ''} ${className}`.trim()} ref={rootRef}>
       <span className={`select-field__label ${hideLabel ? 'select-field__label--hidden' : ''}`} id={`${id}-label`}>
         {label}
         {required ? <span aria-hidden="true" className="field__required"> *</span> : null}
@@ -144,8 +150,10 @@ export function Select<TValue extends string>({
         aria-invalid={Boolean(error)}
         aria-labelledby={`${id}-label ${id}-value`}
         className="select-field__control"
+        disabled={disabled}
         id={id}
         onClick={() => {
+          if (disabled) return
           const nextOpen = !isOpen
           if (nextOpen) {
             const el = rootRef.current?.querySelector('.select-field__control') as HTMLElement | null

@@ -9,9 +9,10 @@ type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
 
 export function Textarea({ className = '', error, hint, id, label, required, rows = 4, ...props }: TextareaProps) {
   const textareaId = id ?? label.toLowerCase().replace(/\s+/g, '-')
+  const isDisabled = Boolean(props.disabled)
 
   return (
-    <label className={`field ${className}`.trim()} htmlFor={textareaId}>
+    <label className={`field ${isDisabled ? 'field--disabled' : ''} ${className}`.trim()} htmlFor={textareaId}>
       <span className="field__label">
         {label}
         {required ? <span aria-hidden="true" className="field__required"> *</span> : null}

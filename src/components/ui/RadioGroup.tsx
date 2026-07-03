@@ -9,6 +9,7 @@ type RadioOption<TValue extends string> = {
 
 type RadioGroupProps<TValue extends string> = {
   className?: string
+  disabled?: boolean
   error?: string
   label: string
   name: string
@@ -20,6 +21,7 @@ type RadioGroupProps<TValue extends string> = {
 
 export function RadioGroup<TValue extends string>({
   className = '',
+  disabled = false,
   error,
   label,
   name,
@@ -29,7 +31,7 @@ export function RadioGroup<TValue extends string>({
   value,
 }: RadioGroupProps<TValue>) {
   return (
-    <fieldset className={`radio-group ${error ? 'radio-group--invalid' : ''} ${className}`.trim()}>
+    <fieldset className={`radio-group ${error ? 'radio-group--invalid' : ''} ${disabled ? 'radio-group--disabled' : ''} ${className}`.trim()} disabled={disabled}>
       <legend className="field__label">
         {label}
         {required ? <span aria-hidden="true" className="field__required"> *</span> : null}
@@ -37,7 +39,7 @@ export function RadioGroup<TValue extends string>({
       <div className="radio-group__options">
         {options.map((option) => (
           <label className={`choice choice--radio ${option.className || ''}`.trim()} key={option.value}>
-            <input checked={option.value === value} name={name} onChange={() => onChange(option.value)} type="radio" />
+            <input checked={option.value === value} disabled={disabled} name={name} onChange={() => onChange(option.value)} type="radio" />
             <span className="choice__box" aria-hidden="true" />
             <span className="choice__copy">
               <span>{option.label}</span>

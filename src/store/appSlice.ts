@@ -14,6 +14,36 @@ import type { Dga_assessment_cycles } from '../generated/models/Dga_assessment_c
 import type { Dga_project_planning_instances } from '../generated/models/Dga_project_planning_instancesModel'
 import type { Systemusers } from '../generated/models/SystemusersModel'
 
+const SELECTED_CYCLE_STORAGE_KEY = 'aop:selected-cycle-id'
+
+function normalizeId(id?: string | null) {
+  return id?.replace(/[{}]/g, '').toLowerCase() ?? ''
+}
+
+function getStoredSelectedCycle() {
+  if (typeof window === 'undefined') return ''
+
+  try {
+    return window.localStorage.getItem(SELECTED_CYCLE_STORAGE_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+function persistSelectedCycle(cycleId: string) {
+  if (typeof window === 'undefined') return
+
+  try {
+    if (cycleId) {
+      window.localStorage.setItem(SELECTED_CYCLE_STORAGE_KEY, cycleId)
+    } else {
+      window.localStorage.removeItem(SELECTED_CYCLE_STORAGE_KEY)
+    }
+  } catch {
+    // localStorage can be unavailable in embedded/runtime contexts.
+  }
+}
+
 export const fetchAssessmentCycles = createAsyncThunk(
   'app/fetchAssessmentCycles',
   async () => {
@@ -104,7 +134,7 @@ type AppState = {
 
 const initialState: AppState = {
   selectedRole: 'AOP - Division Member',
-  selectedCycle: '',
+  selectedCycle: getStoredSelectedCycle(),
   defaultCycleId: '',
   assessmentCycles: [],
   assessmentCyclesLoading: false,
@@ -136,6 +166,7 @@ export const appSlice = createSlice({
       state.planningInstances = []
       state.planningInstancesCycleId = ''
       state.planningInstancesError = null
+      persistSelectedCycle(action.payload)
     },
     setDefaultCycle: (state, action: PayloadAction<string>) => {
       state.defaultCycleId = action.payload
@@ -176,12 +207,24 @@ export const appSlice = createSlice({
       .addCase(fetchAssessmentCycles.fulfilled, (state, action) => {
         state.assessmentCycles = action.payload
         state.assessmentCyclesLoading = false
-        // Auto-select first cycle if none selected yet
-        if (!state.selectedCycle && action.payload.length > 0) {
-          state.selectedCycle = action.payload[0].dga_assessment_cycleid
+
+        const fallbackCycleId = action.payload[0]?.dga_assessment_cycleid ?? ''
+        const validSelectedCycle = action.payload.find(
+          (cycle) => normalizeId(cycle.dga_assessment_cycleid) === normalizeId(state.selectedCycle),
+        )
+        const nextSelectedCycle = validSelectedCycle?.dga_assessment_cycleid ?? fallbackCycleId
+
+        if (state.selectedCycle !== nextSelectedCycle) {
+          state.selectedCycle = nextSelectedCycle
+          state.planningInstances = []
+          state.planningInstancesCycleId = ''
+          state.planningInstancesError = null
         }
-        if (!state.defaultCycleId && action.payload.length > 0) {
-          state.defaultCycleId = action.payload[0].dga_assessment_cycleid
+
+        persistSelectedCycle(nextSelectedCycle)
+
+        if (!state.defaultCycleId && fallbackCycleId) {
+          state.defaultCycleId = fallbackCycleId
         }
       })
       .addCase(fetchAssessmentCycles.rejected, (state) => {

@@ -49,6 +49,7 @@ const ACTIVITY_MEMBER_RELATIONSHIP = 'dga_aop_projects_systemuser_systemuser'
 
 type MembersTabProps = {
   embedded?: boolean
+  isReadOnly?: boolean
   projectId: string
 }
 
@@ -169,7 +170,7 @@ function mapAssociationsToMembers(
 
 // ── Component ──
 
-export function MembersTab({ embedded = false, projectId }: MembersTabProps) {
+export function MembersTab({ embedded = false, isReadOnly = false, projectId }: MembersTabProps) {
   const [availableUsers, setAvailableUsers] = useState<MockUser[]>([])
   const [isUsersLoading, setIsUsersLoading] = useState(false)
   const [usersError, setUsersError] = useState('')
@@ -328,13 +329,14 @@ export function MembersTab({ embedded = false, projectId }: MembersTabProps) {
   // ── Handlers ──
 
   const handleOpenAddMembersModal = useCallback(() => {
+    if (isReadOnly) return
     setSelectedMemberIds(new Set())
     setMemberFilter('all')
     setMemberSearchQuery('')
     setMemberSelectionError('')
     setMembersNotice('')
     setIsAddMembersModalOpen(true)
-  }, [])
+  }, [isReadOnly])
 
   const handleCloseAddMembersModal = useCallback(() => {
     setSelectedMemberIds(new Set())
@@ -345,6 +347,7 @@ export function MembersTab({ embedded = false, projectId }: MembersTabProps) {
   }, [])
 
   const handleAddSelectedMembers = useCallback(async () => {
+    if (isReadOnly) return
     if (isSavingMembers) return
 
     if (!projectId) {
@@ -400,13 +403,15 @@ export function MembersTab({ embedded = false, projectId }: MembersTabProps) {
     setMemberSelectionError('')
     setMembersNotice(`${selectedUserIds.length} member${selectedUserIds.length !== 1 ? 's' : ''} added successfully.`)
     setIsAddMembersModalOpen(false)
-  }, [isSavingMembers, loadMembersContext, members, projectId, selectedMemberIds])
+  }, [isReadOnly, isSavingMembers, loadMembersContext, members, projectId, selectedMemberIds])
 
   const handleRemoveMember = useCallback((member: ActivityMember) => {
+    if (isReadOnly) return
     setMemberToDelete(member)
-  }, [])
+  }, [isReadOnly])
 
   const handleConfirmDeleteMember = useCallback(async () => {
+    if (isReadOnly) return
     if (!memberToDelete) return
     if (isRemovingMember) return
 
@@ -429,7 +434,7 @@ export function MembersTab({ embedded = false, projectId }: MembersTabProps) {
     } finally {
       setIsRemovingMember(false)
     }
-  }, [isRemovingMember, loadMembersContext, memberToDelete, projectId])
+  }, [isReadOnly, isRemovingMember, loadMembersContext, memberToDelete, projectId])
 
   const handleCancelDeleteMember = useCallback(() => {
     setMemberToDelete(null)
@@ -495,7 +500,7 @@ export function MembersTab({ embedded = false, projectId }: MembersTabProps) {
               <Button onClick={handleCloseAddMembersModal} variant="secondary">
                 Cancel
               </Button>
-              <Button disabled={isUsersLoading || isSavingMembers || Boolean(usersError)} icon={<UserCheck size={16} />} onClick={handleAddSelectedMembers}>
+              <Button disabled={isReadOnly || isUsersLoading || isSavingMembers || Boolean(usersError)} icon={<UserCheck size={16} />} onClick={handleAddSelectedMembers}>
                 {isSavingMembers ? 'Adding...' : 'Add Selected Members'}
               </Button>
             </div>
@@ -652,7 +657,7 @@ export function MembersTab({ embedded = false, projectId }: MembersTabProps) {
             <p>Manage users assigned to this activity.</p>
           </div>
         )}
-        <Button disabled={!projectId || isMembersLoading} icon={<UserPlus size={16} />} onClick={handleOpenAddMembersModal}>
+        <Button disabled={isReadOnly || !projectId || isMembersLoading} icon={<UserPlus size={16} />} onClick={handleOpenAddMembersModal}>
           Add Activity Member
         </Button>
       </div>
@@ -760,15 +765,17 @@ export function MembersTab({ embedded = false, projectId }: MembersTabProps) {
                   {member.isDivisionMember ? 'Division Member' : 'Non-Division Member'}
                 </span>
               </div>
-              <button
-                aria-label={`Remove ${member.name}`}
-                className="edit-activity__member-card-remove"
-                onClick={() => handleRemoveMember(member)}
-                title="Remove member"
-                type="button"
-              >
-                <Trash2 size={15} />
-              </button>
+              {!isReadOnly ? (
+                <button
+                  aria-label={`Remove ${member.name}`}
+                  className="edit-activity__member-card-remove"
+                  onClick={() => handleRemoveMember(member)}
+                  title="Remove member"
+                  type="button"
+                >
+                  <Trash2 size={15} />
+                </button>
+              ) : null}
             </div>
           ))}
         </div>

@@ -12,6 +12,7 @@ import {
   LayoutList,
   RotateCcw,
   Rows,
+  Sparkles,
   X,
 } from 'lucide-react'
 import { Badge, Button, DatePicker, EmptyState, Input, SearchInput, Select, Tabs } from '../components/ui'
@@ -99,6 +100,11 @@ const PHASE_LABEL_MAP: Record<number, string> = {
   776140001: 'Execution',
 }
 
+const PROJECT_TYPE_LABEL_MAP: Record<number, string> = {
+  1: 'Strategic',
+  2: 'Operational',
+}
+
 function formatBudget(value: number | null | undefined): string {
   if (value == null) return '—'
   return `AED ${Number(value).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
@@ -122,6 +128,24 @@ function activityStatusTone(code: number): 'neutral' | 'info' | 'warning' | 'suc
 
 function phaseLabel(code: number): string {
   return PHASE_LABEL_MAP[code] ?? 'Unknown'
+}
+
+function projectTypeLabel(code: number | null | undefined): string {
+  if (code == null) return '—'
+  return PROJECT_TYPE_LABEL_MAP[Number(code)] ?? '—'
+}
+
+function yesNoLabel(value: boolean | number | null | undefined): string {
+  if (value === true || value === 1) return 'Yes'
+  return 'No'
+}
+
+function activitySummary(activity: Dga_aop_projectses): string {
+  return activity.dga_description_summary || 'No summary has been provided for this activity.'
+}
+
+function activityScope(activity: Dga_aop_projectses): string {
+  return activity.dga_scope || 'No scope description has been provided for this activity.'
 }
 
 function normalizeId(id?: string | null) {
@@ -317,11 +341,14 @@ export function ActivitiesList() {
   const selectedCycle = useAppSelector((state) => state.app.selectedCycle)
   const planningInstances = useAppSelector((state) => state.app.planningInstances)
   const planningInstancesCycleId = useAppSelector((state) => state.app.planningInstancesCycleId)
+  const planningInstancesLoading = useAppSelector((state) => state.app.planningInstancesLoading)
 
   // Derived role info
   const roleName = currentRole?.roleName ?? ''
   const isDivisionRole = roleName.toLowerCase().includes('division member') || roleName.toLowerCase().includes('division director')
   const isExecutiveDirector = roleName.toLowerCase().includes('executive director')
+  const requiresHierarchyScope = isDivisionRole || isExecutiveDirector
+  const hasRequiredHierarchyScope = !requiresHierarchyScope || Boolean(normalizeId(currentRoleDivisionalHierarchy?.hierarchyId))
 
   // Sector/Division options from hierarchies
   const sectorOptions = useMemo<SelectOption<string>[]>(() => {
@@ -376,17 +403,41 @@ export function ActivitiesList() {
   }, [divisionalHierarchies])
 
   // ── Planning instance IDs for cycle-based filtering ──
+  const hasSelectedCyclePlanningInstances = Boolean(
+    selectedCycle && normalizeId(planningInstancesCycleId) === normalizeId(selectedCycle),
+  )
+
   const cyclePlanningInstanceIds = useMemo(() => {
-    if (!selectedCycle || planningInstances.length === 0) return []
+    if (!selectedCycle || !hasSelectedCyclePlanningInstances || planningInstances.length === 0) return []
     return planningInstances
-      .filter((pi) => pi._dga_assessment_cycle_value === selectedCycle)
+      .filter((pi) => normalizeId(pi._dga_assessment_cycle_value) === normalizeId(selectedCycle))
       .map((pi) => pi.dga_project_planning_instanceid)
-      .filter(Boolean) as string[]
-  }, [planningInstances, selectedCycle])
+      .map((id) => normalizeId(id))
+      .filter(Boolean)
+  }, [hasSelectedCyclePlanningInstances, planningInstances, selectedCycle])
+
+  const isCycleFilterReady = Boolean(
+    selectedCycle && hasSelectedCyclePlanningInstances && !planningInstancesLoading,
+  )
+
+  const roleHierarchyFilter = useMemo(() => {
+    const hierarchyId = normalizeId(currentRoleDivisionalHierarchy?.hierarchyId)
+    if (!hierarchyId) return ''
+
+    const normalizedRoleName = roleName.toLowerCase()
+    if (normalizedRoleName.includes('division member') || normalizedRoleName.includes('division director')) {
+      return `_dga_department_value eq ${hierarchyId}`
+    }
+    if (normalizedRoleName.includes('executive director')) {
+      return `_dga_sector_value eq ${hierarchyId}`
+    }
+
+    return ''
+  }, [currentRoleDivisionalHierarchy?.hierarchyId, roleName])
 
   // Fetch planning instances if they aren't loaded for the current cycle
   useEffect(() => {
-    if (selectedCycle && planningInstancesCycleId !== selectedCycle) {
+    if (selectedCycle && normalizeId(planningInstancesCycleId) !== normalizeId(selectedCycle)) {
       dispatch(fetchPlanningInstances(selectedCycle))
     }
   }, [dispatch, selectedCycle, planningInstancesCycleId])
@@ -411,6 +462,7 @@ export function ActivitiesList() {
   const [currentPage, setCurrentPage] = useState(1)
   const [viewMode, setViewMode] = useState<'pagination' | 'lazy'>('pagination')
   const [lazyCount, setLazyCount] = useState(LAZY_BATCH_SIZE)
+  const [expandedIds, setExpandedIds] = useState<string[]>([])
   const lazySentinelRef = useRef<HTMLDivElement>(null)
 
 
@@ -552,11 +604,46 @@ export function ActivitiesList() {
       parts.push(`(${cyclePlanningInstanceIds.map((id) => `_dga_project_planning_instance_value eq ${id}`).join(' or ')})`)
     }
 
+    if (roleHierarchyFilter) {
+      parts.push(roleHierarchyFilter)
+    }
+
     return parts.join(' and ')
-  }, [debouncedSearch, phaseFilter, statusFilter, aopAdeoFilter, sectorFilter, divisionFilter, strategicFilter, cyclePlanningInstanceIds])
+  }, [debouncedSearch, phaseFilter, statusFilter, aopAdeoFilter, sectorFilter, divisionFilter, strategicFilter, cyclePlanningInstanceIds, roleHierarchyFilter])
 
   // ── Fetch activities ──
   const fetchActivities = useCallback(async () => {
+    if (!selectedCycle) {
+      setIsLoading(false)
+      setError(null)
+      setOwnerNameById({})
+      setAllActivities([])
+      return
+    }
+
+    if (!hasRequiredHierarchyScope) {
+      setIsLoading(false)
+      setError(null)
+      setOwnerNameById({})
+      setAllActivities([])
+      return
+    }
+
+    if (!isCycleFilterReady) {
+      setIsLoading(true)
+      setError(null)
+      setOwnerNameById({})
+      setAllActivities([])
+      return
+    }
+
+    if (cyclePlanningInstanceIds.length === 0) {
+      setIsLoading(false)
+      setError(null)
+      setOwnerNameById({})
+      setAllActivities([])
+      return
+    }
 
     setIsLoading(true)
     setError(null)
@@ -580,6 +667,10 @@ export function ActivitiesList() {
         'dga_requested_budget',
         'dga_planned_start_date',
         'dga_planned_end_date',
+        'dga_description_summary',
+        'dga_scope',
+        'createdon',
+        'modifiedon',
         'dga_strategic_vs_operation',
         '_dga_project_planning_instance_value',
         '_owningteam_value',
@@ -604,7 +695,7 @@ export function ActivitiesList() {
     } finally {
       setIsLoading(false)
     }
-  }, [odataFilter])
+  }, [cyclePlanningInstanceIds.length, hasRequiredHierarchyScope, isCycleFilterReady, odataFilter, selectedCycle])
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -686,6 +777,15 @@ export function ActivitiesList() {
     })
   }
 
+  function toggleExpanded(activityId?: string | null) {
+    if (!activityId) return
+    setExpandedIds((current) =>
+      current.includes(activityId)
+        ? current.filter((expandedId) => expandedId !== activityId)
+        : [...current, activityId],
+    )
+  }
+
   function getSortIcon(column: ActColumnKey) {
     if (!actSort || actSort.column !== column) {
       return <ArrowUp size={12} className="edit-activity__deps-sort-icon edit-activity__deps-sort-icon--inactive" />
@@ -702,7 +802,7 @@ export function ActivitiesList() {
       return
     }
     if (tableWrapRef.current) {
-      const cellEl = (e.currentTarget as HTMLElement).closest('th') as HTMLElement
+      const cellEl = (e.currentTarget as HTMLElement).closest('[data-filter-anchor]') as HTMLElement
       const cellRect = cellEl?.getBoundingClientRect()
       if (cellRect) {
         setFilterPopoverPos({
@@ -908,59 +1008,15 @@ export function ActivitiesList() {
   // ── Render skeleton rows ──
   function renderSkeletonRows() {
     return Array.from({ length: 8 }).map((_, rowIdx) => (
-      <tr className="activities-list__skeleton-row" key={`skel-${rowIdx}`}>
-        <td className="activities-list__skeleton-cell">
-          <div className="activities-list__skeleton-bar activities-list__skeleton-bar--w60" />
-        </td>
-        <td className="activities-list__skeleton-cell">
-          <div className="activities-list__skeleton-bar activities-list__skeleton-bar--w50" />
-        </td>
-        <td className="activities-list__skeleton-cell">
-          <div className="activities-list__skeleton-bar activities-list__skeleton-bar--w50" />
-        </td>
-        <td className="activities-list__skeleton-cell">
-          <div className="activities-list__skeleton-bar activities-list__skeleton-bar--w30" />
-        </td>
-        <td className="activities-list__skeleton-cell">
-          <div className="activities-list__skeleton-bar activities-list__skeleton-bar--w30" />
-        </td>
-        <td className="activities-list__skeleton-cell">
-          <div className="activities-list__skeleton-bar activities-list__skeleton-bar--w30" />
-        </td>
-        <td className="activities-list__skeleton-cell">
-          <div className="activities-list__skeleton-bar activities-list__skeleton-bar--w30" />
-        </td>
-        <td className="activities-list__skeleton-cell">
-          <div className="activities-list__skeleton-bar activities-list__skeleton-bar--w70" />
-        </td>
-        <td className="activities-list__skeleton-cell">
-          <div className="activities-list__skeleton-bar activities-list__skeleton-bar--w60" />
-        </td>
-        <td className="activities-list__skeleton-cell">
-          <div className="activities-list__skeleton-bar activities-list__skeleton-bar--w70" />
-        </td>
-        <td className="activities-list__skeleton-cell">
-          <div className="activities-list__skeleton-bar activities-list__skeleton-bar--w50" />
-        </td>
-        <td className="activities-list__skeleton-cell">
-          <div className="activities-list__skeleton-bar activities-list__skeleton-bar--w70" />
-        </td>
-        <td className="activities-list__skeleton-cell">
-          <div className="activities-list__skeleton-bar activities-list__skeleton-bar--w60" />
-        </td>
-        <td className="activities-list__skeleton-cell">
-          <div className="activities-list__skeleton-bar activities-list__skeleton-bar--w50" />
-        </td>
-        <td className="activities-list__skeleton-cell">
-          <div className="activities-list__skeleton-bar activities-list__skeleton-bar--w50" />
-        </td>
-        <td className="activities-list__skeleton-cell">
-          <div className="activities-list__skeleton-bar activities-list__skeleton-bar--w50" />
-        </td>
-        <td className="activities-list__skeleton-cell">
-          <div className="activities-list__skeleton-bar activities-list__skeleton-bar--w50" />
-        </td>
-      </tr>
+      <div className="activities-grid__row activities-grid__skeleton-row" key={`skel-${rowIdx}`} aria-hidden="true">
+        <span><span className="activities-list__skeleton-bar activities-list__skeleton-bar--w70" /></span>
+        <span><span className="activities-list__skeleton-bar activities-list__skeleton-bar--w60" /></span>
+        <span><span className="activities-list__skeleton-bar activities-list__skeleton-bar--w60" /></span>
+        <span><span className="activities-list__skeleton-bar activities-list__skeleton-bar--w55" /></span>
+        <span><span className="activities-list__skeleton-bar activities-list__skeleton-bar--w60" /></span>
+        <span><span className="activities-list__skeleton-bar activities-list__skeleton-bar--w45" /></span>
+        <span><span className="activities-list__skeleton-bar activities-list__skeleton-bar--w30" /></span>
+      </div>
     ))
   }
 
@@ -1119,7 +1175,238 @@ export function ActivitiesList() {
       ) : null}
 
       {/* ── Data Grid ── */}
-      <div className="data-grid" ref={tableWrapRef} style={{ position: 'relative' }}>
+      <section className="activities-grid" ref={tableWrapRef} aria-label="Activities grid">
+        <div className="activities-grid__head">
+          <div className="activities-list__header-content" data-filter-anchor>
+            <button className="activities-list__sort-btn" onClick={() => handleSort('dga_name')} type="button">
+              <span>Activity Name</span>
+              {getSortIcon('dga_name')}
+            </button>
+            <button
+              className={`activities-list__header-filter-btn${actFilters.dga_name ? ' activities-list__header-filter-btn--active' : ''}`}
+              onClick={(e) => handleOpenFilter('dga_name', e)}
+              type="button"
+              aria-label="Filter by name"
+            >
+              <Filter size={11} />
+            </button>
+          </div>
+          <div className="activities-list__header-content" data-filter-anchor>
+            <button className="activities-list__sort-btn" onClick={() => handleSort('dga_sectorname')} type="button">
+              <span>Sector</span>
+              {getSortIcon('dga_sectorname')}
+            </button>
+            <button
+              className={`activities-list__header-filter-btn${actFilters.dga_sectorname ? ' activities-list__header-filter-btn--active' : ''}`}
+              onClick={(e) => handleOpenFilter('dga_sectorname', e)}
+              type="button"
+              aria-label="Filter by sector"
+            >
+              <Filter size={11} />
+            </button>
+          </div>
+          <div className="activities-list__header-content" data-filter-anchor>
+            <button className="activities-list__sort-btn" onClick={() => handleSort('dga_departmentname')} type="button">
+              <span>Division</span>
+              {getSortIcon('dga_departmentname')}
+            </button>
+            <button
+              className={`activities-list__header-filter-btn${actFilters.dga_departmentname ? ' activities-list__header-filter-btn--active' : ''}`}
+              onClick={(e) => handleOpenFilter('dga_departmentname', e)}
+              type="button"
+              aria-label="Filter by division"
+            >
+              <Filter size={11} />
+            </button>
+          </div>
+          <div className="activities-list__header-content" data-filter-anchor>
+            <button className="activities-list__sort-btn" onClick={() => handleSort('pending_with')} type="button">
+              <span>Pending With</span>
+              {getSortIcon('pending_with')}
+            </button>
+            <button
+              className={`activities-list__header-filter-btn${actFilters.pending_with ? ' activities-list__header-filter-btn--active' : ''}`}
+              onClick={(e) => handleOpenFilter('pending_with', e)}
+              type="button"
+              aria-label="Filter by pending with"
+            >
+              <Filter size={11} />
+            </button>
+          </div>
+          <div className="activities-list__header-content" data-filter-anchor>
+            <button className="activities-list__sort-btn" onClick={() => handleSort('statuscode')} type="button">
+              <span>Approval Status</span>
+              {getSortIcon('statuscode')}
+            </button>
+            <button
+              className={`activities-list__header-filter-btn${actFilters.statuscode ? ' activities-list__header-filter-btn--active' : ''}`}
+              onClick={(e) => handleOpenFilter('statuscode', e)}
+              type="button"
+              aria-label="Filter by approval status"
+            >
+              <Filter size={11} />
+            </button>
+          </div>
+          <div className="activities-list__header-content" data-filter-anchor>
+            <button className="activities-list__sort-btn" onClick={() => handleSort('dga_project_phase')} type="button">
+              <span>Phase</span>
+              {getSortIcon('dga_project_phase')}
+            </button>
+            <button
+              className={`activities-list__header-filter-btn${actFilters.dga_project_phase ? ' activities-list__header-filter-btn--active' : ''}`}
+              onClick={(e) => handleOpenFilter('dga_project_phase', e)}
+              type="button"
+              aria-label="Filter by phase"
+            >
+              <Filter size={11} />
+            </button>
+          </div>
+          <span aria-label="Expand row" />
+        </div>
+
+        <div className="activities-grid__body">
+          {isLoading ? (
+            renderSkeletonRows()
+          ) : activities.length === 0 ? (
+            <div className="activities-grid__empty">
+              <EmptyState
+                description="Try adjusting your search or filter criteria."
+                title="No activities found"
+              />
+            </div>
+          ) : (
+            activities.map((act) => {
+              const activityId = act.dga_aop_projectsid
+              const isExpanded = Boolean(activityId && expandedIds.includes(activityId))
+              const strategies = getCategorizedLabels(act)
+
+              return (
+                <article className={`activities-grid__record${isExpanded ? ' activities-grid__record--expanded' : ''}`} key={activityId}>
+                  <div
+                    className="activities-grid__row"
+                    onClick={() => toggleExpanded(activityId)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        toggleExpanded(activityId)
+                      }
+                    }}
+                  >
+                    <button
+                      className="activities-grid__name"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        navigate(`${APP_ROUTE_PATHS.editActivity}?id=${activityId}`)
+                      }}
+                      type="button"
+                    >
+                      <strong>{act.dga_name || 'Untitled Activity'}</strong>
+                    </button>
+                    <span>{getLookupName(act._dga_sector_value, hierarchyNameById)}</span>
+                    <span>{getLookupName(act._dga_department_value, hierarchyNameById)}</span>
+                    <span>{getPendingWith(act, ownerNameById)}</span>
+                    <span>
+                      <Badge tone={statusCodeTone(Number(act.statuscode))}>
+                        {statusCodeLabel(Number(act.statuscode))}
+                      </Badge>
+                    </span>
+                    <span>
+                      <Badge tone={act.dga_project_phase === 776140001 ? 'success' : 'info'}>
+                        {phaseLabel(Number(act.dga_project_phase))}
+                      </Badge>
+                    </span>
+                    <button
+                      aria-expanded={isExpanded}
+                      aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${act.dga_name || 'activity'}`}
+                      className="activities-grid__expand"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        toggleExpanded(activityId)
+                      }}
+                      type="button"
+                    >
+                      <ChevronDown size={16} />
+                    </button>
+                  </div>
+
+                  {isExpanded ? (
+                    <div className="activities-grid__details">
+                      <div className="activities-grid__details-stack activities-grid__details-stack--summary">
+                        <div className="activities-grid__details-panel activities-grid__details-panel--ai">
+                          <div className="activities-grid__ai-heading">
+                            <span className="activities-grid__ai-icon" aria-hidden="true">
+                              <Sparkles size={15} />
+                            </span>
+                            <span>AI Summary</span>
+                          </div>
+                          <p>{activitySummary(act)}</p>
+                        </div>
+                        <div className="activities-grid__details-panel activities-grid__details-panel--summary">
+                          <span>Activity Description</span>
+                          <p>{activitySummary(act)}</p>
+                          <span>Scope</span>
+                          <p>{activityScope(act)}</p>
+                        </div>
+                      </div>
+                      <div className="activities-grid__details-panel activities-grid__details-panel--timeline">
+                        <span>Timeline</span>
+                        <dl>
+                          <div className="activities-grid__details-inline">
+                            <div><dt>Start</dt><dd>{act.dga_planned_start_date ? formatDate(act.dga_planned_start_date) : '—'}</dd></div>
+                            <div><dt>End</dt><dd>{act.dga_planned_end_date ? formatDate(act.dga_planned_end_date) : '—'}</dd></div>
+                          </div>
+                        </dl>
+                        <div className="activities-grid__yes-no-section">
+                          <span>Readiness Flags</span>
+                          <dl>
+                            <div><dt>EPM Registered</dt><dd>{yesNoLabel(act.dga_registered_or_will_be_registered_in_epm)}</dd></div>
+                            <div><dt>ADEO Required</dt><dd>{yesNoLabel(act.dga_adeo_review_required)}</dd></div>
+                            <div><dt>Budget Required</dt><dd>{yesNoLabel(act.dga_doesthisprojectrequirebudgetallocation)}</dd></div>
+                            <div><dt>Procurement Required</dt><dd>{yesNoLabel(act.dga_does_this_project_require_procurement)}</dd></div>
+                          </dl>
+                        </div>
+                      </div>
+                      <div className="activities-grid__details-panel">
+                        <span>Planning Details</span>
+                        <dl>
+                          <div className="activities-grid__details-inline">
+                            <div><dt>Project Type</dt><dd>{projectTypeLabel(act.dga_strategic_vs_operation)}</dd></div>
+                            <div><dt>Activity Status</dt><dd>{activityStatusLabel(Number(act.dga_project_activity_status))}</dd></div>
+                          </div>
+                          <div>
+                            <dt>Strategies</dt>
+                            <dd>
+                              {strategies.length > 0 ? (
+                                <div className="activities-grid__strategy-chips">
+                                  {strategies.map((label) => (
+                                    <span className="activities-list__category-chip" key={label}>{label}</span>
+                                  ))}
+                                </div>
+                              ) : '—'}
+                            </dd>
+                          </div>
+                          <div className="activities-grid__details-inline">
+                            <div><dt>Total Budget</dt><dd>{formatBudget(act.dga_total_project_budget)}</dd></div>
+                            <div><dt>Requested Budget</dt><dd>{formatBudget(act.dga_requested_budget)}</dd></div>
+                          </div>
+                          <div className="activities-grid__details-inline">
+                            <div><dt>Allocated Budget</dt><dd>{formatBudget(act.dga_allocated_budget)}</dd></div>
+                            <div><dt>Modified</dt><dd>{act.modifiedon ? formatDate(act.modifiedon) : '—'}</dd></div>
+                          </div>
+                        </dl>
+                      </div>
+                    </div>
+                  ) : null}
+                </article>
+              )
+            })
+          )}
+        </div>
+      </section>
+
+      <div className="data-grid activities-list__legacy-grid" aria-hidden="true" style={{ position: 'relative' }}>
         <table>
           <thead>
             <tr>
