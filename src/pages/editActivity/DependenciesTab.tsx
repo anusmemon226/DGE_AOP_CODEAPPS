@@ -38,6 +38,8 @@ type FilterOperator = 'equals' | 'contains' | 'gt' | 'lt'
 type ColumnFilter = { operator: FilterOperator; value: string }
 type SortConfig = { column: DepColumnKey; direction: 'asc' | 'desc' } | null
 type DependenciesTabProps = {
+  embedded?: boolean
+  onDependencyCountChange?: (count: number) => void
   projectId: string
 }
 type DependencyCreatePayload = Omit<Dga_dependenciesBase, 'dga_dependencyid' | 'ownerid' | 'owneridtype'> & {
@@ -65,6 +67,7 @@ function getApplicableLabel(value: ApplicableValue): string {
 }
 
 const DEP_ITEMS_PER_PAGE = 5
+const DEP_EMBEDDED_ITEMS_PER_PAGE = 5
 const DEP_LAZY_BATCH = 12
 
 function getOperationErrorMessage(result: unknown, fallbackMessage: string) {
@@ -127,7 +130,7 @@ function buildDependencyPayload(
 
 // ── Component ──
 
-export function DependenciesTab({ projectId }: DependenciesTabProps) {
+export function DependenciesTab({ embedded = false, onDependencyCountChange, projectId }: DependenciesTabProps) {
   const systemUser = useAppSelector((state) => state.user.systemUser)
   // ── Data state ──
   const [dependencies, setDependencies] = useState<Dependency[]>([])
@@ -215,13 +218,32 @@ export function DependenciesTab({ projectId }: DependenciesTabProps) {
     return () => window.clearTimeout(timeoutId)
   }, [loadDependencies])
 
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      onDependencyCountChange?.(dependencies.length)
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [dependencies.length, onDependencyCountChange])
+
+  useEffect(() => {
+    if (!depNotice) return
+
+    const timeoutId = window.setTimeout(() => {
+      setDepNotice('')
+    }, 10000)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [depNotice])
+
   // ── Derived data ──
 
   const filteredDeps = useMemo(() => {
+    if (embedded) return dependencies
     if (!depSearch.trim()) return dependencies
     const q = depSearch.toLowerCase()
     return dependencies.filter((d) => d.entityName.toLowerCase().includes(q) || d.typeOfSupport.toLowerCase().includes(q))
-  }, [dependencies, depSearch])
+  }, [dependencies, depSearch, embedded])
 
   const columnFilteredDeps = useMemo(() => {
     const activeFilters = Object.entries(depFilters).filter(([, f]) => f.value !== '')
@@ -259,6 +281,7 @@ export function DependenciesTab({ projectId }: DependenciesTabProps) {
 
   // Lazy sentinel observer
   useEffect(() => {
+    if (embedded) return undefined
     if (depViewMode !== 'lazy') return undefined
     const sentinel = depSentinelRef.current
     if (!sentinel) return undefined
@@ -277,16 +300,20 @@ export function DependenciesTab({ projectId }: DependenciesTabProps) {
 
     observer.observe(sentinel)
     return () => observer.disconnect()
-  }, [depViewMode, totalFilteredCount])
+  }, [depViewMode, embedded, totalFilteredCount])
 
-  const depTotalPages = Math.max(1, Math.ceil(totalFilteredCount / DEP_ITEMS_PER_PAGE))
+  const depPageSize = embedded ? DEP_EMBEDDED_ITEMS_PER_PAGE : DEP_ITEMS_PER_PAGE
+  const depTotalPages = Math.max(1, Math.ceil(totalFilteredCount / depPageSize))
 
   const visibleDeps = useMemo(() => {
+    if (embedded) {
+      return displayDeps.slice((depCurrentPage - 1) * DEP_EMBEDDED_ITEMS_PER_PAGE, depCurrentPage * DEP_EMBEDDED_ITEMS_PER_PAGE)
+    }
     if (depViewMode === 'pagination') {
       return displayDeps.slice((depCurrentPage - 1) * DEP_ITEMS_PER_PAGE, depCurrentPage * DEP_ITEMS_PER_PAGE)
     }
     return displayDeps.slice(0, depLazyCount)
-  }, [displayDeps, depViewMode, depCurrentPage, depLazyCount])
+  }, [depCurrentPage, depLazyCount, depViewMode, displayDeps, embedded])
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -559,24 +586,43 @@ export function DependenciesTab({ projectId }: DependenciesTabProps) {
   const filteredCount = totalFilteredCount
   const hasFilter = depSearch.trim().length > 0
   const selectedCount = selectedDepIds.size
-  const showPagination = depViewMode === 'pagination' && filteredCount > DEP_ITEMS_PER_PAGE
-  const showLoadMore = depViewMode === 'lazy' && depLazyCount < filteredCount
-  const rangeStart = filteredCount > 0 ? (depCurrentPage - 1) * DEP_ITEMS_PER_PAGE + 1 : 0
-  const rangeEnd = Math.min(depCurrentPage * DEP_ITEMS_PER_PAGE, filteredCount)
+  const showPagination = embedded
+    ? filteredCount > DEP_EMBEDDED_ITEMS_PER_PAGE
+    : depViewMode === 'pagination' && filteredCount > DEP_ITEMS_PER_PAGE
+  const showLoadMore = !embedded && depViewMode === 'lazy' && depLazyCount < filteredCount
+  const rangeStart = filteredCount > 0 ? (depCurrentPage - 1) * depPageSize + 1 : 0
+  const rangeEnd = Math.min(depCurrentPage * depPageSize, filteredCount)
 
   return (
-    <div className="edit-activity__dependencies">
+    <div className={`edit-activity__dependencies${embedded ? ' card create-activity__section edit-activity__dependencies--embedded' : ''}`}>
       {/* Header */}
-      <div className="edit-activity__members-header">
-        <div className="edit-activity__members-header-text">
-          <h2>
-            Dependencies
-            <span className="edit-activity__members-count-badge">
-              {depCount} Dependenc{depCount !== 1 ? 'ies' : 'y'}
+      <div className={embedded ? 'create-activity__section-header edit-activity__members-header' : 'edit-activity__members-header'}>
+        {embedded ? (
+          <div className="create-activity__section-header-inner">
+            <span className="create-activity__section-header-icon" aria-hidden="true">
+              <GitBranch size={18} />
             </span>
-          </h2>
-          <p>Manage external dependencies for this activity.</p>
-        </div>
+            <div>
+              <span>Dependencies</span>
+              <h2>
+                External dependency support
+                <span className="edit-activity__members-count-badge">
+                  {depCount} Dependenc{depCount !== 1 ? 'ies' : 'y'}
+                </span>
+              </h2>
+            </div>
+          </div>
+        ) : (
+          <div className="edit-activity__members-header-text">
+            <h2>
+              Dependencies
+              <span className="edit-activity__members-count-badge">
+                {depCount} Dependenc{depCount !== 1 ? 'ies' : 'y'}
+              </span>
+            </h2>
+            <p>Manage external dependencies for this activity.</p>
+          </div>
+        )}
         <div className="edit-activity__dependencies-header-actions">
           {selectedCount > 0 ? (
             <Button
@@ -596,19 +642,19 @@ export function DependenciesTab({ projectId }: DependenciesTabProps) {
       </div>
 
       {depError ? (
-        <div className="edit-activity__members-modal-error">
+        <div className="create-activity__notice create-activity__notice--error edit-activity__members-notice" role="alert">
           <X size={13} />
-          {depError}
+          <span>{depError}</span>
         </div>
       ) : depNotice ? (
-        <div className="edit-activity__members-modal-selected-header">
+        <div className="create-activity__notice create-activity__notice--success edit-activity__members-notice" role="status">
           <Check size={14} />
           <span>{depNotice}</span>
         </div>
       ) : null}
 
       {/* Toolbar */}
-      {depCount > 0 ? (
+      {!embedded && depCount > 0 ? (
         <div className="edit-activity__members-toolbar">
           <div className="edit-activity__members-search">
             <Search size={15} />
@@ -922,7 +968,7 @@ export function DependenciesTab({ projectId }: DependenciesTabProps) {
           <span className="edit-activity__members-sentinel-dot" />
           <span className="edit-activity__members-sentinel-dot" />
         </div>
-      ) : depViewMode === 'lazy' && filteredCount > 0 ? (
+      ) : !embedded && depViewMode === 'lazy' && filteredCount > 0 ? (
         <div className="edit-activity__members-sentinel--done" aria-hidden="true">
           <Check size={13} />
           <span>All {filteredCount} dependenc{filteredCount !== 1 ? 'ies' : 'y'} loaded</span>

@@ -20,7 +20,6 @@ import type { Systemusers } from '../../generated/models/SystemusersModel'
 import { SystemusersService } from '../../generated/services/SystemusersService'
 import { Dga_aop_projects_systemusersetService } from '../../generated/services/Dga_aop_projects_systemusersetService'
 import { Dga_custom_web_apiService } from '../../generated/services/Dga_custom_web_apiService'
-import { Dga_categoriesService } from '../../generated'
 
 // ── Types ──
 
@@ -42,12 +41,14 @@ type ActivityMember = MockUser & {
 // ── Mock data removed — ready for dynamic implementation ──
 
 const ITEMS_PER_PAGE = 12
+const EMBEDDED_ITEMS_PER_PAGE = 6
 const LAZY_BATCH = 12
 const ACTIVITY_MEMBER_TARGET_TABLE = 'dga_aop_projects'
 const ACTIVITY_MEMBER_RELATED_TABLE = 'systemuser'
 const ACTIVITY_MEMBER_RELATIONSHIP = 'dga_aop_projects_systemuser_systemuser'
 
 type MembersTabProps = {
+  embedded?: boolean
   projectId: string
 }
 
@@ -168,7 +169,7 @@ function mapAssociationsToMembers(
 
 // ── Component ──
 
-export function MembersTab({ projectId }: MembersTabProps) {
+export function MembersTab({ embedded = false, projectId }: MembersTabProps) {
   const [availableUsers, setAvailableUsers] = useState<MockUser[]>([])
   const [isUsersLoading, setIsUsersLoading] = useState(false)
   const [usersError, setUsersError] = useState('')
@@ -192,9 +193,6 @@ export function MembersTab({ projectId }: MembersTabProps) {
   const sentinelRef = useRef<HTMLDivElement>(null)
 
   const loadMembersContext = useCallback(async () => {
-    const result = await Dga_categoriesService.getAll()
-    console.log(result)
-
     if (!projectId) {
       setUsersError('')
       setMembersError('Activity id is missing from the edit URL.')
@@ -265,13 +263,24 @@ export function MembersTab({ projectId }: MembersTabProps) {
     return () => window.clearTimeout(timeoutId)
   }, [loadMembersContext])
 
+  useEffect(() => {
+    if (!membersNotice) return
+
+    const timeoutId = window.setTimeout(() => {
+      setMembersNotice('')
+    }, 10000)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [membersNotice])
+
   // ── Computed ──
 
   const filteredMembers = useMemo(() => {
+    if (embedded) return members
     if (!memberListSearch.trim()) return members
     const q = memberListSearch.toLowerCase()
     return members.filter((m) => m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q))
-  }, [members, memberListSearch])
+  }, [embedded, members, memberListSearch])
 
   useEffect(() => {
     if (memberViewMode !== 'lazy') return undefined
@@ -294,14 +303,18 @@ export function MembersTab({ projectId }: MembersTabProps) {
     return () => observer.disconnect()
   }, [memberViewMode, filteredMembers.length])
 
-  const totalPages = Math.max(1, Math.ceil(filteredMembers.length / ITEMS_PER_PAGE))
+  const memberPageSize = embedded ? EMBEDDED_ITEMS_PER_PAGE : ITEMS_PER_PAGE
+  const totalPages = Math.max(1, Math.ceil(filteredMembers.length / memberPageSize))
 
   const visibleMembers = useMemo(() => {
+    if (embedded) {
+      return filteredMembers.slice((currentPage - 1) * EMBEDDED_ITEMS_PER_PAGE, currentPage * EMBEDDED_ITEMS_PER_PAGE)
+    }
     if (memberViewMode === 'pagination') {
       return filteredMembers.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
     }
     return filteredMembers.slice(0, lazyVisibleCount)
-  }, [filteredMembers, memberViewMode, currentPage, lazyVisibleCount])
+  }, [embedded, filteredMembers, memberViewMode, currentPage, lazyVisibleCount])
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -458,10 +471,12 @@ export function MembersTab({ projectId }: MembersTabProps) {
   const showingText = hasFilter
     ? `${filteredCount} of ${memberCount} Member${memberCount !== 1 ? 's' : ''}`
     : `${memberCount} Member${memberCount !== 1 ? 's' : ''}`
-  const showPagination = memberViewMode === 'pagination' && filteredCount > ITEMS_PER_PAGE
-  const showLoadMore = memberViewMode === 'lazy' && lazyVisibleCount < filteredCount
-  const rangeStart = filteredCount > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0
-  const rangeEnd = Math.min(currentPage * ITEMS_PER_PAGE, filteredCount)
+  const showPagination = embedded
+    ? filteredCount > EMBEDDED_ITEMS_PER_PAGE
+    : memberViewMode === 'pagination' && filteredCount > ITEMS_PER_PAGE
+  const showLoadMore = !embedded && memberViewMode === 'lazy' && lazyVisibleCount < filteredCount
+  const rangeStart = filteredCount > 0 ? (currentPage - 1) * memberPageSize + 1 : 0
+  const rangeEnd = Math.min(currentPage * memberPageSize, filteredCount)
 
   // ── Add Members Modal ──
 
@@ -613,35 +628,49 @@ export function MembersTab({ projectId }: MembersTabProps) {
   // ── Render ──
 
   return (
-    <div className="edit-activity__members">
-      {/* Header bar */}
-      <div className="edit-activity__members-header">
-        <div className="edit-activity__members-header-text">
-          <h2>
-            Activity Members
-            <span className="edit-activity__members-count-badge">{showingText}</span>
-          </h2>
-          <p>Manage users assigned to this activity.</p>
-        </div>
+    <div className={`edit-activity__members${embedded ? ' card create-activity__section edit-activity__members--embedded' : ''}`}>
+      <div className={embedded ? 'create-activity__section-header edit-activity__members-header' : 'edit-activity__members-header'}>
+        {embedded ? (
+          <div className="create-activity__section-header-inner">
+            <span className="create-activity__section-header-icon" aria-hidden="true">
+              <UsersRound size={18} />
+            </span>
+            <div>
+              <span>Activity Members</span>
+              <h2>
+                Assigned activity team
+                <span className="edit-activity__members-count-badge">{showingText}</span>
+              </h2>
+            </div>
+          </div>
+        ) : (
+          <div className="edit-activity__members-header-text">
+            <h2>
+              Activity Members
+              <span className="edit-activity__members-count-badge">{showingText}</span>
+            </h2>
+            <p>Manage users assigned to this activity.</p>
+          </div>
+        )}
         <Button disabled={!projectId || isMembersLoading} icon={<UserPlus size={16} />} onClick={handleOpenAddMembersModal}>
-          Add Members
+          Add Activity Member
         </Button>
       </div>
 
       {membersError ? (
-        <div className="edit-activity__members-modal-error">
+        <div className="create-activity__notice create-activity__notice--error edit-activity__members-notice" role="alert">
           <AlertCircle size={13} />
-          {membersError}
+          <span>{membersError}</span>
         </div>
       ) : membersNotice ? (
-        <div className="edit-activity__members-modal-selected-header">
+        <div className="create-activity__notice create-activity__notice--success edit-activity__members-notice" role="status">
           <Check size={14} />
           <span>{membersNotice}</span>
         </div>
       ) : null}
 
       {/* Toolbar: search + view toggle */}
-      {memberCount > 0 ? (
+      {!embedded && memberCount > 0 ? (
         <div className="edit-activity__members-toolbar">
           <div className="edit-activity__members-search">
             <Search size={15} />

@@ -259,8 +259,8 @@
   min-width: 0;
 }
 
-.create-activity__section-header span,
-.copilot-panel__header span {
+.create-activity__section-header-inner > div > span,
+.copilot-panel__header > div > span {
   color: var(--color-primary);
   font-size: 0.68rem;
   font-weight: 900;
@@ -345,7 +345,7 @@
   font-weight: 800;
 }
 
-.create-activity__section-header span {
+.create-activity__section-header-inner > div > span {
   font-size: 0.66rem;
   letter-spacing: 0.08em;
 }
@@ -1412,7 +1412,6 @@
 
 .create-activity__guidance-field--done span {
   color: var(--color-text-tertiary);
-  text-decoration: line-through;
 }
 
 /* ── Premium Tags / chips ── */

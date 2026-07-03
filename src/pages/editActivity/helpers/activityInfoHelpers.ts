@@ -230,10 +230,6 @@ export function validateForm(form: ActivityForm) {
     }
   })
 
-  if (form.activityScope === '1' && form.strategies.length === 0) {
-    errors.strategies = 'Select at least one strategy for Strategic activities.'
-  }
-
   if (form.plannedStartDate && form.plannedEndDate) {
     if (form.plannedStartDate >= form.plannedEndDate) {
       errors.plannedStartDate = 'Planned Start Date must be earlier than Planned End Date.'
@@ -276,10 +272,6 @@ export function getRequiredFields(form: ActivityForm): Array<keyof ActivityForm>
       'activityKpi',
       'risks',
     )
-  }
-
-  if (form.activityScope === '1') {
-    fields.push('strategies')
   }
 
   return fields

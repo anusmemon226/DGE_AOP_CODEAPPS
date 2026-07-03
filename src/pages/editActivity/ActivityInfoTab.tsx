@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import {
   Bot,
   Check,
@@ -31,6 +31,8 @@ import {
   getOptionLabel,
   getRequiredFields,
 } from './helpers/activityInfoHelpers'
+import { MembersTab } from './MembersTab'
+import { DependenciesTab } from './DependenciesTab'
 
 // ── Props ──
 
@@ -42,6 +44,7 @@ interface ActivityInfoTabProps {
   isBudgetNo: boolean
   isPaymentOnly: boolean
   isStrategic: boolean
+  projectId: string
   updateForm: (fields: Partial<ActivityForm>) => void
 }
 
@@ -68,16 +71,25 @@ export function ActivityInfoTab({
   isBudgetNo,
   isPaymentOnly,
   isStrategic,
+  projectId,
   updateForm,
 }: ActivityInfoTabProps) {
+  const [dependencyCount, setDependencyCount] = useState(0)
+  const handleDependencyCountChange = useCallback((count: number) => {
+    setDependencyCount(count)
+  }, [])
+
   // ── Guidance Panel ──
   const guidancePanel = useMemo(() => {
     const requiredFields = getRequiredFields(form)
     const pendingFields = requiredFields.filter((field) => !String(form[field] ?? '').trim())
-    const total = requiredFields.length
-    const completedCount = total - pendingFields.length
+    const isDependencyRequired = form.adeoReported === '1'
+    const isDependencyComplete = dependencyCount > 0
+    const pendingDependencyCount = isDependencyRequired && !isDependencyComplete ? 1 : 0
+    const total = requiredFields.length + (isDependencyRequired ? 1 : 0)
+    const completedCount = total - pendingFields.length - pendingDependencyCount
     const percent = total > 0 ? Math.round((completedCount / total) * 100) : 0
-    const isComplete = pendingFields.length === 0
+    const isComplete = pendingFields.length === 0 && pendingDependencyCount === 0
 
     const FIELD_GROUPS: Array<{ key: string; label: string; fields: Array<keyof ActivityForm> }> = [
       { key: 'core', label: 'Core Details', fields: ['activityType', 'activityName', 'activityScope', 'activityClassification', 'adeoReported'] },
@@ -102,11 +114,15 @@ export function ActivityInfoTab({
 
     function getTipText() {
       if (isComplete) return 'All required fields are filled. Review your entries and save when ready.'
-      if (pendingFields.length <= 2) {
-        const first = FIELD_LABELS[pendingFields[0]] ?? pendingFields[0]
+      const pendingItems = [
+        ...pendingFields.map((field) => FIELD_LABELS[field] ?? field),
+        ...(pendingDependencyCount ? ['Add at least one dependency'] : []),
+      ]
+      if (pendingItems.length <= 2) {
+        const first = pendingItems[0]
         return `Start with "${first}" — it's the most impactful field to fill next.`
       }
-      return `Complete the ${pendingFields.length} remaining required field${pendingFields.length > 1 ? 's' : ''} to proceed with saving.`
+      return `Complete the ${pendingItems.length} remaining required item${pendingItems.length > 1 ? 's' : ''} to proceed with saving.`
     }
 
     return (
@@ -192,6 +208,28 @@ export function ActivityInfoTab({
               )
             })}
 
+            {isDependencyRequired ? (
+              <div className="create-activity__guidance-section">
+                <div className="create-activity__guidance-section-header">
+                  <div className="create-activity__guidance-section-header-text">
+                    <span className="create-activity__guidance-section-header-indicator" />
+                    <span>Dependencies</span>
+                  </div>
+                  <span className={`create-activity__guidance-section-count ${isDependencyComplete ? 'create-activity__guidance-section-count--done' : ''}`}>
+                    {isDependencyComplete ? '✓ 1/1' : '0/1'}
+                  </span>
+                </div>
+                <div className="create-activity__guidance-field-list">
+                  <div className={`create-activity__guidance-field ${isDependencyComplete ? 'create-activity__guidance-field--done' : 'create-activity__guidance-field--pending'}`}>
+                    <span className="create-activity__guidance-field-icon">
+                      {isDependencyComplete ? <Check size={12} strokeWidth={2.5} /> : null}
+                    </span>
+                    <span>Add at least one dependency</span>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             {/* Quick overview tags */}
             <div className="create-activity__guidance-tags">
               {form.activityType ? (
@@ -231,7 +269,7 @@ export function ActivityInfoTab({
         </div>
       </aside>
     )
-  }, [form])
+  }, [dependencyCount, form])
 
   // ── Form cards ──
   const formCards = useMemo(() => {
@@ -522,6 +560,11 @@ export function ActivityInfoTab({
             </div>
           </Card>
         ) : null}
+
+        <MembersTab embedded projectId={projectId} />
+        {isAdeoVisible ? (
+          <DependenciesTab embedded onDependencyCountChange={handleDependencyCountChange} projectId={projectId} />
+        ) : null}
       </>
     )
   }, [
@@ -533,6 +576,8 @@ export function ActivityInfoTab({
     isPaymentOnly,
     isBudgetNo,
     isAdeoVisible,
+    projectId,
+    handleDependencyCountChange,
   ])
 
   return (

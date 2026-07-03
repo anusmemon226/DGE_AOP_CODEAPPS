@@ -6,7 +6,6 @@ import {
   Edit3,
   FileText,
   Flag,
-  GitBranch,
   HelpCircle,
   History,
   Save,
@@ -14,7 +13,6 @@ import {
   Sparkles,
   Target,
   UserRound,
-  UsersRound,
   Wallet,
 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
@@ -29,8 +27,6 @@ import type { Teams } from '../generated/models/TeamsModel'
 import { APP_ROUTE_PATHS } from '../routes/appRoutes'
 import { useAppSelector } from '../store/hooks'
 import { ActivityInfoTab } from './editActivity/ActivityInfoTab'
-import { MembersTab } from './editActivity/MembersTab'
-import { DependenciesTab } from './editActivity/DependenciesTab'
 import { MilestonesTab } from './editActivity/MilestonesTab'
 import { ObjectivesTab, type ObjectiveHeaderAction } from './editActivity/ObjectivesTab'
 import { ProcurementTab } from './editActivity/ProcurementTab'
@@ -55,8 +51,6 @@ import {
 
 type TabId =
   | 'activity-info'
-  | 'members'
-  | 'dependencies'
   | 'objectives'
   | 'milestones'
   | 'procurements'
@@ -74,8 +68,6 @@ type TabConfig = {
 
 const TABS: TabConfig[] = [
   { id: 'activity-info', label: 'Activity Information', shortLabel: 'Info', icon: ClipboardList },
-  { id: 'members', label: 'Members', shortLabel: 'Members', icon: UsersRound },
-  { id: 'dependencies', label: 'Dependencies', shortLabel: 'Dependencies', icon: GitBranch },
   { id: 'objectives', label: 'Objectives', shortLabel: 'Objectives', icon: Target },
   { id: 'milestones', label: 'Milestones', shortLabel: 'Milestones', icon: Flag },
   { id: 'procurements', label: 'Procurements', shortLabel: 'Procurements', icon: Briefcase },
@@ -151,7 +143,6 @@ function getTabLockReason(tabId: TabId): string {
     case 'milestones': return 'Activity classification is Payment Only'
     case 'budget': return 'Budget is not required for this activity'
     case 'procurements': return 'Procurement is not required for this activity'
-    case 'dependencies': return 'ADEO reporting is not enabled'
     default: return ''
   }
 }
@@ -210,7 +201,6 @@ export function EditActivity() {
     milestones: isPaymentOnly,
     budget: isBudgetNo,
     procurements: isBudgetNo || form.procurementRequired === '0',
-    dependencies: form.adeoReported === '0',
   }
 
   const activityLeadName = activityLeadOptions.find((o) => o.value === form.activityLeadId)?.label ?? ''
@@ -476,13 +466,10 @@ export function EditActivity() {
             isBudgetNo={isBudgetNo}
             isPaymentOnly={isPaymentOnly}
             isStrategic={isStrategic}
+            projectId={projectId}
             updateForm={updateForm}
           />
         )
-      case 'members':
-        return <MembersTab projectId={projectId} />
-      case 'dependencies':
-        return <DependenciesTab projectId={projectId} />
       case 'objectives':
         return (
           <ObjectivesTab

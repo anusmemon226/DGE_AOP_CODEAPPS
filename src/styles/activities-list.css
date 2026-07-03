@@ -3,7 +3,7 @@
 .activities-list {
   display: grid;
   gap: 1rem;
-  padding: 0 1rem 2rem;
+  padding: 0 0rem 2rem;
   max-width: 1400px;
   margin: 0 auto;
   min-width: 0;
