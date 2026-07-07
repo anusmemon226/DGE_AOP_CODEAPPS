@@ -22,6 +22,8 @@ import {
   ACTIVITY_SCOPE_OPTIONS,
   ACTIVITY_TYPE_OPTIONS,
   CLASSIFICATION_OPTIONS,
+  EXECUTION_ACTIVITY_STATUS_OPTIONS,
+  EXECUTION_ACTIVITY_STATUS_REQUIRES_JUSTIFICATION,
   FIELD_LABELS,
   STRATEGY_OPTIONS,
   YES_NO_OPTIONS,
@@ -41,6 +43,8 @@ interface ActivityInfoTabProps {
   editableFields?: Array<keyof ActivityForm>
   errors: FieldErrors
   form: ActivityForm
+  hasFullEdit?: boolean
+  showExecutionTracking?: boolean
   isReadOnly?: boolean
   isAdeoVisible: boolean
   isBudgetNo: boolean
@@ -70,6 +74,8 @@ export function ActivityInfoTab({
   editableFields,
   errors,
   form,
+  hasFullEdit = false,
+  showExecutionTracking = false,
   isReadOnly = false,
   isAdeoVisible,
   isBudgetNo,
@@ -83,13 +89,19 @@ export function ActivityInfoTab({
     setDependencyCount(count)
   }, [])
   const canEditField = useCallback((field: keyof ActivityForm) => {
-    if (!isReadOnly) return true
-    return editableFields?.includes(field) ?? false
-  }, [editableFields, isReadOnly])
+    if (hasFullEdit) return true
+    if (editableFields?.length) {
+      return editableFields.includes(field)
+    }
+    return !isReadOnly
+  }, [editableFields, hasFullEdit, isReadOnly])
+  const requiresActivityStatusJustification = Boolean(
+    form.activityStatus && EXECUTION_ACTIVITY_STATUS_REQUIRES_JUSTIFICATION.has(form.activityStatus),
+  )
 
   // ── Guidance Panel ──
   const guidancePanel = useMemo(() => {
-    const requiredFields = getRequiredFields(form)
+    const requiredFields = getRequiredFields(form, showExecutionTracking)
     const pendingFields = requiredFields.filter((field) => !String(form[field] ?? '').trim())
     const isDependencyRequired = form.adeoReported === '1'
     const isDependencyComplete = dependencyCount > 0
@@ -100,6 +112,7 @@ export function ActivityInfoTab({
     const isComplete = pendingFields.length === 0 && pendingDependencyCount === 0
 
     const FIELD_GROUPS: Array<{ key: string; label: string; fields: Array<keyof ActivityForm> }> = [
+      { key: 'execution', label: 'Execution Status', fields: requiresActivityStatusJustification ? ['activityStatus', 'activityStatusJustification'] : ['activityStatus'] },
       { key: 'core', label: 'Core Details', fields: ['activityType', 'activityName', 'activityScope', 'activityClassification', 'adeoReported'] },
       { key: 'planning', label: 'Planning', fields: ['activityLeadId', 'plannedStartDate', 'plannedEndDate', 'scopeDescription', 'summary'] },
       { key: 'requirements', label: 'Requirements', fields: ['budgetRequired', 'procurementRequired'] },
@@ -109,6 +122,7 @@ export function ActivityInfoTab({
     const visibleGroups = FIELD_GROUPS.filter((group) => {
       if (group.key === 'requirements' && form.activityClassification === '576610002') return false
       if (group.key === 'adeo' && form.adeoReported !== '1') return false
+      if (group.key === 'execution' && !showExecutionTracking) return false
       return true
     })
 
@@ -117,7 +131,12 @@ export function ActivityInfoTab({
     const ringOffset = ringCircumference - (percent / 100) * ringCircumference
 
     function countDone(fields: Array<keyof ActivityForm>) {
-      return fields.filter((f) => String(form[f] ?? '').trim()).length
+      return fields.filter((field) => {
+        if (field === 'activityStatusJustification' && !requiresActivityStatusJustification) {
+          return true
+        }
+        return String(form[field] ?? '').trim()
+      }).length
     }
 
     function getTipText() {
@@ -277,7 +296,7 @@ export function ActivityInfoTab({
         </div>
       </aside>
     )
-  }, [dependencyCount, form])
+  }, [dependencyCount, form, requiresActivityStatusJustification, showExecutionTracking])
 
   // ── Form cards ──
   const formCards = useMemo(() => {
@@ -292,6 +311,52 @@ export function ActivityInfoTab({
     return (
       <>
         {/* Core Activity Information Card */}
+        {showExecutionTracking ? (
+          <Card className="create-activity__section">
+            <div className="create-activity__section-header">
+              <div className="create-activity__section-header-inner">
+                <span className="create-activity__section-header-icon" aria-hidden="true">
+                  <CheckCircle2 size={18} />
+                </span>
+                <div>
+                  <span>Execution Tracking</span>
+                  <h2>Activity status</h2>
+                </div>
+              </div>
+            </div>
+
+            <div className="create-activity__form-stack">
+              <div className="create-activity__form-row">
+                <RadioGroup
+                  className="create-activity__radio create-activity__radio--status"
+                  disabled={!canEditField('activityStatus')}
+                  error={errors.activityStatus}
+                  label="Activity Status"
+                  name="activity-status"
+                  onChange={(value) => updateForm({ activityStatus: value as ActivityForm['activityStatus'] })}
+                  options={EXECUTION_ACTIVITY_STATUS_OPTIONS}
+                  required
+                  value={form.activityStatus}
+                />
+              </div>
+
+              {requiresActivityStatusJustification ? (
+                <div className="create-activity__form-row">
+                  <Textarea
+                    disabled={!canEditField('activityStatusJustification')}
+                    error={errors.activityStatusJustification}
+                    label="Justification for Activity Status"
+                    onChange={(event) => updateForm({ activityStatusJustification: event.target.value })}
+                    placeholder="Explain why the activity is delayed, on hold, or cancelled"
+                    required
+                    value={form.activityStatusJustification}
+                  />
+                </div>
+              ) : null}
+            </div>
+          </Card>
+        ) : null}
+
         <Card className="create-activity__section">
           <div className="create-activity__section-header">
             <div className="create-activity__section-header-inner">
@@ -601,11 +666,13 @@ export function ActivityInfoTab({
     errors,
     updateForm,
     activityLeadOptions,
+    showExecutionTracking,
     isStrategic,
     isPaymentOnly,
     isBudgetNo,
     isAdeoVisible,
     projectId,
+    requiresActivityStatusJustification,
     isReadOnly,
     canEditField,
     handleDependencyCountChange,

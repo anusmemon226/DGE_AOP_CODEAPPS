@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Edit3,
   Flag,
   Plus,
   Trash2,
+  Upload,
+  X,
 } from 'lucide-react'
 import {
   Badge,
@@ -11,23 +13,43 @@ import {
   ConfirmationDialog,
   DatePicker,
   Input,
+  Select,
   SideDrawer,
   Textarea,
+  type SelectOption,
 } from '../../components/ui'
-import type { Dga_aop_project_milestone_detailses, Dga_aop_project_milestone_detailsesBase } from '../../generated/models/Dga_aop_project_milestone_detailsesModel'
+import {
+  Dga_aop_project_milestone_detailsesstatuscode,
+  type Dga_aop_project_milestone_detailses,
+  type Dga_aop_project_milestone_detailsesBase,
+} from '../../generated/models/Dga_aop_project_milestone_detailsesModel'
 import { Dga_aop_project_milestone_detailsesService } from '../../generated/services/Dga_aop_project_milestone_detailsesService'
 import { formatDateDisplay } from '../../utils/formatting'
 import { getQuarter } from './helpers/sharedHelpers'
 
 // ── Types ──
 
-type MilestoneStatus = 'not-started' | 'in-progress' | 'completed' | 'delayed'
+type MilestoneStatus = 'not-started' | 'in-progress' | 'completed' | 'delayed' | 'cancelled'
+type ExecutionMilestoneStatusValue = '1' | '776140001' | '776140002' | '776140003' | '576610001'
+type UploadedFile = {
+  file: File
+  name: string
+  size: number
+}
+
+type MilestoneFormErrorKey = keyof MilestoneFormData | 'uploadedFile'
 
 type Milestone = {
   id: string
   name: string
   plannedStartDate: string
   plannedEndDate: string
+  actualStartDate: string
+  actualEndDate: string
+  actualProgress: string
+  cancellationReason: string
+  executionJustification: string
+  executionStatus: ExecutionMilestoneStatusValue | ''
   quarter: string
   status: MilestoneStatus
   assignee: string
@@ -46,9 +68,32 @@ const STATUS_CONFIG: Record<MilestoneStatus, { label: string; tone: 'neutral' | 
   'in-progress': { label: 'In Progress', tone: 'info' },
   completed: { label: 'Completed', tone: 'success' },
   delayed: { label: 'Delayed', tone: 'warning' },
+  cancelled: { label: 'Cancelled', tone: 'warning' },
 }
 
 const QUARTERS = ['Quarter 1', 'Quarter 2', 'Quarter 3', 'Quarter 4'] as const
+const EXECUTION_STATUS_VALUES = ['1', '776140001', '776140002', '776140003', '576610001'] as const satisfies readonly ExecutionMilestoneStatusValue[]
+const EXECUTION_STATUS_REQUIRES_JUSTIFICATION = new Set<ExecutionMilestoneStatusValue>(['1', '776140002'])
+const EXECUTION_STATUS_REQUIRES_CANCELLATION_REASON = '576610001'
+
+function formatGeneratedStatusLabel(label: string) {
+  return label
+    .replace(/_/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+const EXECUTION_STATUS_OPTIONS: SelectOption<ExecutionMilestoneStatusValue | ''>[] = [
+  { label: 'Select milestone status', value: '' },
+  ...EXECUTION_STATUS_VALUES.map((value) => ({
+    label: formatGeneratedStatusLabel(
+      Dga_aop_project_milestone_detailsesstatuscode[Number(value) as keyof typeof Dga_aop_project_milestone_detailsesstatuscode],
+    ),
+    value,
+  })),
+]
 
 function getStatusIcon(status: MilestoneStatus): string {
   switch (status) {
@@ -63,12 +108,18 @@ const EMPTY_FORM: MilestoneFormData = {
   name: '',
   plannedStartDate: '',
   plannedEndDate: '',
+  actualStartDate: '',
+  actualEndDate: '',
+  actualProgress: '',
+  cancellationReason: '',
+  executionJustification: '',
+  executionStatus: '',
   quarter: '',
   status: 'not-started',
   assignee: '',
   weightage: 0,
   makhrajAlMarhala: '',
-  marhalaAlMashroua: '',
+  marhalaAlMashroua: '\u200B',
   description: '',
 }
 
@@ -77,7 +128,9 @@ const EMPTY_FORM: MilestoneFormData = {
 interface MilestonesTabProps {
   activityPlannedEndDate: string
   activityPlannedStartDate: string
+  isExecutionPhase?: boolean
   isReadOnly?: boolean
+  canEditExecutionFieldsOnly?: boolean
   isAdeoVisible: boolean
   projectId: string
 }
@@ -119,8 +172,17 @@ function statusCodeToUi(statuscode?: number): MilestoneStatus {
     case 776140001: return 'in-progress'
     case 776140002: return 'delayed'
     case 776140003: return 'completed'
+    case 576610001: return 'cancelled'
     default: return 'not-started'
   }
+}
+
+function statusCodeToExecutionValue(statuscode?: number): ExecutionMilestoneStatusValue | '' {
+  const normalized = String(statuscode ?? '')
+
+  return EXECUTION_STATUS_VALUES.includes(normalized as ExecutionMilestoneStatusValue)
+    ? normalized as ExecutionMilestoneStatusValue
+    : ''
 }
 
 function milestoneToUi(record: Dga_aop_project_milestone_detailses): Milestone | null {
@@ -132,12 +194,18 @@ function milestoneToUi(record: Dga_aop_project_milestone_detailses): Milestone |
     name: record.dga_name ?? '',
     plannedStartDate: toDateOnly(record.dga_planned_start_date),
     plannedEndDate,
+    actualStartDate: toDateOnly(record.dga_actual_start_date),
+    actualEndDate: toDateOnly(record.dga_actual_end_date),
+    actualProgress: record.dga_actual_progress != null ? String(record.dga_actual_progress) : '',
+    cancellationReason: record.dga_cancellation_reason ?? '',
+    executionJustification: record.dga_justification ?? '',
+    executionStatus: statusCodeToExecutionValue(record.statuscode),
     quarter: getQuarter(plannedEndDate),
     status: statusCodeToUi(record.statuscode),
     assignee: '',
     weightage: record.dga_weightage ?? 0,
     makhrajAlMarhala: record.dga_milestone_description ?? '',
-    marhalaAlMashroua: record.dga_justification ?? '',
+    marhalaAlMashroua: '',
     description: record.dga_description ?? '',
   }
 }
@@ -160,7 +228,7 @@ function buildMilestoneCreatePayload(
   return {
     'dga_aop_project@odata.bind': `/dga_aop_projectses(${normalizeId(projectId)})`,
     dga_description: form.description,
-    dga_justification: form.marhalaAlMashroua,
+    dga_justification: '',
     dga_milestone_description: form.makhrajAlMarhala,
     dga_name: form.name.trim(),
     dga_planned_end_date: form.plannedEndDate,
@@ -174,18 +242,35 @@ function buildMilestoneCreatePayload(
 
 function buildMilestoneUpdatePayload(form: MilestoneFormData): Partial<Omit<Dga_aop_project_milestone_detailsesBase, 'dga_aop_project_milestone_detailsid'>> {
   return {
+    dga_actual_end_date: form.actualEndDate || undefined,
+    dga_actual_progress: form.actualProgress ? Number(form.actualProgress) : undefined,
+    dga_actual_start_date: form.actualStartDate || undefined,
+    dga_cancellation_reason: form.executionStatus === EXECUTION_STATUS_REQUIRES_CANCELLATION_REASON ? form.cancellationReason.trim() : '',
     dga_description: form.description,
-    dga_justification: form.marhalaAlMashroua,
+    dga_justification: EXECUTION_STATUS_REQUIRES_JUSTIFICATION.has(form.executionStatus as ExecutionMilestoneStatusValue)
+      ? form.executionJustification.trim()
+      : '',
     dga_milestone_description: form.makhrajAlMarhala,
     dga_name: form.name.trim(),
     dga_planned_end_date: form.plannedEndDate,
     dga_planned_start_date: form.plannedStartDate,
     dga_start_date: form.plannedStartDate,
+    statuscode: form.executionStatus
+      ? Number(form.executionStatus) as Dga_aop_project_milestone_detailsesBase['statuscode']
+      : undefined,
     dga_weightage: form.weightage,
   }
 }
 
-export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate, isReadOnly = false, isAdeoVisible, projectId }: MilestonesTabProps) {
+export function MilestonesTab({
+  activityPlannedEndDate,
+  activityPlannedStartDate,
+  isExecutionPhase = false,
+  isReadOnly = false,
+  canEditExecutionFieldsOnly = false,
+  isAdeoVisible,
+  projectId,
+}: MilestonesTabProps) {
   // ── Data state ──
   const [milestones, setMilestones] = useState<Milestone[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -198,8 +283,10 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null)
   const [form, setForm] = useState<MilestoneFormData>(EMPTY_FORM)
-  const [formErrors, setFormErrors] = useState<Partial<Record<keyof MilestoneFormData, string>>>({})
+  const [formErrors, setFormErrors] = useState<Partial<Record<MilestoneFormErrorKey, string>>>({})
   const [milestoneToDelete, setMilestoneToDelete] = useState<Milestone | null>(null)
+  const [uploadedFile, setUploadedFile] = useState<UploadedFile | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const loadMilestones = useCallback(async () => {
     if (!projectId) {
@@ -218,6 +305,10 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
           'dga_name',
           'dga_planned_start_date',
           'dga_planned_end_date',
+          'dga_actual_start_date',
+          'dga_actual_end_date',
+          'dga_actual_progress',
+          'dga_cancellation_reason',
           'dga_start_date',
           'dga_description',
           'dga_milestone_description',
@@ -321,9 +412,10 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
   }
 
   function handleOpenCreate() {
-    if (isReadOnly) return
+    if (isReadOnly || canEditExecutionFieldsOnly) return
     setEditingMilestone(null)
     setForm(EMPTY_FORM)
+    setUploadedFile(null)
     setFormErrors({})
     setError('')
     setNotice('')
@@ -331,20 +423,26 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
   }
 
   function handleOpenEdit(milestone: Milestone) {
-    if (isReadOnly) return
     setEditingMilestone(milestone)
     setForm({
       name: milestone.name,
       plannedStartDate: milestone.plannedStartDate,
       plannedEndDate: milestone.plannedEndDate,
       quarter: milestone.quarter,
+      actualStartDate: milestone.actualStartDate,
+      actualEndDate: milestone.actualEndDate,
+      actualProgress: milestone.actualProgress,
+      cancellationReason: milestone.cancellationReason,
+      executionJustification: milestone.executionJustification,
+      executionStatus: milestone.executionStatus,
       status: milestone.status,
       assignee: milestone.assignee,
       weightage: milestone.weightage,
       makhrajAlMarhala: milestone.makhrajAlMarhala,
-      marhalaAlMashroua: milestone.marhalaAlMashroua,
+      marhalaAlMashroua: milestone.marhalaAlMashroua || '\u200B',
       description: milestone.description,
     })
+    setUploadedFile(null)
     setFormErrors({})
     setError('')
     setNotice('')
@@ -355,15 +453,28 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
     setIsDrawerOpen(false)
     setEditingMilestone(null)
     setForm(EMPTY_FORM)
+    setUploadedFile(null)
     setFormErrors({})
   }
 
   function handleFieldChange(fields: Partial<MilestoneFormData>) {
-    if (isReadOnly) return
+    if (isReadOnly && !canEditExecutionFieldsOnly) return
     const next = { ...form, ...fields }
     // Auto-calculate quarter when plannedEndDate changes
     if (fields.plannedEndDate !== undefined) {
       next.quarter = getQuarter(next.plannedEndDate)
+    }
+    if (
+      fields.executionStatus !== undefined
+      && fields.executionStatus !== EXECUTION_STATUS_REQUIRES_CANCELLATION_REASON
+    ) {
+      next.cancellationReason = ''
+    }
+    if (
+      fields.executionStatus !== undefined
+      && !EXECUTION_STATUS_REQUIRES_JUSTIFICATION.has(fields.executionStatus as ExecutionMilestoneStatusValue)
+    ) {
+      next.executionJustification = ''
     }
     setForm(next)
     const changedKeys = Object.keys(fields) as Array<keyof MilestoneFormData>
@@ -375,12 +486,40 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
       })
       delete copy.plannedStartDate
       delete copy.plannedEndDate
+      delete copy.actualStartDate
+      delete copy.actualEndDate
+      if (fields.executionStatus !== undefined) {
+        delete copy.cancellationReason
+        delete copy.executionJustification
+      }
       return { ...copy, ...rangeErrors }
     })
   }
 
+  function handleFileChange(file?: File | null) {
+    if (isReadOnly && !canEditExecutionFieldsOnly) return
+    setUploadedFile(file ? {
+      file,
+      name: file.name,
+      size: file.size,
+    } : null)
+    setFormErrors((prev) => {
+      const next = { ...prev }
+      delete next.uploadedFile
+      return next
+    })
+  }
+
+  function handleRemoveFile() {
+    if (isReadOnly && !canEditExecutionFieldsOnly) return
+    setUploadedFile(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
   function validate(): boolean {
-    const errors: Partial<Record<keyof MilestoneFormData, string>> = {}
+    const errors: Partial<Record<MilestoneFormErrorKey, string>> = {}
     if (!form.name.trim()) errors.name = 'Name is required'
     if (!form.plannedStartDate) errors.plannedStartDate = 'Start date is required'
     if (!form.plannedEndDate) errors.plannedEndDate = 'End date is required'
@@ -389,6 +528,36 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
       if (!form.makhrajAlMarhala.trim()) errors.makhrajAlMarhala = 'مخرجات المرحلة مطلوب'
       if (!form.marhalaAlMashroua.trim()) errors.marhalaAlMashroua = 'مرحلة المشروع مطلوبة'
     }
+    if (isExecutionPhase && editingMilestone) {
+      if (!form.actualStartDate) errors.actualStartDate = 'Actual Start Date is required.'
+      if (!form.actualEndDate) errors.actualEndDate = 'Actual End Date is required.'
+      if (!form.executionStatus) errors.executionStatus = 'Milestone Status is required.'
+      if (!form.actualProgress.trim()) errors.actualProgress = 'Actual Progress % is required.'
+      else if (!Number.isFinite(Number(form.actualProgress))) errors.actualProgress = 'Actual Progress % must be a valid number.'
+      else if (Number(form.actualProgress) < 0 || Number(form.actualProgress) > 100) errors.actualProgress = 'Actual Progress % must be between 0 and 100.'
+
+      if (form.actualStartDate && form.actualEndDate && form.actualStartDate > form.actualEndDate) {
+        errors.actualStartDate = 'Actual Start Date must be on or before Actual End Date.'
+        errors.actualEndDate = 'Actual End Date must be on or after Actual Start Date.'
+      }
+
+      if (form.executionStatus === EXECUTION_STATUS_REQUIRES_CANCELLATION_REASON && !form.cancellationReason.trim()) {
+        errors.cancellationReason = 'Cancellation Reason is required.'
+      }
+
+      if (
+        form.executionStatus
+        && EXECUTION_STATUS_REQUIRES_JUSTIFICATION.has(form.executionStatus)
+        && !form.executionJustification.trim()
+      ) {
+        errors.executionJustification = 'Justification is required.'
+      }
+
+      if (!uploadedFile) {
+        errors.uploadedFile = 'Upload File is required.'
+      }
+    }
+
     if (form.weightage > maxAllowedWeightage) {
       errors.weightage = editingMilestone
         ? `Maximum for this milestone is ${maxAllowedWeightage}%`
@@ -401,7 +570,8 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
   }
 
   async function handleSave() {
-    if (isReadOnly) return
+    if (isReadOnly && !canEditExecutionFieldsOnly) return
+    if (canEditExecutionFieldsOnly && !editingMilestone) return
     if (!validate()) return
     if (!projectId) {
       setError('Activity id is missing from the edit URL.')
@@ -438,7 +608,7 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
   }
 
   async function handleConfirmDelete() {
-    if (isReadOnly) return
+    if (isReadOnly || canEditExecutionFieldsOnly) return
     if (!milestoneToDelete) return
     setIsDeleting(true)
     setError('')
@@ -502,7 +672,6 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
           <h3 className="edit-activity__milestone-card-title">
             <button
               className="edit-activity__milestone-card-name-btn"
-              disabled={isReadOnly}
               onClick={() => handleOpenEdit(milestone)}
               type="button"
             >
@@ -516,16 +685,16 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
           )}
           <div className="edit-activity__milestone-card-bottom">
             <p className="edit-activity__milestone-card-desc">{milestone.description}</p>
-            {!isReadOnly ? (
-              <div className="edit-activity__milestone-card-actions">
-                <button
-                  aria-label="Edit milestone"
-                  className="edit-activity__milestone-action-btn"
-                  onClick={() => handleOpenEdit(milestone)}
-                  type="button"
-                >
-                  <Edit3 size={14} />
-                </button>
+            <div className="edit-activity__milestone-card-actions">
+              <button
+                aria-label="Edit milestone"
+                className="edit-activity__milestone-action-btn"
+                onClick={() => handleOpenEdit(milestone)}
+                type="button"
+              >
+                <Edit3 size={14} />
+              </button>
+              {!(isReadOnly || canEditExecutionFieldsOnly) ? (
                 <button
                   aria-label="Delete milestone"
                   className="edit-activity__milestone-action-btn edit-activity__milestone-action-btn--danger"
@@ -534,8 +703,8 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
                 >
                   <Trash2 size={14} />
                 </button>
-              </div>
-            ) : null}
+              ) : null}
+            </div>
           </div>
         </div>
       </div>
@@ -579,6 +748,13 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
 
   function renderDrawerForm() {
     const title = editingMilestone ? 'Edit Milestone' : 'Create Milestone'
+    const showExecutionFields = isExecutionPhase && Boolean(editingMilestone)
+    const canEditExecutionSection = !isReadOnly || (canEditExecutionFieldsOnly && showExecutionFields)
+    const isBaseSectionReadOnly = isReadOnly || canEditExecutionFieldsOnly
+    const requiresCancellationReason = form.executionStatus === EXECUTION_STATUS_REQUIRES_CANCELLATION_REASON
+    const requiresExecutionJustification = Boolean(
+      form.executionStatus && EXECUTION_STATUS_REQUIRES_JUSTIFICATION.has(form.executionStatus),
+    )
     return (
       <SideDrawer
         actions={
@@ -586,7 +762,7 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
             <Button onClick={handleCloseDrawer} variant="secondary">
               Cancel
             </Button>
-            <Button disabled={isReadOnly || isSaving} onClick={handleSave}>
+            <Button disabled={!canEditExecutionSection || isSaving} onClick={handleSave}>
               {isSaving ? 'Saving...' : editingMilestone ? 'Update Milestone' : 'Create Milestone'}
             </Button>
           </div>
@@ -611,7 +787,7 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
 
             <div className="edit-activity__procurement-drawer-section">
               <Input
-                disabled={isReadOnly}
+                disabled={isBaseSectionReadOnly}
                 error={formErrors.name}
                 label="Name of Milestone"
                 onChange={(e) => handleFieldChange({ name: e.target.value })}
@@ -621,7 +797,7 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
 
               <div className="create-activity__date-range">
                 <DatePicker
-                  disabled={isReadOnly}
+                  disabled={isBaseSectionReadOnly}
                   error={formErrors.plannedStartDate}
                   id="ms-planned-start-date"
                   label="Planned Start Date"
@@ -637,7 +813,7 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
                   </svg>
                 </span>
                 <DatePicker
-                  disabled={isReadOnly}
+                  disabled={isBaseSectionReadOnly}
                   error={formErrors.plannedEndDate}
                   id="ms-planned-end-date"
                   label="Planned End Date"
@@ -656,7 +832,7 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
               />
 
               <Textarea
-                disabled={isReadOnly}
+                disabled={isBaseSectionReadOnly}
                 label="Description"
                 onChange={(e) => handleFieldChange({ description: e.target.value })}
                 rows={3}
@@ -681,7 +857,7 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
 
               <div className="edit-activity__procurement-drawer-section">
                 <Input
-                  disabled={isReadOnly}
+                  disabled={isBaseSectionReadOnly}
                   error={formErrors.weightage}
                   label="Weightage (%)"
                   max={maxAllowedWeightage}
@@ -701,7 +877,7 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
                 </div>
 
                 <Input
-                  disabled={isReadOnly}
+                  disabled={isBaseSectionReadOnly}
                   error={formErrors.makhrajAlMarhala}
                   label="مخرجات المرحلة"
                   onChange={(e) => handleFieldChange({ makhrajAlMarhala: e.target.value })}
@@ -710,13 +886,159 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
                 />
 
                 <Input
-                  disabled={isReadOnly}
+                  disabled={isBaseSectionReadOnly}
                   error={formErrors.marhalaAlMashroua}
                   label="مرحلة المشروع"
                   onChange={(e) => handleFieldChange({ marhalaAlMashroua: e.target.value })}
                   required
                   value={form.marhalaAlMashroua}
                 />
+              </div>
+            </div>
+          ) : null}
+
+          {showExecutionFields ? (
+            <div className="edit-activity__procurement-section">
+              <div className="create-activity__section-header">
+                <div className="create-activity__section-header-inner">
+                  <span className="create-activity__section-header-icon" aria-hidden="true">
+                    <Flag size={16} />
+                  </span>
+                  <div>
+                    <span>Execution Details</span>
+                    <h2>Actual timeline, progress & status</h2>
+                  </div>
+                </div>
+              </div>
+
+              <div className="edit-activity__procurement-drawer-section">
+                <div className="create-activity__date-range">
+                  <DatePicker
+                    disabled={!canEditExecutionSection}
+                    error={formErrors.actualStartDate}
+                    id="ms-actual-start-date"
+                    label="Actual Start Date"
+                    onChange={(value) => handleFieldChange({ actualStartDate: value })}
+                    required
+                    value={form.actualStartDate}
+                  />
+                  <span className="create-activity__date-connector" aria-hidden="true">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M5 12h14M13 5l7 7-7 7"/>
+                    </svg>
+                  </span>
+                  <DatePicker
+                    disabled={!canEditExecutionSection}
+                    error={formErrors.actualEndDate}
+                    id="ms-actual-end-date"
+                    label="Actual End Date"
+                    min={form.actualStartDate || undefined}
+                    onChange={(value) => handleFieldChange({ actualEndDate: value })}
+                    required
+                    value={form.actualEndDate}
+                  />
+                </div>
+
+                <Select
+                  disabled={!canEditExecutionSection}
+                  error={formErrors.executionStatus}
+                  id="ms-execution-status"
+                  label="Milestone Status"
+                  onChange={(value) => handleFieldChange({ executionStatus: value })}
+                  options={EXECUTION_STATUS_OPTIONS}
+                  required
+                  value={form.executionStatus}
+                />
+
+                <Input
+                  disabled={!canEditExecutionSection}
+                  error={formErrors.actualProgress}
+                  label="Actual Progress %"
+                  max={100}
+                  min={0}
+                  onChange={(e) => handleFieldChange({ actualProgress: e.target.value })}
+                  required
+                  type="number"
+                  value={form.actualProgress}
+                />
+
+                {requiresCancellationReason ? (
+                  <Textarea
+                    disabled={!canEditExecutionSection}
+                    error={formErrors.cancellationReason}
+                    label="Cancellation Reason"
+                    onChange={(e) => handleFieldChange({ cancellationReason: e.target.value })}
+                    required
+                    rows={3}
+                    value={form.cancellationReason}
+                  />
+                ) : null}
+
+                {requiresExecutionJustification ? (
+                  <Textarea
+                    disabled={!canEditExecutionSection}
+                    error={formErrors.executionJustification}
+                    label="Justification"
+                    onChange={(e) => handleFieldChange({ executionJustification: e.target.value })}
+                    required
+                    rows={3}
+                    value={form.executionJustification}
+                  />
+                ) : null}
+
+                <div className={`field ${!canEditExecutionSection ? 'field--disabled' : ''}`}>
+                  <span className="field__label">
+                    Upload File
+                    <span aria-hidden="true" className="field__required"> *</span>
+                  </span>
+
+                  <input
+                    className="edit-activity__file-upload-input"
+                    disabled={!canEditExecutionSection}
+                    onChange={(event) => handleFileChange(event.target.files?.[0] ?? null)}
+                    ref={fileInputRef}
+                    type="file"
+                  />
+
+                  <button
+                    className={`edit-activity__file-upload ${uploadedFile ? 'edit-activity__file-upload--has-file' : ''}`}
+                    disabled={!canEditExecutionSection}
+                    onClick={() => fileInputRef.current?.click()}
+                    type="button"
+                  >
+                    <span className="edit-activity__file-upload-icon" aria-hidden="true">
+                      <Upload size={18} />
+                    </span>
+                    <span className="edit-activity__file-upload-copy">
+                      <strong>{uploadedFile ? 'File selected' : 'Upload supporting file'}</strong>
+                      <span>{uploadedFile ? 'You can replace it before saving.' : 'Choose one file to support this execution update.'}</span>
+                    </span>
+                    <span className="edit-activity__file-upload-action">
+                      {uploadedFile ? 'Replace file' : 'Choose file'}
+                    </span>
+                  </button>
+
+                  {uploadedFile ? (
+                    <div className="edit-activity__file-upload-meta">
+                      <span className="edit-activity__file-upload-file">
+                        <strong>{uploadedFile.name}</strong>
+                        <span>{Math.max(1, Math.round(uploadedFile.size / 1024))} KB</span>
+                      </span>
+                      {canEditExecutionSection ? (
+                        <button
+                          aria-label="Remove selected file"
+                          className="edit-activity__file-upload-remove"
+                          onClick={handleRemoveFile}
+                          type="button"
+                        >
+                          <X size={14} />
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {formErrors.uploadedFile ? <span className="field__error">{formErrors.uploadedFile}</span> : null}
+                </div>
               </div>
             </div>
           ) : null}
@@ -738,7 +1060,7 @@ export function MilestonesTab({ activityPlannedEndDate, activityPlannedStartDate
           </h2>
           <p>Track project milestones and key deliverables.</p>
         </div>
-        <Button disabled={isReadOnly || !projectId || isLoading} icon={<Plus size={15} />} onClick={handleOpenCreate}>
+        <Button disabled={isReadOnly || canEditExecutionFieldsOnly || !projectId || isLoading} icon={<Plus size={15} />} onClick={handleOpenCreate}>
           Add Milestone
         </Button>
       </div>

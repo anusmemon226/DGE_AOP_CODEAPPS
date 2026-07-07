@@ -45,6 +45,8 @@ export const SUBMISSION_ACTIVITY_SELECT_FIELDS = [
   '_dga_activity_lead_value',
   'dga_planned_start_date',
   'dga_planned_end_date',
+  'dga_project_activity_status',
+  'dga_justification_for_activity_status',
   'dga_scope',
   'dga_description_summary',
   'dga_project_name',
@@ -143,10 +145,11 @@ function validatePersistedBudget(project: Dga_aop_projectses | undefined, months
 
 export async function validateActivitySubmissionRequirements(options: {
   form: ActivityForm
+  isExecutionPhase: boolean
   projectId: string
   tabLocks: SubmissionTabLocks
 }): Promise<SubmissionValidationResult> {
-  const { form, projectId, tabLocks } = options
+  const { form, isExecutionPhase, projectId, tabLocks } = options
 
   if (!projectId) {
     return {
@@ -156,7 +159,7 @@ export async function validateActivitySubmissionRequirements(options: {
     }
   }
 
-  const activityInfoErrors = validateForm(form)
+  const activityInfoErrors = validateForm(form, isExecutionPhase)
   if (Object.keys(activityInfoErrors).length > 0) {
     return {
       valid: false,
@@ -295,6 +298,7 @@ export async function validatePersistedActivitySubmission(projectId: string): Pr
 
   return validateActivitySubmissionRequirements({
     form,
+    isExecutionPhase: Number(project.dga_project_phase ?? 776140000) === 776140001,
     projectId,
     tabLocks: {
       budget: form.budgetRequired === '0',

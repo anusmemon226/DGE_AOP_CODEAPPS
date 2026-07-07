@@ -681,6 +681,7 @@ export function Approvals() {
 
     if (normalizedRole.includes('director general')) {
       return {
+        dga_project_activity_status: 776140007,
         statuscode: 776140011,
         dga_project_phase: 776140001,
         'ownerid@odata.bind': toEntityBind('teams', await resolvePlanningTeam(approval.planningInstanceId, '_dga_division_member_team_value')),

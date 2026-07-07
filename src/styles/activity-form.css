@@ -523,6 +523,12 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.create-activity__radio--status .radio-group__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.42rem;
+}
+
 .create-activity__form-stack .radio-group .choice,
 .create-activity__form-stack .checkbox-group .choice {
   align-items: center;
@@ -577,6 +583,12 @@
 
 .create-activity__radio--classification .choice {
   min-height: 2.45rem;
+}
+
+.create-activity__radio--status .choice {
+  flex: 0 0 auto;
+  min-height: 2.45rem;
+  width: auto;
 }
 
 .create-activity__strategy-group .checkbox-group__options {
@@ -1821,8 +1833,21 @@
 }
 
 .copilot-assistant__error {
+  align-items: center;
+  background: var(--color-error-soft);
+  border: 1px solid color-mix(in srgb, var(--color-error) 28%, transparent);
+  border-radius: 0.9rem;
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--color-error) 8%, transparent);
+  color: var(--color-error);
+  display: flex;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.45;
+  margin-top: -0.25rem;
   max-width: 64rem;
+  padding: 0.75rem 0.95rem;
   width: min(100%, 64rem);
+  margin: auto;
 }
 
 .copilot-chips {

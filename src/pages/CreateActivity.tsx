@@ -15,6 +15,7 @@ import {
   type SelectOption,
 } from '../components/ui'
 import { Dga_aop_projectsesService } from '../generated/services/Dga_aop_projectsesService'
+import { Dga_custom_web_apiService } from '../generated/services/Dga_custom_web_apiService'
 import { Dga_project_planning_instancesService } from '../generated/services/Dga_project_planning_instancesService'
 import { SystemusersService } from '../generated/services/SystemusersService'
 import type { Dga_aop_projectsesBase, Dga_aop_projectses } from '../generated/models/Dga_aop_projectsesModel'
@@ -112,6 +113,7 @@ type CopilotAttachment = {
   name: string
   size: number
   type: string
+  file: File
 }
 
 const INITIAL_FORM: CreateActivityForm = {
@@ -183,7 +185,8 @@ const COPILOT_PROMPTS = [
 ] as const
 
 const MAX_ATTACHMENT_SIZE = 8 * 1024 * 1024
-const ALLOWED_ATTACHMENT_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'text/plain']
+const EXCEL_XLSX_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+const EXCEL_UPLOAD_ERROR = 'Only Excel .xlsx files are supported for AI draft generation.'
 
 function getResultValue<T>(result: unknown): T | undefined {
   const shaped = result as { data?: T; value?: T; result?: T; record?: T }
@@ -249,6 +252,39 @@ function formatFileSize(size: number) {
   }
 
   return `${Math.max(1, Math.round(size / 1024))} KB`
+}
+
+function isXlsxFile(file: File) {
+  const normalizedName = file.name.toLowerCase()
+  const hasXlsxExtension = normalizedName.endsWith('.xlsx')
+  const hasBlockedXlsExtension = normalizedName.endsWith('.xls')
+  const hasValidMime = !file.type || file.type === EXCEL_XLSX_MIME_TYPE
+
+  return hasXlsxExtension && !hasBlockedXlsExtension && hasValidMime
+}
+
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : ''
+      const base64 = result.includes(',') ? result.split(',')[1] : result
+
+      if (!base64) {
+        reject(new Error('Unable to read the selected Excel file. Please try again.'))
+        return
+      }
+
+      resolve(base64)
+    }
+
+    reader.onerror = () => {
+      reject(new Error('Unable to read the selected Excel file. Please try again.'))
+    }
+
+    reader.readAsDataURL(file)
+  })
 }
 
 function getOptionLabel<TValue extends string>(options: readonly SelectOption<TValue>[], value: TValue | '') {
@@ -537,88 +573,6 @@ async function assignActivityToDivisionMemberTeam(projectId: string, planningIns
   assertOperationSuccess(result, 'Activity was created, but owner assignment to the Division Member team failed.')
 }
 
-function inferActivityType(prompt: string): ActivityTypeValue {
-  const normalizedPrompt = prompt.toLowerCase()
-
-  if (normalizedPrompt.includes('ongoing') || normalizedPrompt.includes('continue')) {
-    return '2'
-  }
-
-  if (normalizedPrompt.includes('contract') || normalizedPrompt.includes('vendor')) {
-    return '3'
-  }
-
-  if (normalizedPrompt.includes('internal') || normalizedPrompt.includes('operation')) {
-    return '4'
-  }
-
-  return '1'
-}
-
-function inferActivityClassification(prompt: string): ClassificationValue {
-  const normalizedPrompt = prompt.toLowerCase()
-
-  if (normalizedPrompt.includes('payment only') || normalizedPrompt.includes('payment-only')) {
-    return '576610002'
-  }
-
-  if (normalizedPrompt.includes('epm')) {
-    return '576610000'
-  }
-
-  return '576610001'
-}
-
-function inferYesNo(prompt: string, yesKeywords: string[], noKeywords: string[] = []): YesNoValue {
-  const normalizedPrompt = prompt.toLowerCase()
-
-  if (noKeywords.some((keyword) => normalizedPrompt.includes(keyword))) {
-    return '0'
-  }
-
-  if (yesKeywords.some((keyword) => normalizedPrompt.includes(keyword))) {
-    return '1'
-  }
-
-  return '0'
-}
-
-function buildDraftFromCopilot(prompt: string, attachments: CopilotAttachment[], currentForm: CreateActivityForm) {
-  const normalizedPrompt = prompt.toLowerCase()
-  const firstSentence = prompt.split(/[.\n]/).find(Boolean)?.trim() ?? ''
-  const fallbackName = firstSentence.length > 72 ? firstSentence.slice(0, 69).trimEnd() : firstSentence
-  const attachmentSummary = attachments.length > 0
-    ? ` Supporting context was attached from ${attachments.map((attachment) => attachment.name).join(', ')}.`
-    : ''
-  const scopeDescription = prompt || currentForm.scopeDescription
-  const adeoReported = currentForm.adeoReported || inferYesNo(prompt, ['adeo', 'execution plan', 'reported'])
-  const activityScope: ActivityScopeValue = currentForm.activityScope || (normalizedPrompt.includes('strateg') ? '1' : '2')
-  const activityClassification = currentForm.activityClassification || inferActivityClassification(prompt)
-  const budgetRequired = currentForm.budgetRequired || inferYesNo(prompt, ['budget', 'aed', 'cost', 'fund', 'payment'], ['no budget'])
-  const procurementRequired = currentForm.procurementRequired || inferYesNo(prompt, ['procurement', 'contract', 'vendor', 'tender'], ['no procurement'])
-
-  return normalizeControlledRules({
-    ...currentForm,
-    activityName: currentForm.activityName || fallbackName || 'AI Assisted Activity Draft',
-    activityType: currentForm.activityType || inferActivityType(prompt),
-    activityScope,
-    strategies: activityScope === '1' ? currentForm.strategies.length > 0 ? currentForm.strategies : ['576610001'] : [],
-    activityClassification,
-    budgetRequired,
-    procurementRequired,
-    adeoReported,
-    scopeDescription,
-    summary: `${prompt}${attachmentSummary}`.trim() || currentForm.summary,
-    adeoProjectName: adeoReported === '1' ? currentForm.adeoProjectName || fallbackName || 'ADEO Activity Draft' : '',
-    adeoProjectDescription: adeoReported === '1' ? currentForm.adeoProjectDescription || scopeDescription : '',
-    longTermImpact: adeoReported === '1' ? currentForm.longTermImpact || prompt : '',
-    overallLongTermImpact: adeoReported === '1' ? currentForm.overallLongTermImpact || prompt : '',
-    stakeholder: adeoReported === '1' ? currentForm.stakeholder || 'To be confirmed during planning review' : '',
-    activityKpi: adeoReported === '1' ? currentForm.activityKpi || 'Defined during activity planning review' : '',
-    risks: adeoReported === '1' ? currentForm.risks || 'To be confirmed during planning review' : '',
-  })
-}
-
 function getDraftWarnings(draft: CreateActivityForm) {
   const warnings: string[] = []
   const errors = validateForm(draft)
@@ -739,6 +693,7 @@ export function CreateActivity() {
   const [copilotDraft, setCopilotDraft] = useState<CreateActivityForm | null>(null)
   const [attachments, setAttachments] = useState<CopilotAttachment[]>([])
   const [attachmentError, setAttachmentError] = useState('')
+  const [isCopilotGenerating, setIsCopilotGenerating] = useState(false)
   const cycle = assessmentCycles.find((item) => item.dga_assessment_cycleid === selectedCycle)
   const isStrategic = form.activityScope === '1'
   const isPaymentOnly = form.activityClassification === '576610002'
@@ -915,34 +870,33 @@ export function CreateActivity() {
 
   function addAttachments(files: FileList | File[]) {
     setAttachmentError('')
-    const nextAttachments: CopilotAttachment[] = []
+    setCopilotDraft(null)
 
-    Array.from(files).forEach((file) => {
-      if (file.size > MAX_ATTACHMENT_SIZE) {
-        setAttachmentError(`${file.name} is larger than the 8 MB limit.`)
-        return
-      }
+    const [file] = Array.from(files)
 
-      if (!ALLOWED_ATTACHMENT_TYPES.includes(file.type)) {
-        setAttachmentError(`${file.name} is not a supported file type.`)
-        return
-      }
-
-      nextAttachments.push({
-        id: `${file.name}-${file.size}-${file.lastModified}`,
-        name: file.name,
-        size: file.size,
-        type: file.type || 'Unknown',
-      })
-    })
-
-    if (nextAttachments.length > 0) {
-      setAttachments((currentAttachments) => {
-        const existingIds = new Set(currentAttachments.map((attachment) => attachment.id))
-
-        return [...currentAttachments, ...nextAttachments.filter((attachment) => !existingIds.has(attachment.id))]
-      })
+    if (!file) {
+      return
     }
+
+    if (file.size > MAX_ATTACHMENT_SIZE) {
+      setAttachmentError(`${file.name} is larger than the 8 MB limit.`)
+      setAttachments([])
+      return
+    }
+
+    if (!isXlsxFile(file)) {
+      setAttachmentError(EXCEL_UPLOAD_ERROR)
+      setAttachments([])
+      return
+    }
+
+    setAttachments([{
+      id: `${file.name}-${file.size}-${file.lastModified}`,
+      name: file.name,
+      size: file.size,
+      type: 'Excel workbook',
+      file,
+    }])
   }
 
   function handleFileInput(event: ChangeEvent<HTMLInputElement>) {
@@ -958,10 +912,37 @@ export function CreateActivity() {
     setCopilotDraft(null)
   }
 
-  function createCopilotDraft() {
-    const draft = buildDraftFromCopilot(copilotPrompt, attachments, form)
+  async function createCopilotDraft() {
+    const [attachment] = attachments
 
-    setCopilotDraft(draft)
+    if (!attachment) {
+      setAttachmentError('Upload an Excel .xlsx file before starting the draft.')
+      return
+    }
+
+    setAttachmentError('')
+    setCopilotDraft(null)
+    setIsCopilotGenerating(true)
+
+    try {
+      const base64 = await readFileAsBase64(attachment.file)
+      const result = await Dga_custom_web_apiService.dga_custom_web_api(
+        'openai',
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        base64,
+      )
+      console.log(base64)
+      console.log(result)
+      assertOperationSuccess(result, 'AI Assistant could not process the uploaded Excel file.')
+      console.log('Create activity AI draft response', result)
+    } catch (error) {
+      setAttachmentError(error instanceof Error ? error.message : 'AI Assistant could not process the uploaded Excel file.')
+    } finally {
+      setIsCopilotGenerating(false)
+    }
   }
 
   function applyCopilotDraft() {
@@ -1838,16 +1819,16 @@ export function CreateActivity() {
                 <div className="copilot-composer__tools">
                   <label className="copilot-tool-button">
                     <Paperclip size={16} />
-                    Upload Document
-                    <input accept=".pdf,.png,.jpg,.jpeg,.txt" multiple onChange={handleFileInput} type="file" />
+                    Upload Excel
+                    <input accept=".xlsx" onChange={handleFileInput} type="file" />
                   </label>
                   <button className="copilot-tool-button" onClick={() => applyPromptChip('Review if this activity requires ADEO reporting, procurement, budget, or strategic categorization.')} type="button">
                     <Sparkles size={16} />
                     Check Considerations
                   </button>
                 </div>
-                <Button disabled={!copilotPrompt.trim() && attachments.length === 0} icon={<Send size={16} />} onClick={createCopilotDraft}>
-                  Start Draft
+                <Button disabled={attachments.length === 0 || isCopilotGenerating} icon={<Send size={16} />} onClick={createCopilotDraft}>
+                  {isCopilotGenerating ? 'Starting Draft...' : 'Start Draft'}
                 </Button>
               </div>
             </div>

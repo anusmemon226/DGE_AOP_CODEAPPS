@@ -40,9 +40,11 @@ import { BudgetTab, type BudgetHeaderAction } from './editActivity/BudgetTab'
 import { ClarificationTab } from './editActivity/ClarificationTab'
 import { EngagementPlanTab } from './editActivity/EngagementPlanTab'
 import { LogTab } from './editActivity/LogTab'
+import { ReviewChangesPanel } from './editActivity/ReviewChangesPanel'
 import {
   assertOperationSuccess,
   buildActivityInfoUpdatePayload,
+  buildExecutionStatusUpdatePayload,
   getResultValue,
   normalizeControlledRules,
   projectToActivityForm,
@@ -97,6 +99,7 @@ const ACTIVITY_INFO_SELECT_FIELDS = [
   '_dga_activity_lead_value',
   'dga_planned_start_date',
   'dga_planned_end_date',
+  'dga_justification_for_activity_status',
   'dga_scope',
   'dga_description_summary',
   'dga_project_name',
@@ -233,12 +236,16 @@ export function EditActivity() {
   const [isSubmittingToDirectorGeneral, setIsSubmittingToDirectorGeneral] = useState(false)
   const [isDirectorGeneralApproveConfirmOpen, setIsDirectorGeneralApproveConfirmOpen] = useState(false)
   const [isApprovingAsDirectorGeneral, setIsApprovingAsDirectorGeneral] = useState(false)
+  const [isStartingActivity, setIsStartingActivity] = useState(false)
 
   // ── Loaded activity data ──
   const activityName = activity?.dga_name || form.activityName || 'Edit Activity'
   const aiSummary = activity?.dga_description_summary || form.summary || 'No summary is available for this activity yet.'
   const statusCode = activity?.statuscode ?? 1 // Draft
   const projectPhase = activity?.dga_project_phase ?? 776140000 // Planning
+  const projectPhaseCode = Number(projectPhase)
+  const isExecutionPhase = projectPhaseCode === 776140001
+  const hasExecutionActivityStarted = isExecutionPhase && statusCode === 776140011 && form.activityStatus !== '776140007'
   const isStrategic = form.activityScope === '1'
   const isPaymentOnly = form.activityClassification === '576610002'
   const isBudgetNo = form.budgetRequired === '0'
@@ -274,27 +281,48 @@ export function EditActivity() {
         && statusCode === 776140001
       )
     )
+    const canEditExecutionStatusOnly = (
+      selectedRole === 'AOP - Division Member'
+      && isOwnedByCurrentRoleTeam
+      && statusCode === 776140011
+      && isExecutionPhase
+    )
+    const canEditMilestoneExecutionOnly = (
+      selectedRole === 'AOP - Division Member'
+      && isOwnedByCurrentRoleTeam
+      && statusCode === 776140011
+      && isExecutionPhase
+      && form.activityStatus !== '776140007'
+    )
     const isProcurementOnly = selectedRole === 'AOP - Procurement Team'
     const isPmoClassificationOnly = selectedRole === 'AOP - PMO'
+    const activityInfoEditableFields = isPmoClassificationOnly
+      ? ['activityClassification'] as Array<keyof ActivityForm>
+      : canEditExecutionStatusOnly
+        ? ['activityStatus', 'activityStatusJustification'] as Array<keyof ActivityForm>
+        : undefined
 
     return {
-      activityInfoCanSave: hasFullEdit || isPmoClassificationOnly,
-      activityInfoEditableFields: isPmoClassificationOnly ? ['activityClassification'] as Array<keyof ActivityForm> : undefined,
-      activityInfoReadOnly: !hasFullEdit && !isPmoClassificationOnly,
+      activityInfoCanSave: hasFullEdit || isPmoClassificationOnly || canEditExecutionStatusOnly,
+      activityInfoEditableFields,
+      activityInfoReadOnly: !hasFullEdit,
+      activityInfoHasFullEdit: hasFullEdit,
       budgetReadOnly: !hasFullEdit,
       canSubmitToDivisionDirector: selectedRole === 'AOP - Division Member' && hasFullEdit,
       canSubmitToStrategyTeam: selectedRole === 'AOP - Division Director' && hasFullEdit,
       canSubmitToExecutiveDirector: selectedRole === 'AOP - Strategy Team' && isOwnedByCurrentRoleTeam && statusCode === 776140003,
       canSubmitToDirectorGeneral: selectedRole === 'AOP - Executive Director' && isOwnedByCurrentRoleTeam && statusCode === 776140002,
       canApproveAsDirectorGeneral: selectedRole === 'AOP - Director General' && isOwnedByCurrentRoleTeam && statusCode === 776140014,
-      canStartActivity: selectedRole === 'AOP - Division Member' && isOwnedByCurrentRoleTeam && statusCode === 776140011 && projectPhase === 776140001,
-      milestonesReadOnly: !hasFullEdit,
+      canStartActivity: selectedRole === 'AOP - Division Member' && isOwnedByCurrentRoleTeam && statusCode === 776140011 && isExecutionPhase && form.activityStatus === '776140007',
+      canEditExecutionStatusOnly,
+      canEditMilestoneExecutionOnly,
+      milestonesReadOnly: !hasFullEdit && !canEditMilestoneExecutionOnly,
       objectivesReadOnly: !hasFullEdit,
       procurementReadOnly: !hasFullEdit && !isProcurementOnly,
       isPmoClassificationOnly,
     }
-  }, [activity?._owningteam_value, currentRole?.teamId, projectPhase, selectedRole, statusCode])
-  const canShowDivisionMemberEditActions = !isDivisionMember || editPermissions.canSubmitToDivisionDirector
+  }, [activity?._owningteam_value, currentRole?.teamId, form.activityStatus, isExecutionPhase, selectedRole, statusCode])
+  const canShowDivisionMemberEditActions = !isDivisionMember || editPermissions.canSubmitToDivisionDirector || editPermissions.canEditExecutionStatusOnly
   const canShowDivisionDirectorReviewActions = !isDivisionDirector || editPermissions.canSubmitToStrategyTeam
   const canShowExecutiveDirectorReviewActions = !isExecutiveDirector
   const canShowDirectorGeneralReviewActions = !isDirectorGeneral
@@ -449,8 +477,8 @@ export function EditActivity() {
     setForm(normalizedForm)
     setErrors((currentErrors) => {
       const nextErrors = { ...currentErrors }
-      const allRuntimeErrors = validateForm(normalizedForm)
-      const runtimeErrors = getRuntimeErrors(normalizedForm, changedFields)
+      const allRuntimeErrors = validateForm(normalizedForm, isExecutionPhase)
+      const runtimeErrors = getRuntimeErrors(normalizedForm, changedFields, isExecutionPhase)
 
       Object.keys(INITIAL_FORM).forEach((key) => {
         const field = key as keyof ActivityForm
@@ -502,7 +530,9 @@ export function EditActivity() {
 
     const nextErrors = editPermissions.isPmoClassificationOnly
       ? getRuntimeErrors(form, ['activityClassification'])
-      : validateForm(form)
+      : editPermissions.canEditExecutionStatusOnly
+        ? getRuntimeErrors(form, ['activityStatus', 'activityStatusJustification'], isExecutionPhase)
+      : validateForm(form, isExecutionPhase)
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors)
       setActiveTab('activity-info')
@@ -513,7 +543,9 @@ export function EditActivity() {
     try {
       const payload = editPermissions.isPmoClassificationOnly
         ? buildPmoActivityInfoUpdatePayload(form)
-        : buildActivityInfoUpdatePayload(form)
+        : editPermissions.canEditExecutionStatusOnly
+          ? buildExecutionStatusUpdatePayload(form)
+        : buildActivityInfoUpdatePayload(form, isExecutionPhase)
       console.log('Edit activity information payload', payload)
       const result = await Dga_aop_projectsesService.update(
         projectId,
@@ -531,8 +563,10 @@ export function EditActivity() {
         dga_adeo_review_required: payload.dga_adeo_review_required ?? currentActivity.dga_adeo_review_required,
         dga_does_this_project_require_procurement: payload.dga_does_this_project_require_procurement ?? currentActivity.dga_does_this_project_require_procurement,
         dga_doesthisprojectrequirebudgetallocation: payload.dga_doesthisprojectrequirebudgetallocation ?? currentActivity.dga_doesthisprojectrequirebudgetallocation,
+        dga_justification_for_activity_status: payload.dga_justification_for_activity_status ?? currentActivity.dga_justification_for_activity_status,
         dga_planned_end_date: form.plannedEndDate,
         dga_planned_start_date: form.plannedStartDate,
+        dga_project_activity_status: payload.dga_project_activity_status ?? currentActivity.dga_project_activity_status,
         dga_project_kpi: form.activityKpi,
         dga_registered_or_will_be_registered_in_epm: payload.dga_registered_or_will_be_registered_in_epm ?? currentActivity.dga_registered_or_will_be_registered_in_epm,
         dga_scope: form.scopeDescription,
@@ -564,6 +598,7 @@ export function EditActivity() {
     try {
       const validationResult = await validateSubmissionRequirements({
         form,
+        isExecutionPhase,
         projectId,
         tabLocks: {
           budget: tabLocked.budget,
@@ -590,7 +625,7 @@ export function EditActivity() {
       }))
       return false
     }
-  }, [form, projectId, tabLocked.budget, tabLocked.milestones, tabLocked.procurements])
+  }, [form, isExecutionPhase, projectId, tabLocked.budget, tabLocked.milestones, tabLocked.procurements])
 
   const validateSubmitToDivisionDirector = useCallback(async () => {
     if (!isDivisionMember || !editPermissions.canSubmitToDivisionDirector) {
@@ -1080,6 +1115,7 @@ export function EditActivity() {
       }
 
       const payload = {
+        dga_project_activity_status: 776140007 as Dga_aop_projectsesBase['dga_project_activity_status'],
         dga_project_phase: 776140001 as Dga_aop_projectsesBase['dga_project_phase'],
         statuscode: 776140011 as Dga_aop_projectsesBase['statuscode'],
         'ownerid@odata.bind': toEntityBind('teams', divisionMemberTeamId),
@@ -1105,12 +1141,18 @@ export function EditActivity() {
 
       setActivity((currentActivity) => currentActivity ? {
         ...currentActivity,
+        dga_project_activity_status: 776140007,
         _owningteam_value: divisionMemberTeamId,
         _owninguser_value: undefined,
         dga_project_phase: 776140001,
         owneridname: nextPendingWith,
         statuscode: 776140011,
       } : currentActivity)
+      setForm((currentForm) => ({
+        ...currentForm,
+        activityStatus: '776140007',
+        activityStatusJustification: '',
+      }))
       setPendingWith(nextPendingWith)
       setErrors((currentErrors) => ({ ...currentErrors, submit: undefined }))
       setSuccessMessage('Activity approved successfully.')
@@ -1136,10 +1178,53 @@ export function EditActivity() {
     console.log('Request Clarification')
   }, [])
 
-  const handleStartActivity = useCallback(() => {
-    // TODO: Implement start activity logic
-    console.log('Start Activity')
-  }, [])
+  const handleStartActivity = useCallback(async () => {
+    if (isStartingActivity) return
+    if (!isDivisionMember || !editPermissions.canStartActivity) {
+      setErrors((currentErrors) => ({
+        ...currentErrors,
+        submit: 'You can start this activity only when it is active, in execution, assigned to your Division Member team, and still not started.',
+      }))
+      return
+    }
+
+    setIsStartingActivity(true)
+    setSuccessMessage('')
+
+    try {
+      const payload = {
+        dga_project_activity_status: 776140006 as Dga_aop_projectsesBase['dga_project_activity_status'],
+        dga_justification_for_activity_status: '',
+      }
+
+      console.log('Start Activity payload', payload)
+      const startResult = await Dga_aop_projectsesService.update(
+        projectId,
+        payload as unknown as Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>>,
+      )
+      assertOperationSuccess(startResult, 'Failed to start activity.')
+
+      setActivity((currentActivity) => currentActivity ? {
+        ...currentActivity,
+        dga_project_activity_status: 776140006,
+        dga_justification_for_activity_status: '',
+      } : currentActivity)
+      setForm((currentForm) => ({
+        ...currentForm,
+        activityStatus: '776140006',
+        activityStatusJustification: '',
+      }))
+      setErrors((currentErrors) => ({ ...currentErrors, submit: undefined }))
+      setSuccessMessage('Activity started successfully.')
+    } catch (error) {
+      setErrors((currentErrors) => ({
+        ...currentErrors,
+        submit: error instanceof Error ? error.message : 'Failed to start activity.',
+      }))
+    } finally {
+      setIsStartingActivity(false)
+    }
+  }, [editPermissions.canStartActivity, isDivisionMember, isStartingActivity, projectId])
 
   // ── Tab content ──
 
@@ -1152,6 +1237,8 @@ export function EditActivity() {
             editableFields={editPermissions.activityInfoEditableFields}
             errors={errors}
             form={form}
+            hasFullEdit={editPermissions.activityInfoHasFullEdit}
+            showExecutionTracking={hasExecutionActivityStarted}
             isReadOnly={editPermissions.activityInfoReadOnly}
             isAdeoVisible={isAdeoVisible}
             isBudgetNo={isBudgetNo}
@@ -1175,6 +1262,8 @@ export function EditActivity() {
           <MilestonesTab
             activityPlannedEndDate={form.plannedEndDate}
             activityPlannedStartDate={form.plannedStartDate}
+            canEditExecutionFieldsOnly={editPermissions.canEditMilestoneExecutionOnly}
+            isExecutionPhase={hasExecutionActivityStarted}
             isReadOnly={editPermissions.milestonesReadOnly}
             isAdeoVisible={isAdeoVisible}
             projectId={projectId}
@@ -1467,7 +1556,7 @@ export function EditActivity() {
             <span className="create-activity__chip">
               <span className="create-activity__chip-label">Phase</span>
               <Badge tone="info">
-                {projectPhase === 776140000 ? 'Planning' : 'Execution'}
+                {isExecutionPhase ? 'Execution' : 'Planning'}
               </Badge>
             </span>
             <span className="create-activity__chip create-activity__chip--user">
@@ -1579,8 +1668,8 @@ export function EditActivity() {
               </Button>
             ) : null}
             {isDivisionMember && editPermissions.canStartActivity ? (
-              <Button icon={<Send size={16} />} onClick={handleStartActivity}>
-                Start Activity
+              <Button disabled={isStartingActivity || Boolean(errors.context)} icon={<Send size={16} />} onClick={handleStartActivity}>
+                {isStartingActivity ? 'Starting...' : 'Start Activity'}
               </Button>
             ) : null}
             <Button icon={<FileText size={16} />} variant="ghost" className="edit-activity__card-btn">
@@ -1634,6 +1723,7 @@ export function EditActivity() {
 
       {/* Stage content */}
       <div className="edit-activity__stage-content" role="tabpanel">
+        {hasExecutionActivityStarted ? <ReviewChangesPanel key={activeTab} activeTab={activeTab} /> : null}
         {renderTabContent()}
       </div>
 

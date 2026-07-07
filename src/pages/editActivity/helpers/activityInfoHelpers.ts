@@ -1,5 +1,9 @@
 import { type SelectOption } from '../../../components/ui'
-import type { Dga_aop_projectses, Dga_aop_projectsesBase } from '../../../generated/models/Dga_aop_projectsesModel'
+import {
+  Dga_aop_projectsesdga_project_activity_status,
+  type Dga_aop_projectses,
+  type Dga_aop_projectsesBase,
+} from '../../../generated/models/Dga_aop_projectsesModel'
 
 // ── Form Types ──
 
@@ -8,6 +12,7 @@ export type ActivityScopeValue = '1' | '2'
 export type StrategyValue = '576610000' | '576610001' | '576610002'
 export type ClassificationValue = '576610000' | '576610001' | '576610002'
 export type YesNoValue = '1' | '0'
+export type ActivityStatusValue = '776140007' | '776140005' | '776140006' | '776140009' | '776140010' | '776140013'
 
 export type ActivityForm = {
   activityName: string
@@ -25,6 +30,8 @@ export type ActivityForm = {
   activityLeadId: string
   plannedStartDate: string
   plannedEndDate: string
+  activityStatus: ActivityStatusValue | ''
+  activityStatusJustification: string
   scopeDescription: string
   summary: string
   adeoProjectName: string
@@ -67,6 +74,8 @@ export const FIELD_LABELS: Partial<Record<keyof ActivityForm, string>> = {
   activityLeadId: 'Activity Lead / PM Name',
   plannedStartDate: 'Planned Start Date',
   plannedEndDate: 'Planned End Date',
+  activityStatus: 'Activity Status',
+  activityStatusJustification: 'Activity Status Justification',
   scopeDescription: 'Activity Scope Description',
   summary: 'Summary',
   adeoProjectName: 'اسم المشروع',
@@ -94,6 +103,8 @@ export const INITIAL_FORM: ActivityForm = {
   activityLeadId: '',
   plannedStartDate: '',
   plannedEndDate: '',
+  activityStatus: '',
+  activityStatusJustification: '',
   scopeDescription: '',
   summary: '',
   adeoProjectName: '',
@@ -139,6 +150,37 @@ export const YES_NO_OPTIONS = [
   { label: 'No', value: '0', className: 'choice--no' },
 ] as const satisfies SelectOption<YesNoValue | ''>[]
 
+function formatGeneratedChoiceLabel(label: string) {
+  return label
+    .replace(/_/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+const EXECUTION_ACTIVITY_STATUS_VALUES = [
+  '776140007',
+  '776140005',
+  '776140006',
+  '776140009',
+  '776140010',
+  '776140013',
+] as const satisfies readonly ActivityStatusValue[]
+
+export const EXECUTION_ACTIVITY_STATUS_OPTIONS = EXECUTION_ACTIVITY_STATUS_VALUES.map((value) => ({
+  label: formatGeneratedChoiceLabel(
+    Dga_aop_projectsesdga_project_activity_status[Number(value) as keyof typeof Dga_aop_projectsesdga_project_activity_status],
+  ),
+  value,
+})) as readonly SelectOption<ActivityStatusValue>[]
+
+export const EXECUTION_ACTIVITY_STATUS_REQUIRES_JUSTIFICATION = new Set<ActivityStatusValue>([
+  '776140005',
+  '776140009',
+  '776140010',
+])
+
 // ── Helpers ──
 
 export function getOptionLabel<TValue extends string>(options: readonly SelectOption<TValue>[], value: TValue | '') {
@@ -171,10 +213,17 @@ export function normalizeControlledRules(form: ActivityForm): ActivityForm {
     nextForm.risks = ''
   }
 
+  if (
+    !nextForm.activityStatus
+    || !EXECUTION_ACTIVITY_STATUS_REQUIRES_JUSTIFICATION.has(nextForm.activityStatus)
+  ) {
+    nextForm.activityStatusJustification = ''
+  }
+
   return nextForm
 }
 
-export function validateForm(form: ActivityForm) {
+export function validateForm(form: ActivityForm, isExecutionPhase = false) {
   const errors: FieldErrors = {}
   const requiredFields: Array<keyof ActivityForm> = [
     'activityName',
@@ -211,6 +260,16 @@ export function validateForm(form: ActivityForm) {
     )
   }
 
+  if (isExecutionPhase) {
+    requiredFields.push('activityStatus')
+    if (
+      form.activityStatus
+      && EXECUTION_ACTIVITY_STATUS_REQUIRES_JUSTIFICATION.has(form.activityStatus)
+    ) {
+      requiredFields.push('activityStatusJustification')
+    }
+  }
+
   function requiredMessage(field: keyof ActivityForm) {
     if (field === 'activityType') return 'Select an Activity Type.'
     if (field === 'activityScope') return 'Choose Strategic or Operational Activity Scope.'
@@ -221,6 +280,8 @@ export function validateForm(form: ActivityForm) {
     if (field === 'activityLeadId') return 'Select an Activity Lead / PM Name.'
     if (field === 'plannedStartDate') return 'Select a Planned Start Date.'
     if (field === 'plannedEndDate') return 'Select a Planned End Date.'
+    if (field === 'activityStatus') return 'Select an Activity Status.'
+    if (field === 'activityStatusJustification') return 'Enter a justification for the selected Activity Status.'
     return `Enter ${FIELD_LABELS[field] ?? 'this field'}.`
   }
 
@@ -240,7 +301,7 @@ export function validateForm(form: ActivityForm) {
   return errors
 }
 
-export function getRequiredFields(form: ActivityForm): Array<keyof ActivityForm> {
+export function getRequiredFields(form: ActivityForm, isExecutionPhase = false): Array<keyof ActivityForm> {
   const fields: Array<keyof ActivityForm> = [
     'activityName',
     'activityType',
@@ -253,6 +314,16 @@ export function getRequiredFields(form: ActivityForm): Array<keyof ActivityForm>
     'plannedEndDate',
     'adeoReported',
   ]
+
+  if (isExecutionPhase) {
+    fields.push('activityStatus')
+    if (
+      form.activityStatus
+      && EXECUTION_ACTIVITY_STATUS_REQUIRES_JUSTIFICATION.has(form.activityStatus)
+    ) {
+      fields.push('activityStatusJustification')
+    }
+  }
 
   if (form.activityClassification !== '576610002') {
     fields.push('budgetRequired')
@@ -277,8 +348,8 @@ export function getRequiredFields(form: ActivityForm): Array<keyof ActivityForm>
   return fields
 }
 
-export function getRuntimeErrors(form: ActivityForm, fields: Array<keyof ActivityForm>) {
-  const formErrors = validateForm(form)
+export function getRuntimeErrors(form: ActivityForm, fields: Array<keyof ActivityForm>, isExecutionPhase = false) {
+  const formErrors = validateForm(form, isExecutionPhase)
   const nextErrors: FieldErrors = {}
 
   fields.forEach((field) => {
@@ -385,6 +456,8 @@ export function projectToActivityForm(project: Dga_aop_projectses, fallbacks: Ac
     activityLeadId: project._dga_activity_lead_value ?? '',
     plannedStartDate: toDateOnly(project.dga_planned_start_date),
     plannedEndDate: toDateOnly(project.dga_planned_end_date),
+    activityStatus: toStringChoice(project.dga_project_activity_status, EXECUTION_ACTIVITY_STATUS_VALUES),
+    activityStatusJustification: project.dga_justification_for_activity_status ?? '',
     scopeDescription: project.dga_scope ?? '',
     summary: project.dga_description_summary ?? '',
     adeoProjectName: project.dga_project_name ?? '',
@@ -398,7 +471,7 @@ export function projectToActivityForm(project: Dga_aop_projectses, fallbacks: Ac
   })
 }
 
-export function buildActivityInfoUpdatePayload(form: ActivityForm): ActivityInfoUpdatePayload {
+export function buildActivityInfoUpdatePayload(form: ActivityForm, isExecutionPhase = false): ActivityInfoUpdatePayload {
   const normalizedForm = normalizeControlledRules(form)
   const serializedStrategies = serializeStrategies(normalizedForm.strategies)
 
@@ -414,6 +487,9 @@ export function buildActivityInfoUpdatePayload(form: ActivityForm): ActivityInfo
     dga_name: normalizedForm.activityName.trim(),
     dga_planned_end_date: normalizedForm.plannedEndDate,
     dga_planned_start_date: normalizedForm.plannedStartDate,
+    dga_project_activity_status: isExecutionPhase
+      ? numberOrUndefined<Dga_aop_projectsesBase['dga_project_activity_status']>(normalizedForm.activityStatus)
+      : undefined,
     dga_project_categorized_under: normalizedForm.activityScope === '1' ? serializedStrategies : null,
     dga_project_description: normalizedForm.adeoProjectDescription,
     dga_project_kpi: normalizedForm.activityKpi,
@@ -426,5 +502,17 @@ export function buildActivityInfoUpdatePayload(form: ActivityForm): ActivityInfo
     dga_scope: normalizedForm.scopeDescription,
     dga_stakeholders: normalizedForm.stakeholder,
     dga_strategic_vs_operation: numberOrUndefined<Dga_aop_projectsesBase['dga_strategic_vs_operation']>(normalizedForm.activityScope),
+    dga_justification_for_activity_status: isExecutionPhase
+      ? normalizedForm.activityStatusJustification
+      : undefined,
+  }
+}
+
+export function buildExecutionStatusUpdatePayload(form: ActivityForm): ActivityInfoUpdatePayload {
+  const normalizedForm = normalizeControlledRules(form)
+
+  return {
+    dga_project_activity_status: numberOrUndefined<Dga_aop_projectsesBase['dga_project_activity_status']>(normalizedForm.activityStatus),
+    dga_justification_for_activity_status: normalizedForm.activityStatusJustification,
   }
 }
