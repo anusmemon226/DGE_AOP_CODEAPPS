@@ -293,6 +293,10 @@ export function EditActivity() {
       && statusCode === 776140011
       && isExecutionPhase
     )
+    const canEditExecutionBudget = (
+      selectedRole === 'AOP - Strategy Team'
+      || canEditExecutionStatusOnly
+    )
     const canEditMilestoneExecutionOnly = (
       selectedRole === 'AOP - Division Member'
       && isOwnedByCurrentRoleTeam
@@ -319,6 +323,7 @@ export function EditActivity() {
       canSubmitToExecutiveDirector: selectedRole === 'AOP - Strategy Team' && isOwnedByCurrentRoleTeam && statusCode === 776140003,
       canSubmitToDirectorGeneral: selectedRole === 'AOP - Executive Director' && isOwnedByCurrentRoleTeam && statusCode === 776140002,
       canApproveAsDirectorGeneral: selectedRole === 'AOP - Director General' && isOwnedByCurrentRoleTeam && statusCode === 776140014,
+      canEditExecutionBudget,
       canStartActivity: selectedRole === 'AOP - Division Member' && isOwnedByCurrentRoleTeam && statusCode === 776140011 && isExecutionPhase && form.activityStatus === '776140007',
       canEditExecutionStatusOnly,
       canEditMilestoneExecutionOnly,
@@ -1309,6 +1314,10 @@ export function EditActivity() {
       case 'budget':
         return (
           <BudgetTab
+            activityScope={form.activityScope}
+            canEditExecutionBudget={editPermissions.canEditExecutionBudget}
+            hierarchyId={form.divisionId}
+            isExecutionPhase={isExecutionPhase}
             isReadOnly={editPermissions.budgetReadOnly}
             onHeaderActionChange={setBudgetHeaderAction}
             plannedEndDate={form.plannedEndDate}

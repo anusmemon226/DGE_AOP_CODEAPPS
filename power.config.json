@@ -126,6 +126,10 @@
         "aopprojectbudgetdetails": {
           "entitySetName": "dga_aop_project_budget_detailses",
           "logicalName": "dga_aop_project_budget_details"
+        },
+        "accountcodes": {
+          "entitySetName": "dga_account_codes",
+          "logicalName": "dga_account_code"
         }
       },
       "environmentVariableName": ""

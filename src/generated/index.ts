@@ -6,6 +6,7 @@
 // Models
 export * as AccountsModel from './models/AccountsModel';
 export * as CommonModels from './models/CommonModels';
+export * as Dga_account_codesModel from './models/Dga_account_codesModel';
 export * as Dga_aop_cost_centersModel from './models/Dga_aop_cost_centersModel';
 export * as Dga_aop_engagement_plansModel from './models/Dga_aop_engagement_plansModel';
 export * as Dga_aop_project_budget_detailsesModel from './models/Dga_aop_project_budget_detailsesModel';
@@ -33,6 +34,7 @@ export * as TeamsModel from './models/TeamsModel';
 
 // Services
 export * from './services/AccountsService';
+export * from './services/Dga_account_codesService';
 export * from './services/Dga_aop_cost_centersService';
 export * from './services/Dga_aop_engagement_plansService';
 export * from './services/Dga_aop_project_budget_detailsesService';

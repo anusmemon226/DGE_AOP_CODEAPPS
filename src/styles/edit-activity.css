@@ -4287,6 +4287,988 @@
   color: var(--color-primary);
 }
 
+.edit-activity__execution-budget-quarter-grid {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.edit-activity__execution-budget-quarter {
+  background: color-mix(in srgb, var(--color-primary) 3%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 16%, var(--color-border));
+  border-radius: 1rem;
+  display: grid;
+  gap: 0.85rem;
+  padding: 0.85rem;
+}
+
+.edit-activity__execution-budget-quarter--current {
+  border-color: color-mix(in srgb, var(--color-primary) 34%, var(--color-border));
+  box-shadow: 0 14px 28px color-mix(in srgb, var(--color-primary) 9%, transparent);
+}
+
+.edit-activity__execution-budget-quarter-header {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.edit-activity__execution-budget-quarter-title {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.edit-activity__execution-budget-quarter-number {
+  align-items: center;
+  background: var(--color-primary-soft);
+  border-radius: 0.55rem;
+  color: var(--color-primary);
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 800;
+  height: 1.9rem;
+  justify-content: center;
+  min-width: 2.1rem;
+}
+
+.edit-activity__execution-budget-quarter-range,
+.edit-activity__execution-budget-quarter-total > span {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.edit-activity__execution-budget-quarter-total {
+  display: grid;
+  gap: 0.12rem;
+  justify-items: end;
+}
+
+.edit-activity__execution-budget-quarter-total strong,
+.edit-activity__execution-budget-quarter-total .currency-display {
+  color: var(--color-text-primary);
+  font-size: 0.94rem;
+}
+
+.edit-activity__execution-budget-quarter-total .dirham-icon {
+  color: var(--color-primary);
+}
+
+.edit-activity__execution-budget-quarter-body {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.edit-activity__execution-budget-graph {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-primary) 2.5%, var(--color-surface)), var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 14%, var(--color-border));
+  border-radius: 1rem;
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.edit-activity__execution-budget-graph-section {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.edit-activity__execution-budget-graph-section + .edit-activity__execution-budget-graph-section {
+  border-top: 1px solid color-mix(in srgb, var(--color-primary) 12%, var(--color-border));
+  padding-top: 1rem;
+}
+
+.edit-activity__execution-budget-graph-head {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.edit-activity__execution-budget-graph-head h3 {
+  color: var(--color-text-primary);
+  font-size: 1rem;
+  font-weight: 850;
+  margin: 0;
+}
+
+.edit-activity__execution-budget-graph-legend {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  justify-content: flex-end;
+}
+
+.edit-activity__execution-budget-graph-legend span {
+  align-items: center;
+  color: var(--color-text-secondary);
+  display: inline-flex;
+  font-size: 0.75rem;
+  font-weight: 750;
+  gap: 0.35rem;
+}
+
+.edit-activity__execution-budget-legend-dot {
+  border-radius: 999px;
+  display: inline-block;
+  height: 0.55rem;
+  width: 0.55rem;
+}
+
+.edit-activity__execution-budget-legend-dot--planned {
+  background: var(--color-primary);
+}
+
+.edit-activity__execution-budget-legend-dot--actual {
+  background: var(--color-info);
+}
+
+.edit-activity__execution-budget-legend-dot--delivered {
+  background: var(--color-success);
+}
+
+.edit-activity__execution-budget-monthly-chart {
+  align-items: stretch;
+  background: color-mix(in srgb, var(--color-primary) 2%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 12%, var(--color-border));
+  border-radius: 1rem;
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: 4rem minmax(0, 1fr);
+  padding: 1.85rem 1rem 1rem 0;
+}
+
+.edit-activity__execution-budget-monthly-y-axis {
+  color: var(--color-text-secondary);
+  display: flex;
+  flex-direction: column;
+  font-size: 0.72rem;
+  font-weight: 850;
+  height: 12rem;
+  justify-content: space-between;
+  padding: 0;
+  text-align: right;
+}
+
+.edit-activity__execution-budget-monthly-y-axis .currency-display,
+.edit-activity__execution-budget-monthly-y-axis .currency-display > span,
+.edit-activity__execution-budget-monthly-y-axis .dirham-icon {
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 850;
+  justify-content: flex-end;
+}
+
+.edit-activity__execution-budget-monthly-plot {
+  align-items: stretch;
+  border-radius: 0.75rem;
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  min-width: 0;
+  padding: 0;
+  position: relative;
+}
+
+.edit-activity__execution-budget-monthly-plot::before {
+  background:
+    linear-gradient(to bottom, color-mix(in srgb, var(--color-primary) 7%, var(--color-border)) 0 1px, transparent 1px) 0 0.45rem / 100% calc((12rem - 0.9rem) / 4) repeat-y;
+  border-radius: 0.75rem 0.75rem 0 0;
+  content: '';
+  height: 12rem;
+  inset: 0 0 auto;
+  pointer-events: none;
+  position: absolute;
+}
+
+.edit-activity__execution-budget-monthly-chart-item {
+  position: relative;
+  z-index: 1;
+}
+
+.edit-activity__execution-budget-monthly-chart-item {
+  align-items: stretch;
+  border-radius: 0.75rem;
+  display: grid;
+  gap: 0.35rem;
+  grid-template-rows: 12rem auto;
+  justify-items: center;
+  min-width: 0;
+  padding: 0 0.08rem;
+  transition: background 0.18s ease, transform 0.18s ease;
+}
+
+.edit-activity__execution-budget-monthly-chart-item:hover {
+  background: color-mix(in srgb, var(--color-primary) 5%, transparent);
+  transform: translateY(-1px);
+}
+
+.edit-activity__execution-budget-monthly-chart-item strong {
+  color: var(--color-text-secondary);
+  font-size: 0.74rem;
+  font-weight: 850;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
+.edit-activity__execution-budget-monthly-bars {
+  align-items: end;
+  align-self: center;
+  display: flex;
+  gap: 0.18rem;
+  height: calc(12rem - 0.9rem);
+  justify-content: center;
+  min-width: 0;
+  width: 100%;
+}
+
+.edit-activity__execution-budget-monthly-bar {
+  border-radius: 999px 999px 0.2rem 0.2rem;
+  display: block;
+  min-height: 0;
+  width: clamp(0.34rem, 0.8vw, 0.58rem);
+}
+
+.edit-activity__execution-budget-monthly-bar--planned {
+  background: var(--color-primary);
+}
+
+.edit-activity__execution-budget-monthly-bar--actual {
+  background: var(--color-info);
+}
+
+.edit-activity__execution-budget-monthly-bar--delivered {
+  background: var(--color-success);
+}
+
+.edit-activity__execution-budget-chart {
+  align-items: stretch;
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.edit-activity__execution-budget-chart-quarter,
+.edit-activity__execution-budget-overall {
+  background: color-mix(in srgb, var(--color-primary) 2%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 10%, var(--color-border));
+  border-radius: 0.9rem;
+  display: grid;
+  gap: 0.65rem;
+  min-width: 0;
+  padding: 0.8rem;
+}
+
+.edit-activity__execution-budget-chart-quarter-head {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.edit-activity__execution-budget-chart-quarter-head strong {
+  color: var(--color-text-primary);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.edit-activity__execution-budget-chart-quarter-head span {
+  color: var(--color-text-secondary);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.edit-activity__execution-budget-chart-bars {
+  align-items: end;
+  display: flex;
+  gap: 0.7rem;
+  justify-content: center;
+  min-height: 9rem;
+}
+
+.edit-activity__execution-budget-chart-bar-wrap {
+  align-items: center;
+  display: grid;
+  gap: 0.35rem;
+  grid-template-rows: 1fr auto;
+  height: 100%;
+  justify-items: center;
+}
+
+.edit-activity__execution-budget-chart-bar-wrap em {
+  color: var(--color-text-secondary);
+  font-size: 0.64rem;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.edit-activity__execution-budget-chart-bar {
+  border-radius: 999px 999px 0.25rem 0.25rem;
+  align-self: end;
+  display: block;
+  min-height: 0.35rem;
+  width: 1.05rem;
+}
+
+.edit-activity__execution-budget-chart-bar--planned {
+  background: var(--color-primary);
+}
+
+.edit-activity__execution-budget-chart-bar--actual {
+  background: var(--color-info);
+}
+
+.edit-activity__execution-budget-chart-copy {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.edit-activity__execution-budget-chart-copy span {
+  align-items: center;
+  color: var(--color-text-secondary);
+  display: inline-flex;
+  flex-wrap: wrap;
+  font-size: 0.66rem;
+  font-weight: 700;
+  gap: 0.2rem;
+  justify-content: space-between;
+}
+
+.edit-activity__execution-budget-chart-copy-row--planned .currency-display,
+.edit-activity__execution-budget-chart-copy-row--planned .currency-display > span,
+.edit-activity__execution-budget-chart-copy-row--planned .dirham-icon {
+  color: var(--color-primary);
+}
+
+.edit-activity__execution-budget-chart-copy-row--actual .currency-display,
+.edit-activity__execution-budget-chart-copy-row--actual .currency-display > span,
+.edit-activity__execution-budget-chart-copy-row--actual .dirham-icon {
+  color: var(--color-info);
+}
+
+.edit-activity__execution-budget-chart-copy .currency-display,
+.edit-activity__execution-budget-chart-copy .currency-display > span,
+.edit-activity__execution-budget-overall-values .currency-display,
+.edit-activity__execution-budget-overall-values .currency-display > span {
+  font-size: 0.68rem;
+}
+
+.edit-activity__execution-budget-progress-track {
+  background: var(--color-surface-muted);
+  border-radius: 999px;
+  height: 0.42rem;
+  overflow: hidden;
+}
+
+.edit-activity__execution-budget-progress-track > span {
+  background: linear-gradient(90deg, var(--color-info), var(--color-success));
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+}
+
+.edit-activity__execution-budget-overall {
+  align-content: center;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-primary) 8%, var(--color-surface)), var(--color-surface));
+  justify-items: center;
+  text-align: center;
+}
+
+.edit-activity__execution-budget-overall > div:first-child {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.edit-activity__execution-budget-overall > div:first-child span {
+  color: var(--color-text-secondary);
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.edit-activity__execution-budget-overall > div:first-child strong {
+  color: var(--color-primary);
+  font-size: 1.45rem;
+  font-weight: 850;
+}
+
+.edit-activity__execution-budget-overall-ring {
+  align-items: center;
+  background:
+    conic-gradient(var(--color-primary) var(--progress), color-mix(in srgb, var(--color-primary) 12%, var(--color-border)) 0);
+  border-radius: 999px;
+  display: inline-flex;
+  height: 5.4rem;
+  justify-content: center;
+  position: relative;
+  width: 5.4rem;
+}
+
+.edit-activity__execution-budget-overall-ring::before {
+  background: var(--color-surface);
+  border-radius: inherit;
+  content: '';
+  inset: 0.55rem;
+  position: absolute;
+}
+
+.edit-activity__execution-budget-overall-ring span {
+  color: var(--color-text-primary);
+  font-size: 0.9rem;
+  font-weight: 850;
+  position: relative;
+}
+
+.edit-activity__execution-budget-overall-values {
+  display: grid;
+  gap: 0.28rem;
+  width: 100%;
+}
+
+.edit-activity__execution-budget-overall-values span {
+  align-items: center;
+  color: var(--color-text-secondary);
+  display: flex;
+  font-size: 0.68rem;
+  font-weight: 700;
+  justify-content: space-between;
+}
+
+.edit-activity__execution-budget-month {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-primary) 1.5%, var(--color-surface)), var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 12%, var(--color-border));
+  border-radius: 1rem;
+  box-shadow:
+    0 8px 20px color-mix(in srgb, var(--color-primary) 5%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #ffffff 72%, transparent);
+  display: grid;
+  gap: 0.62rem;
+  grid-template-areas:
+    'head'
+    'values'
+    'actions';
+  grid-template-columns: 1fr;
+  padding: 0.72rem;
+  align-items: start;
+  overflow: hidden;
+  position: relative;
+  min-width: 0;
+}
+
+.edit-activity__execution-budget-month--future {
+  opacity: 0.84;
+}
+
+.edit-activity__execution-budget-month--zero {
+  border-color: color-mix(in srgb, var(--color-warning) 36%, var(--color-border));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-warning) 4.5%, var(--color-surface)), var(--color-surface));
+}
+
+.edit-activity__execution-budget-month--zero .edit-activity__execution-budget-delivered .currency-input__control {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.edit-activity__execution-budget-month--zero .edit-activity__execution-budget-delivered .currency-input__control .dirham-icon,
+.edit-activity__execution-budget-month--zero .edit-activity__execution-budget-delivered .field__control {
+  color: var(--color-text-muted);
+}
+
+:root[data-theme='dark'] .edit-activity__execution-budget-month,
+:root[data-theme='dark'] .edit-activity__execution-budget-value,
+:root[data-theme='dark'] .edit-activity__execution-budget-value--delivered {
+  box-shadow: none;
+}
+
+:root[data-theme='dark'] .edit-activity__execution-budget-month {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+:root[data-theme='dark'] .edit-activity__execution-budget-value {
+  background: var(--color-surface-muted);
+}
+
+:root[data-theme='dark'] .edit-activity__execution-budget-delivered .currency-input__control {
+  box-shadow: none;
+}
+
+.edit-activity__execution-budget-month-head {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  grid-area: head;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.edit-activity__execution-budget-month-head-copy {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.edit-activity__execution-budget-month-head strong {
+  color: var(--color-text-primary);
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.edit-activity__execution-budget-month-head-copy > span {
+  color: var(--color-text-secondary);
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.edit-activity__execution-budget-month-head-side {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+}
+
+.edit-activity__execution-budget-month-statuses {
+  align-items: center;
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.edit-activity__execution-budget-zero-pill {
+  align-items: center;
+  background: var(--color-warning-soft);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 26%, var(--color-border));
+  border-radius: 999px;
+  color: var(--color-warning);
+  display: inline-grid;
+  font-size: 0.68rem;
+  font-weight: 600;
+  justify-content: center;
+  line-height: 1;
+  min-height: 1.5rem;
+  place-items: center;
+  padding: 0 0.6rem;
+  vertical-align: middle;
+}
+
+.edit-activity__execution-budget-month-chip {
+  align-items: center;
+  background: var(--color-success-soft);
+  border-radius: 999px;
+  color: var(--color-success);
+  display: inline-grid;
+  font-size: 0.68rem;
+  font-weight: 600;
+  justify-content: center;
+  line-height: 1;
+  min-height: 1.5rem;
+  place-items: center;
+  padding: 0 0.6rem;
+  vertical-align: middle;
+}
+
+.edit-activity__execution-budget-month-chip--future {
+  background: var(--color-neutral-soft);
+  color: var(--color-text-secondary);
+}
+
+.edit-activity__execution-budget-values {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-area: values;
+  min-width: 0;
+}
+
+.edit-activity__execution-budget-value {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface) 82%, var(--color-primary-soft)), var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 10%, var(--color-border));
+  border-radius: 0.78rem;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #ffffff 66%, transparent);
+  display: grid;
+  gap: 0.22rem;
+  min-height: 3.65rem;
+  padding: 0.62rem 0.68rem;
+  align-content: center;
+  min-width: 0;
+}
+
+.edit-activity__execution-budget-value span {
+  color: var(--color-text-secondary);
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0;
+  white-space: normal;
+  text-transform: none;
+  line-height: 1.2;
+}
+
+.edit-activity__execution-budget-value strong,
+.edit-activity__execution-budget-value .currency-display {
+  color: var(--color-text-primary);
+  font-size: 0.95rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.edit-activity__execution-budget-value .currency-display,
+.edit-activity__execution-budget-delivered .currency-input__control,
+.edit-activity__execution-budget-delivered .field__control {
+  font-size: 0.84rem;
+}
+
+.edit-activity__execution-budget-value .dirham-icon {
+  color: var(--color-primary);
+  height: 1.12rem;
+  width: 1.12rem;
+}
+
+.edit-activity__execution-budget-value .currency-display > span {
+  color: var(--color-text-primary);
+  font-size: 0.84rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.edit-activity__execution-budget-value--detail-count strong {
+  color: var(--color-primary);
+}
+
+.edit-activity__execution-budget-delivered {
+  min-width: 0;
+}
+
+.edit-activity__execution-budget-value--delivered {
+  background: color-mix(in srgb, var(--color-primary) 5%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-primary) 28%, var(--color-border));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #ffffff 72%, transparent),
+    0 0 0 2px color-mix(in srgb, var(--color-primary) 8%, transparent);
+  padding: 0.46rem 0.5rem 0.5rem;
+}
+
+.edit-activity__execution-budget-delivered .currency-input__control {
+  background: var(--color-surface);
+  min-height: 2.35rem;
+  width: 100%;
+  border-color: color-mix(in srgb, var(--color-primary) 26%, var(--color-border));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 9%, transparent);
+}
+
+.edit-activity__execution-budget-delivered .field__label {
+  color: var(--color-primary);
+  font-size: 0.68rem;
+  font-weight: 750;
+  white-space: normal;
+  margin-bottom: 0.2rem;
+  text-transform: none;
+}
+
+.edit-activity__execution-budget-month-actions {
+  align-items: stretch;
+  display: grid;
+  gap: 0.42rem;
+  grid-area: actions;
+  grid-template-columns: 1fr;
+  justify-content: stretch;
+  min-width: 0;
+  width: 100%;
+}
+
+.edit-activity__execution-budget-manage-btn {
+  min-height: 2.15rem;
+  padding-inline: 0.85rem;
+  white-space: nowrap;
+  border-radius: 0.7rem;
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--color-primary) 8%, transparent);
+  width: 100%;
+}
+
+.edit-activity__execution-budget-zero-btn {
+  align-items: center;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0.65rem;
+  box-shadow: none !important;
+  color: var(--color-primary) !important;
+  flex: 1 1 100%;
+  font-weight: 750;
+  gap: 0.18rem;
+  min-height: 1.95rem;
+  justify-content: center;
+  padding-inline: 0.25rem;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.edit-activity__execution-budget-zero-btn .button__icon {
+  margin-right: -0.12rem;
+}
+
+.edit-activity__execution-budget-zero-btn:hover:not(:disabled) {
+  background: var(--color-primary-soft) !important;
+  color: var(--color-primary-hover) !important;
+}
+
+.edit-activity__execution-budget-zero-btn--active {
+  color: var(--color-warning) !important;
+}
+
+.edit-activity__budget-details-drawer {
+  display: grid;
+  gap: 1rem;
+}
+
+.edit-activity__budget-details-stats {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.edit-activity__budget-details-stat {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-primary) 5%, var(--color-surface)), var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 14%, var(--color-border));
+  border-radius: 0.95rem;
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.8rem 0.9rem;
+}
+
+.edit-activity__budget-details-stat span {
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.edit-activity__budget-details-stat strong,
+.edit-activity__budget-details-stat .currency-display {
+  color: var(--color-text-primary);
+  font-size: 0.96rem;
+}
+
+.edit-activity__budget-details-stat .dirham-icon {
+  color: var(--color-primary);
+}
+
+.edit-activity__budget-details-header {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.edit-activity__budget-details-header span {
+  color: var(--color-primary);
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.edit-activity__budget-details-header h3 {
+  color: var(--color-text-primary);
+  font-size: 1rem;
+  margin: 0.16rem 0 0;
+}
+
+.edit-activity__budget-details-form {
+  background: color-mix(in srgb, var(--color-primary) 4%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 16%, var(--color-border));
+  border-radius: 1rem;
+  display: grid;
+  gap: 0.9rem;
+  padding: 1rem;
+}
+
+.edit-activity__budget-details-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  justify-content: flex-end;
+}
+
+.edit-activity__budget-details-grid-wrap .data-grid {
+  overflow: hidden;
+  border-radius: 0.95rem;
+}
+
+.edit-activity__budget-details-grid-wrap .data-grid table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.edit-activity__budget-details-grid-wrap .data-grid th {
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface-muted));
+  color: var(--color-text-secondary);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  padding: 0.72rem 0.8rem;
+  text-transform: uppercase;
+}
+
+.edit-activity__budget-details-grid-wrap .data-grid td {
+  color: var(--color-text-primary);
+  font-size: 0.82rem;
+  padding: 0.78rem 0.8rem;
+  vertical-align: middle;
+}
+
+.edit-activity__budget-details-grid-wrap .data-grid th,
+.edit-activity__budget-details-grid-wrap .data-grid td {
+  white-space: normal;
+}
+
+.edit-activity__budget-details-grid-wrap .data-grid th:nth-child(1),
+.edit-activity__budget-details-grid-wrap .data-grid td:nth-child(1) {
+  width: 3.25rem;
+}
+
+.edit-activity__budget-details-grid-wrap .data-grid th:nth-child(2),
+.edit-activity__budget-details-grid-wrap .data-grid td:nth-child(2) {
+  width: 42%;
+}
+
+.edit-activity__budget-details-grid-wrap .data-grid th:nth-child(3),
+.edit-activity__budget-details-grid-wrap .data-grid td:nth-child(3) {
+  width: 18%;
+}
+
+.edit-activity__budget-details-grid-wrap .data-grid th:nth-child(4),
+.edit-activity__budget-details-grid-wrap .data-grid td:nth-child(4) {
+  width: 18%;
+}
+
+.edit-activity__budget-details-grid-wrap .data-grid th:nth-child(5),
+.edit-activity__budget-details-grid-wrap .data-grid td:nth-child(5) {
+  text-align: center;
+  width: 7.5rem;
+}
+
+.edit-activity__budget-detail-account-code,
+.edit-activity__budget-detail-grn {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.edit-activity__budget-detail-account-code {
+  color: var(--color-text-primary);
+  font-weight: 750;
+}
+
+.edit-activity__budget-detail-actions {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.35rem;
+  justify-content: center;
+}
+
+.edit-activity__budget-detail-amount {
+  color: var(--color-text-primary);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.edit-activity__budget-detail-amount .currency-display {
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.edit-activity__budget-detail-amount .dirham-icon {
+  color: var(--color-primary);
+  height: 1.05rem;
+  width: 1.05rem;
+}
+
+.edit-activity__budget-breakdown-header {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.edit-activity__budget-view-switch {
+  align-items: center;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-primary) 5%, var(--color-surface)), var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 18%, var(--color-border));
+  border-radius: 0.95rem;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #ffffff 68%, transparent);
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.28rem;
+}
+
+.edit-activity__budget-view-switch-btn {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 0.72rem;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 750;
+  gap: 0.38rem;
+  min-height: 2.15rem;
+  padding: 0 0.85rem;
+  transition: background 160ms ease, box-shadow 160ms ease, color 160ms ease;
+  white-space: nowrap;
+}
+
+.edit-activity__budget-view-switch-btn:hover {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.edit-activity__budget-view-switch-btn--active {
+  background: var(--color-primary);
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--color-primary) 22%, transparent);
+  color: var(--color-on-primary);
+}
+
+.edit-activity__budget-view-switch-btn--active:hover {
+  background: var(--color-primary-hover);
+  color: var(--color-on-primary);
+}
+
+:root[data-theme='dark'] .edit-activity__budget-view-switch {
+  background: color-mix(in srgb, var(--color-surface-secondary) 72%, transparent);
+  border-color: var(--color-border);
+  box-shadow: none;
+}
+
+:root[data-theme='dark'] .edit-activity__budget-view-switch-btn--active {
+  box-shadow: none;
+}
+
+.edit-activity__budget-details-drawer-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
 @media (max-width: 1050px) {
   .edit-activity__monthly-overview {
     align-items: stretch;
@@ -4296,11 +5278,99 @@
   .edit-activity__monthly-metric:first-child {
     padding-left: 0;
   }
+
+  .edit-activity__budget-breakdown-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .edit-activity__budget-view-switch {
+    align-self: flex-start;
+  }
+
+  .edit-activity__execution-budget-chart {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .edit-activity__execution-budget-monthly-chart {
+    grid-template-columns: 4.4rem minmax(0, 1fr);
+  }
 }
 
 @media (max-width: 900px) {
   .edit-activity__monthly-quarter-grid {
     grid-template-columns: 1fr;
+  }
+
+  .edit-activity__execution-budget-quarter-body,
+  .edit-activity__budget-details-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .edit-activity__execution-budget-quarter-body {
+    grid-template-columns: 1fr;
+  }
+
+  .edit-activity__execution-budget-values {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .edit-activity__execution-budget-month-head {
+    align-items: start;
+    grid-template-columns: 1fr;
+  }
+
+  .edit-activity__execution-budget-month-head-side {
+    align-items: start;
+    justify-items: start;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .edit-activity__execution-budget-month-statuses {
+    justify-content: flex-start;
+  }
+
+  .edit-activity__execution-budget-month-actions {
+    justify-content: stretch;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .edit-activity__execution-budget-quarter-body {
+    grid-template-columns: 1fr;
+  }
+
+  .edit-activity__execution-budget-values {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .edit-activity__budget-view-switch {
+    width: 100%;
+  }
+
+  .edit-activity__budget-view-switch-btn {
+    flex: 1 1 0;
+    justify-content: center;
+    padding-inline: 0.5rem;
+  }
+
+  .edit-activity__execution-budget-chart {
+    grid-template-columns: 1fr;
+  }
+
+  .edit-activity__execution-budget-monthly-chart {
+    grid-template-columns: 3.8rem minmax(0, 1fr);
+    padding: 0.65rem;
+  }
+
+  .edit-activity__execution-budget-monthly-plot {
+    gap: 0.32rem;
+  }
+
+  .edit-activity__execution-budget-monthly-bars {
+    gap: 0.1rem;
   }
 }
 
