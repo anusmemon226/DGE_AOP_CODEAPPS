@@ -15,8 +15,8 @@ import {
   type SelectOption,
 } from '../components/ui'
 import { Dga_aop_projectsesService } from '../generated/services/Dga_aop_projectsesService'
-import { Dga_custom_web_apiService } from '../generated/services/Dga_custom_web_apiService'
 import { Dga_project_planning_instancesService } from '../generated/services/Dga_project_planning_instancesService'
+import { PowerApps_V2__RetrieveAOPProjectDatafromExcelService } from '../generated/services/PowerApps_V2__RetrieveAOPProjectDatafromExcelService'
 import { SystemusersService } from '../generated/services/SystemusersService'
 import type { Dga_aop_projectsesBase, Dga_aop_projectses } from '../generated/models/Dga_aop_projectsesModel'
 import type { Dga_divisional_hierarchies } from '../generated/models/Dga_divisional_hierarchiesModel'
@@ -114,6 +114,14 @@ type CopilotAttachment = {
   size: number
   type: string
   file: File
+}
+
+type RetrieveAopProjectDataFromExcelInput = {
+  file?: {
+    name?: string
+    contentBytes?: string
+    mimeType?: string
+  }
 }
 
 const INITIAL_FORM: CreateActivityForm = {
@@ -926,15 +934,16 @@ export function CreateActivity() {
 
     try {
       const base64 = await readFileAsBase64(attachment.file)
-      const result = await Dga_custom_web_apiService.dga_custom_web_api(
-        'openai',
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        base64,
+      const payload: RetrieveAopProjectDataFromExcelInput = {
+        file: {
+          name: attachment.name,
+          contentBytes: base64,
+          mimeType: attachment.file.type || EXCEL_XLSX_MIME_TYPE,
+        },
+      }
+      const result = await PowerApps_V2__RetrieveAOPProjectDatafromExcelService.Run(
+        payload as Parameters<typeof PowerApps_V2__RetrieveAOPProjectDatafromExcelService.Run>[0],
       )
-      console.log(base64)
       console.log(result)
       assertOperationSuccess(result, 'AI Assistant could not process the uploaded Excel file.')
       console.log('Create activity AI draft response', result)

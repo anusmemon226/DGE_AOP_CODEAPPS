@@ -9,7 +9,20 @@
   "buildEntryPoint": "index.html",
   "localAppUrl": "http://localhost:3000",
   "logoPath": "Default",
-  "connectionReferences": {},
+  "connectionReferences": {
+    "e638307b-48aa-489b-a038-66e6bcf5772c": {
+      "id": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
+      "displayName": "Logic flows",
+      "dataSources": [
+        "powerapps_v2__retrieveaopprojectdatafromexcel"
+      ],
+      "workflowDetails": {
+        "workflowEntityId": "292e778b-fc79-f111-ab0e-002248e401e3",
+        "workflowDisplayName": "PowerApps (V2) – Retrieve AOP Project Data from Excel",
+        "workflowName": "76ff6ba9-c8d2-78fd-f0d6-3924624f4cab"
+      }
+    }
+  },
   "databaseReferences": {
     "default.cds": {
       "dataSources": {

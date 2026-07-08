@@ -104,6 +104,12 @@
   gap: 1rem;
   min-height: 16rem;
   min-width: 0;
+  width: 100%;
+}
+
+.edit-activity__stage-content > * {
+  min-width: 0;
+  width: 100%;
 }
 
 /* ── Execution review changes panel ── */
@@ -256,6 +262,122 @@
   gap: 0;
 }
 
+.edit-activity__review-group-list {
+  display: grid;
+  gap: 0.95rem;
+}
+
+.edit-activity__review-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.edit-activity__review-tab {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-primary) 4%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 16%, var(--color-border));
+  border-radius: 999px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 0.55rem;
+  justify-content: center;
+  line-height: 1;
+  min-height: 2.2rem;
+  padding: 0 0.9rem;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.edit-activity__review-tab:hover {
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-primary) 28%, var(--color-border));
+  color: var(--color-text-primary);
+  transform: translateY(-1px);
+}
+
+.edit-activity__review-tab--active {
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-primary) 42%, var(--color-border));
+  box-shadow: 0 12px 22px color-mix(in srgb, var(--color-primary) 10%, transparent);
+  color: var(--color-primary);
+}
+
+.edit-activity__review-tab--active .edit-activity__review-tab-count {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.edit-activity__review-tab-label {
+  align-items: center;
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1;
+  min-height: 1.45rem;
+  white-space: nowrap;
+}
+
+.edit-activity__review-tab-count {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface));
+  border-radius: 999px;
+  color: inherit;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+  font-weight: 850;
+  height: 1.45rem;
+  justify-content: center;
+  line-height: 1;
+  min-width: 1.45rem;
+  padding: 0 0.42rem;
+}
+
+.edit-activity__review-group {
+  background: color-mix(in srgb, var(--color-primary) 3%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 14%, var(--color-border));
+  border-radius: 1rem;
+  display: grid;
+  gap: 0.8rem;
+  overflow: hidden;
+  padding: 0.85rem;
+}
+
+.edit-activity__review-group-header {
+  align-items: center;
+  display: flex;
+  gap: 0.8rem;
+  justify-content: flex-start;
+}
+
+.edit-activity__review-group-title {
+  display: grid;
+  gap: 0.14rem;
+  min-width: 0;
+}
+
+.edit-activity__review-group-title span {
+  color: var(--color-primary);
+  font-size: 0.74rem;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.edit-activity__review-group-title strong {
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
 .edit-activity__review-change-grid {
   display: grid;
   gap: 0.75rem;
@@ -296,14 +418,6 @@
   display: grid;
   gap: 0.15rem;
   min-width: 0;
-}
-
-.edit-activity__review-change-badges {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-  justify-content: flex-end;
 }
 
 .edit-activity__review-change-label {
@@ -407,6 +521,10 @@
 
   .edit-activity__review-changes-toggle {
     align-self: flex-start;
+  }
+
+  .edit-activity__review-tabs {
+    gap: 0.5rem;
   }
 
   .edit-activity__review-change-grid {
@@ -2732,6 +2850,8 @@
   flex-direction: column;
   gap: 1.25rem;
   max-width: 100%;
+  min-width: 0;
+  width: 100%;
 }
 
 .edit-activity__procurement .data-grid,
@@ -2739,8 +2859,11 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  width: 100%;
 }
 
 .edit-activity__procurement .data-grid table,
@@ -2748,10 +2871,44 @@
   border-collapse: collapse;
   min-width: 100%;
   white-space: nowrap;
+  width: 100%;
 }
 
 .edit-activity__procurement-name {
+  color: #375EFB;
   font-weight: 600;
+}
+
+.edit-activity__procurement-name-btn,
+.edit-activity__engagement-name-btn {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  justify-content: flex-start;
+  margin: 0;
+  max-width: 100%;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.edit-activity__procurement-name-btn:hover .edit-activity__procurement-name,
+.edit-activity__engagement-name-btn:hover .edit-activity__engagement-name {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.12rem;
+}
+
+.edit-activity__procurement-name-btn:focus-visible,
+.edit-activity__engagement-name-btn:focus-visible {
+  border-radius: 0.35rem;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent);
+  outline: none;
 }
 
 .edit-activity__procurement-value {
@@ -2943,9 +3100,12 @@
   flex-direction: column;
   gap: 1.25rem;
   max-width: 100%;
+  min-width: 0;
+  width: 100%;
 }
 
 .edit-activity__engagement-name {
+  color: #375EFB;
   font-weight: 600;
 }
 

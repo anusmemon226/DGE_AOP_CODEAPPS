@@ -264,6 +264,12 @@ export function EditActivity() {
   const isStrategyTeam = selectedRole === 'AOP - Strategy Team'
   const isExecutiveDirector = selectedRole === 'AOP - Executive Director'
   const isDirectorGeneral = selectedRole === 'AOP - Director General'
+  const canShowSubmitActivityUpdates = (
+    isDivisionMember
+    && statusCode === 776140011
+    && isExecutionPhase
+    && !['', '2', '776140007', '776140014'].includes(form.activityStatus)
+  )
   const editPermissions = useMemo(() => {
     const ownerTeamId = normalizeId(activity?._owningteam_value)
     const currentRoleTeamId = normalizeId(currentRole?.teamId)
@@ -1226,6 +1232,11 @@ export function EditActivity() {
     }
   }, [editPermissions.canStartActivity, isDivisionMember, isStartingActivity, projectId])
 
+  const handleSubmitActivityUpdates = useCallback(() => {
+    // TODO: Implement submit activity updates logic
+    console.log('Submit Activity Updates')
+  }, [])
+
   // ── Tab content ──
 
   function renderTabContent() {
@@ -1670,6 +1681,11 @@ export function EditActivity() {
             {isDivisionMember && editPermissions.canStartActivity ? (
               <Button disabled={isStartingActivity || Boolean(errors.context)} icon={<Send size={16} />} onClick={handleStartActivity}>
                 {isStartingActivity ? 'Starting...' : 'Start Activity'}
+              </Button>
+            ) : null}
+            {canShowSubmitActivityUpdates ? (
+              <Button icon={<Send size={16} />} onClick={handleSubmitActivityUpdates}>
+                Submit Activity Updates
               </Button>
             ) : null}
             <Button icon={<FileText size={16} />} variant="ghost" className="edit-activity__card-btn">

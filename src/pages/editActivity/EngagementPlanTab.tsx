@@ -604,7 +604,15 @@ export function EngagementPlanTab({
     {
       key: 'engagementName',
       header: 'Engagement Name',
-      render: (row: EngagementPlan) => <span className="edit-activity__engagement-name">{row.engagementName}</span>,
+      render: (row: EngagementPlan) => (
+        <button
+          className="edit-activity__engagement-name-btn"
+          onClick={() => handleOpenEdit(row)}
+          type="button"
+        >
+          <span className="edit-activity__engagement-name">{row.engagementName}</span>
+        </button>
+      ),
     },
     {
       key: 'sectors',
