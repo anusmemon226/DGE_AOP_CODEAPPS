@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Edit3,
   Flag,
+  LayoutGrid,
+  List,
   Plus,
   Trash2,
   Upload,
@@ -221,6 +223,12 @@ function sortMilestonesByEndDate(a: Milestone, b: Milestone) {
   return a.plannedEndDate.localeCompare(b.plannedEndDate) || a.name.localeCompare(b.name)
 }
 
+function getQuarterBadgeClass(quarter: string) {
+  const quarterKey = quarter.replace(/\s+/g, '-').toLowerCase()
+
+  return `edit-activity__milestone-quarter-badge edit-activity__milestone-quarter-badge--${quarterKey}`
+}
+
 function buildMilestoneCreatePayload(
   form: MilestoneFormData,
   projectId: string,
@@ -278,6 +286,7 @@ export function MilestonesTab({
   const [isDeleting, setIsDeleting] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [viewMode, setViewMode] = useState<'list' | 'quarter'>('list')
 
   // ── CRUD state ──
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
@@ -746,6 +755,94 @@ export function MilestonesTab({
     )
   }
 
+  function renderMilestonesListView() {
+    if (milestones.length === 0) {
+      return (
+        <div className="edit-activity__members-empty">
+          <Flag size={40} strokeWidth={1.2} />
+          <h3>No milestones yet</h3>
+          <p>Add a milestone to start tracking project delivery checkpoints.</p>
+        </div>
+      )
+    }
+
+    return (
+      <div className="data-grid edit-activity__milestone-list-grid">
+        <table>
+          <thead>
+            <tr>
+              <th>Milestone Name</th>
+              <th>Quarter</th>
+              <th>Start Date</th>
+              <th>End Date</th>
+              {isAdeoVisible ? <th>Weightage</th> : null}
+              <th>Milestone Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {milestones.map((milestone) => {
+              const statusCfg = STATUS_CONFIG[milestone.status]
+
+              return (
+                <tr key={milestone.id}>
+                  <td>
+                    <button
+                      className="edit-activity__milestone-list-name-btn"
+                      onClick={() => handleOpenEdit(milestone)}
+                      type="button"
+                    >
+                      <span className="edit-activity__milestone-list-name">{milestone.name}</span>
+                    </button>
+                  </td>
+                  <td>
+                    <span className={`badge ${getQuarterBadgeClass(milestone.quarter)}`}>
+                      {milestone.quarter}
+                    </span>
+                  </td>
+                  <td>{formatDateDisplay(milestone.plannedStartDate)}</td>
+                  <td>{formatDateDisplay(milestone.plannedEndDate)}</td>
+                  {isAdeoVisible ? <td>{milestone.weightage}%</td> : null}
+                  <td>
+                    <Badge tone={statusCfg.tone}>{statusCfg.label}</Badge>
+                  </td>
+                  <td>
+                    <div className="edit-activity__procurement-actions">
+                      <button
+                        aria-label="Edit milestone"
+                        className="edit-activity__procurement-action-btn"
+                        onClick={() => handleOpenEdit(milestone)}
+                        type="button"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                        </svg>
+                      </button>
+                      {!(isReadOnly || canEditExecutionFieldsOnly) ? (
+                        <button
+                          aria-label="Delete milestone"
+                          className="edit-activity__procurement-action-btn edit-activity__procurement-action-btn--danger"
+                          onClick={() => setMilestoneToDelete(milestone)}
+                          type="button"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6" />
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                          </svg>
+                        </button>
+                      ) : null}
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
   function renderDrawerForm() {
     const title = editingMilestone ? 'Edit Milestone' : 'Create Milestone'
     const showExecutionFields = isExecutionPhase && Boolean(editingMilestone)
@@ -1060,9 +1157,29 @@ export function MilestonesTab({
           </h2>
           <p>Track project milestones and key deliverables.</p>
         </div>
-        <Button disabled={isReadOnly || canEditExecutionFieldsOnly || !projectId || isLoading} icon={<Plus size={15} />} onClick={handleOpenCreate}>
-          Add Milestone
-        </Button>
+        <div className="edit-activity__milestone-header-actions">
+          <Button disabled={isReadOnly || canEditExecutionFieldsOnly || !projectId || isLoading} icon={<Plus size={15} />} onClick={handleOpenCreate}>
+            Add Milestone
+          </Button>
+          <div className="edit-activity__milestone-view-switch" aria-label="Milestone view switch">
+            <button
+              className={`edit-activity__milestone-view-switch-btn ${viewMode === 'list' ? 'edit-activity__milestone-view-switch-btn--active' : ''}`}
+              onClick={() => setViewMode('list')}
+              type="button"
+            >
+              <List size={15} />
+              List View
+            </button>
+            <button
+              className={`edit-activity__milestone-view-switch-btn ${viewMode === 'quarter' ? 'edit-activity__milestone-view-switch-btn--active' : ''}`}
+              onClick={() => setViewMode('quarter')}
+              type="button"
+            >
+              <LayoutGrid size={15} />
+              Quarter View
+            </button>
+          </div>
+        </div>
       </div>
 
       {error ? (
@@ -1080,13 +1197,15 @@ export function MilestonesTab({
       {/* Progress bar */}
       {renderProgressBar()}
 
-      {/* Quarter grid */}
+      {/* Milestone content */}
       {isLoading ? (
         <div className="edit-activity__members-empty">
           <Flag size={40} strokeWidth={1.2} />
           <h3>Loading milestones...</h3>
           <p>Fetching milestones for this activity.</p>
         </div>
+      ) : viewMode === 'list' ? (
+        renderMilestonesListView()
       ) : (
         <div className="edit-activity__milestone-quarter-grid">
           {QUARTERS.map(renderQuarterCard)}

@@ -2309,6 +2309,126 @@
 
 /* ── Milestone quarter grid ── */
 
+.edit-activity__milestone-viewbar {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.edit-activity__milestone-header-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  justify-content: flex-end;
+}
+
+.edit-activity__milestone-view-switch {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-primary) 4%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 16%, var(--color-border));
+  border-radius: 0.95rem;
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.28rem;
+}
+
+.edit-activity__milestone-view-switch-btn {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 0.72rem;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  gap: 0.38rem;
+  min-height: 2.15rem;
+  padding: 0 0.85rem;
+  transition: background 160ms ease, color 160ms ease;
+  white-space: nowrap;
+}
+
+.edit-activity__milestone-view-switch-btn:hover {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.edit-activity__milestone-view-switch-btn--active {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.edit-activity__milestone-view-switch-btn--active:hover {
+  background: var(--color-primary-hover);
+  color: var(--color-on-primary);
+}
+
+.edit-activity__milestone-list-grid {
+  margin-top: -0.1rem;
+}
+
+.edit-activity__milestone-list-name-btn {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  justify-content: flex-start;
+  margin: 0;
+  max-width: 100%;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.edit-activity__milestone-list-name {
+  color: #375EFB;
+  font-weight: 600;
+}
+
+.edit-activity__milestone-list-name-btn:hover .edit-activity__milestone-list-name {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.12rem;
+}
+
+.edit-activity__milestone-list-name-btn:focus-visible {
+  border-radius: 0.35rem;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent);
+  outline: none;
+}
+
+.edit-activity__milestone-quarter-badge {
+  --quarter-badge-accent: var(--color-primary);
+  background: color-mix(in srgb, var(--quarter-badge-accent) 12%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--quarter-badge-accent) 22%, var(--color-border));
+  color: var(--quarter-badge-accent);
+}
+
+.edit-activity__milestone-quarter-badge--quarter-2 {
+  --quarter-badge-accent: var(--color-info);
+}
+
+.edit-activity__milestone-quarter-badge--quarter-3 {
+  --quarter-badge-accent: var(--color-warning);
+}
+
+.edit-activity__milestone-quarter-badge--quarter-4 {
+  --quarter-badge-accent: var(--color-success);
+}
+
+:root[data-theme='dark'] .edit-activity__milestone-view-switch {
+  background: color-mix(in srgb, var(--color-surface-secondary) 72%, transparent);
+  border-color: var(--color-border);
+}
+
 .edit-activity__milestone-quarter-grid {
   display: grid;
   gap: 0.85rem;
@@ -2472,6 +2592,19 @@
 }
 
 @media (max-width: 900px) {
+  .edit-activity__milestone-viewbar {
+    align-items: flex-start;
+    justify-content: flex-start;
+  }
+
+  .edit-activity__milestone-view-switch {
+    align-self: flex-start;
+  }
+
+  .edit-activity__milestone-list-grid {
+    overflow-x: auto;
+  }
+
   .edit-activity__milestone-quarter-grid {
     grid-template-columns: 1fr;
   }
@@ -2855,7 +2988,8 @@
 }
 
 .edit-activity__procurement .data-grid,
-.edit-activity__engagement .data-grid {
+.edit-activity__engagement .data-grid,
+.edit-activity__milestones .data-grid {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -2867,7 +3001,8 @@
 }
 
 .edit-activity__procurement .data-grid table,
-.edit-activity__engagement .data-grid table {
+.edit-activity__engagement .data-grid table,
+.edit-activity__milestones .data-grid table {
   border-collapse: collapse;
   min-width: 100%;
   white-space: nowrap;
@@ -3066,7 +3201,8 @@
 
 /* DataGrid within procurement uses same styles as deps table */
 .edit-activity__procurement .data-grid th,
-.edit-activity__engagement .data-grid th {
+.edit-activity__engagement .data-grid th,
+.edit-activity__milestones .data-grid th {
   background: var(--color-surface-muted);
   border-bottom: 1px solid var(--color-border);
   color: var(--color-text-secondary);
@@ -3081,7 +3217,8 @@
 }
 
 .edit-activity__procurement .data-grid td,
-.edit-activity__engagement .data-grid td {
+.edit-activity__engagement .data-grid td,
+.edit-activity__milestones .data-grid td {
   border-bottom: 1px solid var(--color-border);
   color: var(--color-text-primary);
   font-size: 0.82rem;
@@ -3089,7 +3226,8 @@
 }
 
 .edit-activity__procurement .data-grid tr:hover td,
-.edit-activity__engagement .data-grid tr:hover td {
+.edit-activity__engagement .data-grid tr:hover td,
+.edit-activity__milestones .data-grid tr:hover td {
   background: var(--color-surface-hover);
 }
 

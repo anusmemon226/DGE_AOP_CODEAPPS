@@ -1970,6 +1970,106 @@
   color: var(--color-error);
 }
 
+.copilot-output-choice {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-primary) 5%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 18%, var(--color-border));
+  border-radius: var(--radius-sm);
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+  max-width: 64rem;
+  padding: 0.55rem 0.65rem 0.55rem 0.85rem;
+  width: min(100%, 64rem);
+}
+
+.copilot-output-choice > span {
+  color: var(--color-text-secondary);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.copilot-output-choice > div {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-primary) 5%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 16%, var(--color-border));
+  border-radius: 999px;
+  display: inline-flex;
+  gap: 0.2rem;
+  padding: 0.2rem;
+}
+
+.copilot-output-choice__option {
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 850;
+  min-height: 1.9rem;
+  padding: 0 0.8rem;
+  transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+
+.copilot-output-choice__option:hover {
+  color: var(--color-primary);
+}
+
+.copilot-output-choice__option--active {
+  background: var(--color-primary);
+  box-shadow: 0 8px 16px color-mix(in srgb, var(--color-primary) 18%, transparent);
+  color: var(--color-on-primary);
+}
+
+.copilot-output-choice__option--active:hover {
+  color: var(--color-on-primary);
+}
+
+.copilot-generated-output {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-success) 8%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-success) 24%, var(--color-border));
+  border-radius: var(--radius-sm);
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  max-width: 64rem;
+  padding: 0.7rem 0.75rem;
+  width: min(100%, 64rem);
+}
+
+.copilot-generated-output > svg {
+  color: var(--color-success);
+}
+
+.copilot-generated-output strong,
+.copilot-generated-output span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.copilot-generated-output strong {
+  color: var(--color-text-primary);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.copilot-generated-output span {
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 650;
+  margin-top: 0.1rem;
+}
+
+.copilot-generated-output__button {
+  min-height: 2.1rem;
+  padding-inline: 0.75rem;
+}
+
 .copilot-actions {
   align-items: center;
   display: flex;

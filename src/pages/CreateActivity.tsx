@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
-import { Bot, Check, CheckCircle2, ClipboardList, FileText, Lightbulb, LockKeyhole, Paperclip, RefreshCcw, Save, Send, Sparkles, Trash2, WandSparkles } from 'lucide-react'
+import { jsPDF } from 'jspdf'
+import autoTable from 'jspdf-autotable'
+import { Bot, Check, CheckCircle2, ClipboardList, Download, FileText, Lightbulb, LockKeyhole, Paperclip, RefreshCcw, Save, Send, Sparkles, Trash2, WandSparkles } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import * as XLSX from 'xlsx'
 import {
   Badge,
   Button,
@@ -116,6 +119,16 @@ type CopilotAttachment = {
   file: File
 }
 
+type OutputFormat = 'pdf' | 'csv'
+
+type GeneratedOutputFile = {
+  contentBytes: string
+  format: OutputFormat
+  mimeType: string
+  name: string
+  tableCount: number
+}
+
 type RetrieveAopProjectDataFromExcelInput = {
   file?: {
     name?: string
@@ -194,7 +207,18 @@ const COPILOT_PROMPTS = [
 
 const MAX_ATTACHMENT_SIZE = 8 * 1024 * 1024
 const EXCEL_XLSX_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+const PDF_MIME_TYPE = 'application/pdf'
+const CSV_MIME_TYPE = 'text/csv'
 const EXCEL_UPLOAD_ERROR = 'Only Excel .xlsx files are supported for AI draft generation.'
+const NO_TABLES_FOUND_ERROR = 'No table data was found in the uploaded Excel file.'
+const MIN_TABLE_NON_EMPTY_CELLS = 3
+
+type ExcelTableRegion = {
+  columns: string[]
+  rows: string[][]
+  sheetName: string
+  tableNumber: number
+}
 
 function getResultValue<T>(result: unknown): T | undefined {
   const shaped = result as { data?: T; value?: T; result?: T; record?: T }
@@ -271,28 +295,311 @@ function isXlsxFile(file: File) {
   return hasXlsxExtension && !hasBlockedXlsExtension && hasValidMime
 }
 
-function readFileAsBase64(file: File): Promise<string> {
+function readFileAsArrayBuffer(file: File): Promise<ArrayBuffer> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
 
     reader.onload = () => {
-      const result = typeof reader.result === 'string' ? reader.result : ''
-      const base64 = result.includes(',') ? result.split(',')[1] : result
-
-      if (!base64) {
+      if (!(reader.result instanceof ArrayBuffer)) {
         reject(new Error('Unable to read the selected Excel file. Please try again.'))
         return
       }
 
-      resolve(base64)
+      resolve(reader.result)
     }
 
     reader.onerror = () => {
       reject(new Error('Unable to read the selected Excel file. Please try again.'))
     }
 
-    reader.readAsDataURL(file)
+    reader.readAsArrayBuffer(file)
   })
+}
+
+function normalizeCellValue(value: unknown) {
+  return String(value ?? '').replace(/\s+/g, ' ').trim()
+}
+
+function isBlankCell(value: unknown) {
+  return normalizeCellValue(value) === ''
+}
+
+function isBlankRow(row: unknown[]) {
+  return row.every(isBlankCell)
+}
+
+function getColumnLabel(index: number) {
+  let label = ''
+  let value = index + 1
+
+  while (value > 0) {
+    const remainder = (value - 1) % 26
+    label = String.fromCharCode(65 + remainder) + label
+    value = Math.floor((value - 1) / 26)
+  }
+
+  return `Column ${label}`
+}
+
+function getContiguousBands(indices: number[]) {
+  const bands: Array<[number, number]> = []
+  let start: number | null = null
+  let previous: number | null = null
+
+  indices.forEach((index) => {
+    if (start === null || previous === null || index !== previous + 1) {
+      if (start !== null && previous !== null) {
+        bands.push([start, previous])
+      }
+
+      start = index
+    }
+
+    previous = index
+  })
+
+  if (start !== null && previous !== null) {
+    bands.push([start, previous])
+  }
+
+  return bands
+}
+
+function getTableRegionsFromSheet(sheetName: string, sheet: XLSX.WorkSheet): ExcelTableRegion[] {
+  const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+    blankrows: true,
+    defval: '',
+    header: 1,
+    raw: false,
+  })
+
+  if (rows.length === 0) {
+    return []
+  }
+
+  const maxColumnCount = rows.reduce((max, row) => Math.max(max, row.length), 0)
+  const normalizedRows = rows.map((row) => Array.from({ length: maxColumnCount }, (_, index) => normalizeCellValue(row[index])))
+  const rowBands: Array<[number, number]> = []
+  let bandStart: number | null = null
+
+  normalizedRows.forEach((row, rowIndex) => {
+    if (isBlankRow(row)) {
+      if (bandStart !== null) {
+        rowBands.push([bandStart, rowIndex - 1])
+        bandStart = null
+      }
+
+      return
+    }
+
+    if (bandStart === null) {
+      bandStart = rowIndex
+    }
+  })
+
+  if (bandStart !== null) {
+    rowBands.push([bandStart, normalizedRows.length - 1])
+  }
+
+  const detectedTables: ExcelTableRegion[] = []
+
+  rowBands.forEach(([startRow, endRow]) => {
+    const usedColumnIndices = Array.from({ length: maxColumnCount }, (_, columnIndex) => columnIndex)
+      .filter((columnIndex) => {
+        for (let rowIndex = startRow; rowIndex <= endRow; rowIndex += 1) {
+          if (!isBlankCell(normalizedRows[rowIndex][columnIndex])) {
+            return true
+          }
+        }
+
+        return false
+      })
+
+    getContiguousBands(usedColumnIndices).forEach(([startColumn, endColumn]) => {
+      const tableRows = normalizedRows
+        .slice(startRow, endRow + 1)
+        .map((row) => row.slice(startColumn, endColumn + 1))
+        .filter((row) => !isBlankRow(row))
+      const nonEmptyCellCount = tableRows.flat().filter((cell) => !isBlankCell(cell)).length
+
+      if (tableRows.length < 2 || tableRows[0].length < 2 || nonEmptyCellCount < MIN_TABLE_NON_EMPTY_CELLS) {
+        return
+      }
+
+      const [headerRow, ...bodyRows] = tableRows
+      const columns = headerRow.map((value, index) => value || getColumnLabel(index))
+
+      detectedTables.push({
+        columns,
+        rows: bodyRows,
+        sheetName,
+        tableNumber: detectedTables.length + 1,
+      })
+    })
+  })
+
+  return detectedTables
+}
+
+function buildPdfFileName(excelFileName: string) {
+  const baseName = excelFileName.replace(/\.xlsx$/i, '').trim() || 'aop-project-data'
+
+  return `${baseName}.pdf`
+}
+
+function buildCsvFileName(excelFileName: string) {
+  const baseName = excelFileName.replace(/\.xlsx$/i, '').trim() || 'aop-project-data'
+
+  return `${baseName}.csv`
+}
+
+function generateTablesPdfBase64(fileName: string, tables: ExcelTableRegion[]) {
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' })
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const pageHeight = doc.internal.pageSize.getHeight()
+  const marginX = 36
+  let cursorY = 42
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(16)
+  doc.text('AOP Project Data Extract', marginX, cursorY)
+  cursorY += 20
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.setTextColor(90, 105, 130)
+  doc.text(`Source Excel: ${fileName}`, marginX, cursorY)
+  cursorY += 24
+
+  tables.forEach((table, index) => {
+    if (cursorY > pageHeight - 100) {
+      doc.addPage()
+      cursorY = 42
+    }
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(11)
+    doc.setTextColor(17, 24, 39)
+    doc.text(`${table.sheetName} - Table ${table.tableNumber}`, marginX, cursorY)
+    cursorY += 10
+
+    autoTable(doc, {
+      body: table.rows,
+      head: [table.columns],
+      margin: { bottom: 34, left: marginX, right: marginX, top: 34 },
+      pageBreak: 'auto',
+      showHead: 'everyPage',
+      startY: cursorY,
+      styles: {
+        cellPadding: 4,
+        font: 'helvetica',
+        fontSize: 7.5,
+        overflow: 'linebreak',
+        textColor: [17, 24, 39],
+        valign: 'middle',
+      },
+      headStyles: {
+        fillColor: [235, 239, 255],
+        fontStyle: 'bold',
+        textColor: [55, 94, 251],
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252],
+      },
+      tableWidth: pageWidth - marginX * 2,
+      theme: 'grid',
+    })
+
+    const lastAutoTable = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable
+    cursorY = (lastAutoTable?.finalY ?? cursorY) + 22
+
+    if (index < tables.length - 1 && cursorY > pageHeight - 90) {
+      doc.addPage()
+      cursorY = 42
+    }
+  })
+
+  return doc.output('datauristring').split(',')[1] ?? ''
+}
+
+function escapeCsvValue(value: string) {
+  if (/[",\r\n]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`
+  }
+
+  return value
+}
+
+function generateTablesCsvBase64(tables: ExcelTableRegion[]) {
+  const lines: string[] = []
+
+  tables.forEach((table, index) => {
+    if (index > 0) {
+      lines.push('')
+    }
+
+    lines.push(`# ${table.sheetName} - Table ${table.tableNumber}`)
+    lines.push(table.columns.map(escapeCsvValue).join(','))
+    table.rows.forEach((row) => {
+      lines.push(row.map(escapeCsvValue).join(','))
+    })
+  })
+
+  const csv = lines.join('\r\n')
+  const bytes = new TextEncoder().encode(csv)
+  let binary = ''
+
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte)
+  })
+
+  return window.btoa(binary)
+}
+
+async function extractExcelTables(file: File) {
+  const buffer = await readFileAsArrayBuffer(file)
+  const workbook = XLSX.read(buffer, { type: 'array' })
+  const tables = workbook.SheetNames.flatMap((sheetName) => {
+    const sheet = workbook.Sheets[sheetName]
+
+    return sheet ? getTableRegionsFromSheet(sheetName, sheet) : []
+  })
+
+  if (tables.length === 0) {
+    throw new Error(NO_TABLES_FOUND_ERROR)
+  }
+
+  return tables
+}
+
+async function convertExcelFile(file: File, format: OutputFormat): Promise<GeneratedOutputFile> {
+  const tables = await extractExcelTables(file)
+  const contentBytes = format === 'pdf'
+    ? generateTablesPdfBase64(file.name, tables)
+    : generateTablesCsvBase64(tables)
+
+  if (!contentBytes) {
+    throw new Error(`Unable to generate a ${format.toUpperCase()} from the uploaded Excel file. Please try again.`)
+  }
+
+  return {
+    contentBytes,
+    format,
+    mimeType: format === 'pdf' ? PDF_MIME_TYPE : CSV_MIME_TYPE,
+    name: format === 'pdf' ? buildPdfFileName(file.name) : buildCsvFileName(file.name),
+    tableCount: tables.length,
+  }
+}
+
+function base64ToBlob(base64: string, mimeType: string) {
+  const binary = window.atob(base64)
+  const bytes = new Uint8Array(binary.length)
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index)
+  }
+
+  return new Blob([bytes], { type: mimeType })
 }
 
 function getOptionLabel<TValue extends string>(options: readonly SelectOption<TValue>[], value: TValue | '') {
@@ -702,6 +1009,9 @@ export function CreateActivity() {
   const [attachments, setAttachments] = useState<CopilotAttachment[]>([])
   const [attachmentError, setAttachmentError] = useState('')
   const [isCopilotGenerating, setIsCopilotGenerating] = useState(false)
+  const [copilotGenerationStatus, setCopilotGenerationStatus] = useState('')
+  const [selectedOutputFormat, setSelectedOutputFormat] = useState<OutputFormat | ''>('')
+  const [generatedOutputFile, setGeneratedOutputFile] = useState<GeneratedOutputFile | null>(null)
   const cycle = assessmentCycles.find((item) => item.dga_assessment_cycleid === selectedCycle)
   const isStrategic = form.activityScope === '1'
   const isPaymentOnly = form.activityClassification === '576610002'
@@ -879,6 +1189,9 @@ export function CreateActivity() {
   function addAttachments(files: FileList | File[]) {
     setAttachmentError('')
     setCopilotDraft(null)
+    setCopilotGenerationStatus('')
+    setGeneratedOutputFile(null)
+    setSelectedOutputFormat('')
 
     const [file] = Array.from(files)
 
@@ -907,6 +1220,12 @@ export function CreateActivity() {
     }])
   }
 
+  function handleOutputFormatChange(format: OutputFormat) {
+    setAttachmentError('')
+    setGeneratedOutputFile(null)
+    setSelectedOutputFormat(format)
+  }
+
   function handleFileInput(event: ChangeEvent<HTMLInputElement>) {
     if (event.target.files) {
       addAttachments(event.target.files)
@@ -928,29 +1247,44 @@ export function CreateActivity() {
       return
     }
 
+    if (!selectedOutputFormat) {
+      setAttachmentError('Select whether you want to convert the Excel file to PDF or CSV before starting the draft.')
+      return
+    }
+
     setAttachmentError('')
     setCopilotDraft(null)
+    setGeneratedOutputFile(null)
     setIsCopilotGenerating(true)
+    setCopilotGenerationStatus(`Preparing ${selectedOutputFormat.toUpperCase()}...`)
 
     try {
-      const base64 = await readFileAsBase64(attachment.file)
+      const convertedFile = await convertExcelFile(attachment.file, selectedOutputFormat)
+      setGeneratedOutputFile(convertedFile)
+      setCopilotGenerationStatus('Starting Draft...')
       const payload: RetrieveAopProjectDataFromExcelInput = {
         file: {
-          name: attachment.name,
-          contentBytes: base64,
-          mimeType: attachment.file.type || EXCEL_XLSX_MIME_TYPE,
+          name: convertedFile.name,
+          contentBytes: convertedFile.contentBytes,
+          mimeType: convertedFile.mimeType,
         },
       }
       const result = await PowerApps_V2__RetrieveAOPProjectDatafromExcelService.Run(
         payload as Parameters<typeof PowerApps_V2__RetrieveAOPProjectDatafromExcelService.Run>[0],
       )
-      console.log(result)
+      console.log('Create activity AI draft converted payload', {
+        fileName: convertedFile.name,
+        format: convertedFile.format,
+        mimeType: convertedFile.mimeType,
+        tableCount: convertedFile.tableCount,
+      })
       assertOperationSuccess(result, 'AI Assistant could not process the uploaded Excel file.')
       console.log('Create activity AI draft response', result)
     } catch (error) {
       setAttachmentError(error instanceof Error ? error.message : 'AI Assistant could not process the uploaded Excel file.')
     } finally {
       setIsCopilotGenerating(false)
+      setCopilotGenerationStatus('')
     }
   }
 
@@ -967,6 +1301,45 @@ export function CreateActivity() {
 
   function removeAttachment(attachmentId: string) {
     setAttachments((currentAttachments) => currentAttachments.filter((item) => item.id !== attachmentId))
+    setGeneratedOutputFile(null)
+    setSelectedOutputFormat('')
+    setCopilotDraft(null)
+  }
+
+  function downloadGeneratedOutputFile() {
+    if (!generatedOutputFile) {
+      return
+    }
+
+    const blob = base64ToBlob(generatedOutputFile.contentBytes, generatedOutputFile.mimeType)
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+
+    link.href = url
+    link.download = generatedOutputFile.name
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  function renderGeneratedOutputFile() {
+    if (!generatedOutputFile) {
+      return null
+    }
+
+    return (
+      <div className="copilot-generated-output">
+        <FileText size={17} />
+        <div>
+          <strong>{generatedOutputFile.name}</strong>
+          <span>{generatedOutputFile.tableCount} table{generatedOutputFile.tableCount === 1 ? '' : 's'} prepared as {generatedOutputFile.format.toUpperCase()} for workflow upload</span>
+        </div>
+        <Button className="copilot-generated-output__button" icon={<Download size={15} />} onClick={downloadGeneratedOutputFile} variant="secondary">
+          Download {generatedOutputFile.format.toUpperCase()}
+        </Button>
+      </div>
+    )
   }
 
   function renderAttachmentList(className = '') {
@@ -992,6 +1365,34 @@ export function CreateActivity() {
             </button>
           </div>
         ))}
+      </div>
+    )
+  }
+
+  function renderOutputFormatChoice() {
+    if (attachments.length === 0) {
+      return null
+    }
+
+    return (
+      <div className="copilot-output-choice" aria-label="Choose converted file format">
+        <span>Convert Excel to</span>
+        <div>
+          <button
+            className={selectedOutputFormat === 'pdf' ? 'copilot-output-choice__option copilot-output-choice__option--active' : 'copilot-output-choice__option'}
+            onClick={() => handleOutputFormatChange('pdf')}
+            type="button"
+          >
+            PDF
+          </button>
+          <button
+            className={selectedOutputFormat === 'csv' ? 'copilot-output-choice__option copilot-output-choice__option--active' : 'copilot-output-choice__option'}
+            onClick={() => handleOutputFormatChange('csv')}
+            type="button"
+          >
+            CSV
+          </button>
+        </div>
       </div>
     )
   }
@@ -1836,14 +2237,16 @@ export function CreateActivity() {
                     Check Considerations
                   </button>
                 </div>
-                <Button disabled={attachments.length === 0 || isCopilotGenerating} icon={<Send size={16} />} onClick={createCopilotDraft}>
-                  {isCopilotGenerating ? 'Starting Draft...' : 'Start Draft'}
+                <Button disabled={attachments.length === 0 || !selectedOutputFormat || isCopilotGenerating} icon={<Send size={16} />} onClick={createCopilotDraft}>
+                  {isCopilotGenerating ? copilotGenerationStatus || 'Starting Draft...' : 'Start Draft'}
                 </Button>
               </div>
             </div>
 
             {attachmentError ? <span className="field__error copilot-assistant__error">{attachmentError}</span> : null}
             {renderAttachmentList()}
+            {renderOutputFormatChoice()}
+            {renderGeneratedOutputFile()}
 
             <div className="copilot-chips">
               {COPILOT_PROMPTS.map((prompt) => (
