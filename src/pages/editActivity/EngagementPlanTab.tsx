@@ -92,6 +92,7 @@ interface EngagementPlanTabProps {
   currentHierarchyId?: string
   divisionName: string
   hierarchies: Dga_divisional_hierarchies[]
+  onActivityDataChanged?: () => void
   projectId: string
   selectedRole: string
   sectorName: string
@@ -428,6 +429,7 @@ export function EngagementPlanTab({
   activitySummary,
   currentHierarchyId,
   hierarchies,
+  onActivityDataChanged,
   projectId,
   selectedRole,
 }: EngagementPlanTabProps) {
@@ -899,6 +901,7 @@ export function EngagementPlanTab({
 
       handleCloseDrawer()
       await loadEngagementPlans()
+      onActivityDataChanged?.()
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Unable to save engagement plan.')
     } finally {
@@ -918,6 +921,7 @@ export function EngagementPlanTab({
       setPlanToDelete(null)
       setNotice('Engagement plan deleted successfully.')
       await loadEngagementPlans()
+      onActivityDataChanged?.()
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : 'Unable to delete engagement plan.')
     } finally {

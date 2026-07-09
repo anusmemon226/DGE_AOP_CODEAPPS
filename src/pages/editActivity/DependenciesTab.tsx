@@ -40,6 +40,7 @@ type SortConfig = { column: DepColumnKey; direction: 'asc' | 'desc' } | null
 type DependenciesTabProps = {
   embedded?: boolean
   isReadOnly?: boolean
+  onActivityDataChanged?: () => void
   onDependencyCountChange?: (count: number) => void
   projectId: string
 }
@@ -131,7 +132,13 @@ function buildDependencyPayload(
 
 // ── Component ──
 
-export function DependenciesTab({ embedded = false, isReadOnly = false, onDependencyCountChange, projectId }: DependenciesTabProps) {
+export function DependenciesTab({
+  embedded = false,
+  isReadOnly = false,
+  onActivityDataChanged,
+  onDependencyCountChange,
+  projectId,
+}: DependenciesTabProps) {
   const systemUser = useAppSelector((state) => state.user.systemUser)
   // ── Data state ──
   const [dependencies, setDependencies] = useState<Dependency[]>([])
@@ -521,6 +528,7 @@ export function DependenciesTab({ embedded = false, isReadOnly = false, onDepend
 
       handleCloseDepModal()
       await loadDependencies()
+      onActivityDataChanged?.()
     } catch (error) {
       setDepError(error instanceof Error ? error.message : 'Unable to save dependency.')
     } finally {
@@ -541,6 +549,7 @@ export function DependenciesTab({ embedded = false, isReadOnly = false, onDepend
       setSelectedDepIds((prev) => { const next = new Set(prev); next.delete(depToDelete.id); return next })
       setDepToDelete(null)
       setDepNotice('Dependency deleted successfully.')
+      onActivityDataChanged?.()
     } catch (error) {
       setDepError(error instanceof Error ? error.message : 'Unable to delete dependency.')
     } finally {
@@ -568,6 +577,9 @@ export function DependenciesTab({ embedded = false, isReadOnly = false, onDepend
     }
 
     await loadDependencies()
+    if (failedCount === 0) {
+      onActivityDataChanged?.()
+    }
   }
 
   function handleToggleDepSelection(id: string) {

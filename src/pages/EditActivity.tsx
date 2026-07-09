@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   ArrowLeft,
   BarChart3,
   Briefcase,
@@ -17,7 +18,7 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Badge, Button, ConfirmationDialog, type SelectOption } from '../components/ui'
+import { Badge, Button, ConfirmationDialog, Modal, Textarea, type SelectOption } from '../components/ui'
 import {
   Dga_aop_projectsesstatuscode,
   type Dga_aop_projectses,
@@ -54,6 +55,8 @@ import {
   type FieldErrors,
 } from './editActivity/helpers/activityInfoHelpers'
 import { validateActivitySubmissionRequirements as validateSubmissionRequirements } from './editActivity/helpers/submissionValidation'
+import { triggerActivityAiSummaryRefresh } from './editActivity/helpers/aiSummaryFlow'
+import { validateExecutionUpdateSubmission } from './editActivity/helpers/executionUpdateValidation'
 
 // ── Types ──
 
@@ -122,6 +125,8 @@ const ACTIVITY_INFO_SELECT_FIELDS = [
   'dga_project_phase',
   'dga_project_activity_status',
   'dga_project_related_changes',
+  'dga_is_rejected',
+  'dga_rejection_reason',
   '_dga_project_planning_instance_value',
 ]
 
@@ -178,6 +183,7 @@ function normalizeId(id?: string | null) {
 type ProjectRelatedChange = {
   new_value: unknown
   old_value: unknown
+  planned_value?: unknown
 }
 
 type ProjectRelatedChanges = {
@@ -255,6 +261,50 @@ function resolveProjectRelatedValue(change: ProjectRelatedChange | undefined): u
   }
 
   return change.old_value
+}
+
+function transformProjectRelatedChangesValues(
+  node: ProjectRelatedChange | ProjectRelatedChanges | unknown,
+  mode: 'approve' | 'reject',
+): ProjectRelatedChange | ProjectRelatedChanges | unknown {
+  if (!isPlainObject(node)) {
+    return node
+  }
+
+  if ('old_value' in node || 'new_value' in node) {
+    const change = node as ProjectRelatedChange
+    return {
+      ...change,
+      old_value: mode === 'reject' ? change.new_value ?? '' : change.old_value ?? '',
+      new_value: mode === 'approve' ? change.old_value ?? '' : change.new_value ?? '',
+    }
+  }
+
+  return Object.entries(node).reduce<ProjectRelatedChanges>((next, [key, value]) => {
+    next[key] = transformProjectRelatedChangesValues(value, mode) as ProjectRelatedChange | ProjectRelatedChanges
+    return next
+  }, {})
+}
+
+function approveProjectRelatedChanges(relatedChanges?: string | null) {
+  return JSON.stringify(transformProjectRelatedChangesValues(parseProjectRelatedChanges(relatedChanges), 'approve'))
+}
+
+function rejectProjectRelatedChanges(relatedChanges?: string | null) {
+  return JSON.stringify(transformProjectRelatedChangesValues(parseProjectRelatedChanges(relatedChanges), 'reject'))
+}
+
+function hasApprovedProjectRelatedChange(node: ProjectRelatedChange | ProjectRelatedChanges | unknown): boolean {
+  if (!isPlainObject(node)) return false
+
+  if ('old_value' in node || 'new_value' in node) {
+    const change = node as ProjectRelatedChange
+    const oldValue = String(change.old_value ?? '').trim()
+    const newValue = String(change.new_value ?? '').trim()
+    return Boolean(oldValue && newValue && oldValue === newValue)
+  }
+
+  return Object.values(node).some((value) => hasApprovedProjectRelatedChange(value))
 }
 
 function applyActivityInformationRelatedChanges(form: ActivityForm, relatedChanges?: string | null): ActivityForm {
@@ -375,6 +425,31 @@ export function EditActivity() {
   const [isDirectorGeneralApproveConfirmOpen, setIsDirectorGeneralApproveConfirmOpen] = useState(false)
   const [isApprovingAsDirectorGeneral, setIsApprovingAsDirectorGeneral] = useState(false)
   const [isStartingActivity, setIsStartingActivity] = useState(false)
+  const [isSubmittingActivityUpdates, setIsSubmittingActivityUpdates] = useState(false)
+  const [isActivityUpdateSubmitConfirmOpen, setIsActivityUpdateSubmitConfirmOpen] = useState(false)
+  const [isExecutionApproveConfirmOpen, setIsExecutionApproveConfirmOpen] = useState(false)
+  const [isApprovingExecutionUpdates, setIsApprovingExecutionUpdates] = useState(false)
+  const [isExecutionRejectModalOpen, setIsExecutionRejectModalOpen] = useState(false)
+  const [isRejectingExecutionUpdates, setIsRejectingExecutionUpdates] = useState(false)
+  const [executionRejectionReason, setExecutionRejectionReason] = useState('')
+  const [executionRejectionError, setExecutionRejectionError] = useState('')
+
+  const refreshActivityAiSummary = useCallback((reason: string) => {
+    if (!projectId) return
+
+    void triggerActivityAiSummaryRefresh(projectId)
+      .then((result) => {
+        assertOperationSuccess(result, 'AI summary refresh flow failed.')
+        console.log('Activity AI summary refresh triggered', { projectId, reason, result })
+      })
+      .catch((error) => {
+        console.warn('Activity AI summary refresh failed', {
+          error,
+          projectId,
+          reason,
+        })
+      })
+  }, [projectId])
 
   // ── Loaded activity data ──
   const activityName = activity?.dga_name || form.activityName || 'Edit Activity'
@@ -383,7 +458,7 @@ export function EditActivity() {
   const projectPhase = activity?.dga_project_phase ?? 776140000 // Planning
   const projectPhaseCode = Number(projectPhase)
   const isExecutionPhase = projectPhaseCode === 776140001
-  const hasExecutionActivityStarted = isExecutionPhase && statusCode === 776140011 && form.activityStatus !== '776140007'
+  const shouldShowExecutionFields = isExecutionPhase && form.activityStatus !== '776140007'
   const isStrategic = form.activityScope === '1'
   const isPaymentOnly = form.activityClassification === '576610002'
   const isBudgetNo = form.budgetRequired === '0'
@@ -402,8 +477,27 @@ export function EditActivity() {
   const isStrategyTeam = selectedRole === 'AOP - Strategy Team'
   const isExecutiveDirector = selectedRole === 'AOP - Executive Director'
   const isDirectorGeneral = selectedRole === 'AOP - Director General'
+  const ownerTeamId = normalizeId(activity?._owningteam_value)
+  const currentRoleTeamId = normalizeId(currentRole?.teamId)
+  const isOwnedByCurrentRoleTeam = Boolean(ownerTeamId && currentRoleTeamId && ownerTeamId === currentRoleTeamId)
+  const isExecutionApprovalPending = isExecutionPhase && [776140001, 776140003, 776140002].includes(Number(statusCode))
+  const canApproveExecutionAsDivisionDirector = isDivisionDirector && isOwnedByCurrentRoleTeam && isExecutionPhase && statusCode === 776140001
+  const canApproveExecutionAsStrategyTeam = isStrategyTeam && isOwnedByCurrentRoleTeam && isExecutionPhase && statusCode === 776140003
+  const canApproveExecutionAsExecutiveDirector = isExecutiveDirector && isOwnedByCurrentRoleTeam && isExecutionPhase && statusCode === 776140002
+  const canReviewExecutionUpdates = canApproveExecutionAsDivisionDirector || canApproveExecutionAsStrategyTeam || canApproveExecutionAsExecutiveDirector
+  const hasApprovedExecutionBaseline = hasApprovedProjectRelatedChange(parseProjectRelatedChanges(activity?.dga_project_related_changes))
+  const showExecutionPendingNotice = isDivisionMember && isExecutionApprovalPending
+  const showExecutionRejectedNotice = isDivisionMember && Boolean(activity?.dga_is_rejected && activity?.dga_rejection_reason)
+  const showExecutionApprovedNotice = (
+    isDivisionMember
+    && isExecutionPhase
+    && statusCode === 776140011
+    && !showExecutionRejectedNotice
+    && hasApprovedExecutionBaseline
+  )
   const canShowSubmitActivityUpdates = (
     isDivisionMember
+    && isOwnedByCurrentRoleTeam
     && statusCode === 776140011
     && isExecutionPhase
     && !['', '2', '776140007', '776140014'].includes(form.activityStatus)
@@ -423,6 +517,7 @@ export function EditActivity() {
         selectedRole === 'AOP - Division Director'
         && isOwnedByCurrentRoleTeam
         && statusCode === 776140001
+        && !isExecutionPhase
       )
     )
     const canEditExecutionStatusOnly = (
@@ -457,10 +552,10 @@ export function EditActivity() {
       activityInfoHasFullEdit: hasFullEdit,
       budgetReadOnly: !hasFullEdit,
       canSubmitToDivisionDirector: selectedRole === 'AOP - Division Member' && hasFullEdit,
-      canSubmitToStrategyTeam: selectedRole === 'AOP - Division Director' && hasFullEdit,
-      canSubmitToExecutiveDirector: selectedRole === 'AOP - Strategy Team' && isOwnedByCurrentRoleTeam && statusCode === 776140003,
-      canSubmitToDirectorGeneral: selectedRole === 'AOP - Executive Director' && isOwnedByCurrentRoleTeam && statusCode === 776140002,
-      canApproveAsDirectorGeneral: selectedRole === 'AOP - Director General' && isOwnedByCurrentRoleTeam && statusCode === 776140014,
+      canSubmitToStrategyTeam: selectedRole === 'AOP - Division Director' && hasFullEdit && !isExecutionPhase,
+      canSubmitToExecutiveDirector: selectedRole === 'AOP - Strategy Team' && isOwnedByCurrentRoleTeam && statusCode === 776140003 && !isExecutionPhase,
+      canSubmitToDirectorGeneral: selectedRole === 'AOP - Executive Director' && isOwnedByCurrentRoleTeam && statusCode === 776140002 && !isExecutionPhase,
+      canApproveAsDirectorGeneral: selectedRole === 'AOP - Director General' && isOwnedByCurrentRoleTeam && statusCode === 776140014 && !isExecutionPhase,
       canEditExecutionBudget,
       canStartActivity: selectedRole === 'AOP - Division Member' && isOwnedByCurrentRoleTeam && statusCode === 776140011 && isExecutionPhase && form.activityStatus === '776140007',
       canEditExecutionStatusOnly,
@@ -753,6 +848,7 @@ export function EditActivity() {
       } : currentActivity)
       setErrors((currentErrors) => ({ ...currentErrors, submit: undefined }))
       setSuccessMessage('Activity information saved successfully.')
+      refreshActivityAiSummary('activity-information-save')
     } catch (error) {
       setErrors((currentErrors) => ({
         ...currentErrors,
@@ -934,6 +1030,8 @@ export function EditActivity() {
       }
 
       const payload = {
+        dga_is_rejected: false,
+        dga_rejection_reason: '',
         statuscode: 776140001 as Dga_aop_projectsesBase['statuscode'],
         'ownerid@odata.bind': toEntityBind('teams', divisionDirectorTeamId),
       }
@@ -960,6 +1058,8 @@ export function EditActivity() {
         ...currentActivity,
         _owningteam_value: divisionDirectorTeamId,
         _owninguser_value: undefined,
+        dga_is_rejected: false,
+        dga_rejection_reason: '',
         owneridname: nextPendingWith,
         statuscode: 776140001,
       } : currentActivity)
@@ -1003,6 +1103,47 @@ export function EditActivity() {
       name: strategyTeam.name || 'AOP - Strategy Team',
     }
   }, [])
+
+  const resolvePlanningInstanceTeam = useCallback(async (
+    teamField:
+      | '_dga_division_member_team_value'
+      | '_dga_division_director_team_value'
+      | '_dga_executive_director_team_value',
+    fallbackName: string,
+  ) => {
+    const planningInstanceId = normalizeId(activity?._dga_project_planning_instance_value)
+    if (!planningInstanceId) {
+      throw new Error('Planning instance could not be resolved for this activity.')
+    }
+
+    const planningInstanceResult = await Dga_project_planning_instancesService.get(planningInstanceId, {
+      select: ['dga_project_planning_instanceid', teamField],
+    })
+    assertOperationSuccess(planningInstanceResult, `Unable to load ${fallbackName} team from the planning instance.`)
+
+    const planningInstance = getResultValue<Dga_project_planning_instances>(planningInstanceResult) as Dga_project_planning_instances & Record<string, unknown>
+    const teamId = normalizeId(planningInstance?.[teamField] as string | undefined)
+
+    if (!teamId) {
+      throw new Error(`${fallbackName} team could not be resolved from the current planning instance.`)
+    }
+
+    let teamName = fallbackName
+    try {
+      const teamResult = await TeamsService.get(teamId, {
+        select: ['teamid', 'name'],
+      })
+      assertOperationSuccess(teamResult, `Unable to load ${fallbackName} team name.`)
+      teamName = getResultValue<Teams>(teamResult)?.name || teamName
+    } catch {
+      // Owner assignment can proceed with the resolved id; display name can fall back.
+    }
+
+    return {
+      id: teamId,
+      name: teamName,
+    }
+  }, [activity?._dga_project_planning_instance_value])
 
   const handleSubmitToStrategyTeam = useCallback(async () => {
     if (isSubmittingToStrategyTeam) return
@@ -1435,10 +1576,332 @@ export function EditActivity() {
     projectId,
   ])
 
-  const handleSubmitActivityUpdates = useCallback(() => {
-    // TODO: Implement submit activity updates logic
-    console.log('Submit Activity Updates')
-  }, [])
+  const validateSubmitActivityUpdates = useCallback(async () => {
+    if (!canShowSubmitActivityUpdates) {
+      setErrors((currentErrors) => ({
+        ...currentErrors,
+        submit: 'You can submit activity updates only when this active execution activity is assigned to your Division Member team.',
+      }))
+      return false
+    }
+
+    if (!projectId) {
+      setErrors((currentErrors) => ({
+        ...currentErrors,
+        submit: 'Activity id is missing from the edit URL.',
+      }))
+      return false
+    }
+
+    const validation = await validateExecutionUpdateSubmission({
+      form,
+      projectId,
+      relatedChanges: activity?.dga_project_related_changes,
+    })
+
+    if (!validation.valid) {
+      setErrors({
+        ...(validation.fieldErrors ?? {}),
+        submit: validation.message,
+      })
+      setActiveTab(validation.section)
+      return false
+    }
+
+    setErrors((currentErrors) => ({ ...currentErrors, submit: undefined }))
+    return true
+  }, [
+    activity?.dga_project_related_changes,
+    canShowSubmitActivityUpdates,
+    form,
+    projectId,
+  ])
+
+  const handleSubmitActivityUpdates = useCallback(async () => {
+    if (isSubmittingActivityUpdates) return
+
+    const canSubmit = await validateSubmitActivityUpdates()
+    if (canSubmit) {
+      setIsActivityUpdateSubmitConfirmOpen(true)
+    }
+  }, [isSubmittingActivityUpdates, validateSubmitActivityUpdates])
+
+  const handleConfirmSubmitActivityUpdates = useCallback(async () => {
+    if (isSubmittingActivityUpdates) return
+
+    const canSubmit = await validateSubmitActivityUpdates()
+    if (!canSubmit) {
+      setIsActivityUpdateSubmitConfirmOpen(false)
+      return
+    }
+
+    const planningInstanceId = normalizeId(activity?._dga_project_planning_instance_value)
+    if (!planningInstanceId) {
+      setErrors((currentErrors) => ({
+        ...currentErrors,
+        submit: 'Planning instance could not be resolved for this activity.',
+      }))
+      setIsActivityUpdateSubmitConfirmOpen(false)
+      return
+    }
+
+    setIsSubmittingActivityUpdates(true)
+    setSuccessMessage('')
+
+    try {
+      const planningInstanceResult = await Dga_project_planning_instancesService.get(planningInstanceId, {
+        select: [
+          'dga_project_planning_instanceid',
+          '_dga_division_director_team_value',
+        ],
+      })
+      assertOperationSuccess(planningInstanceResult, 'Unable to load Division Director team from the planning instance.')
+
+      const planningInstance = getResultValue<Dga_project_planning_instances>(planningInstanceResult)
+      const divisionDirectorTeamId = normalizeId(planningInstance?._dga_division_director_team_value)
+
+      if (!divisionDirectorTeamId) {
+        throw new Error('Division Director team could not be resolved from the current planning instance.')
+      }
+
+      const payload = {
+        dga_is_rejected: false,
+        dga_rejection_reason: '',
+        statuscode: 776140001 as Dga_aop_projectsesBase['statuscode'],
+        'ownerid@odata.bind': toEntityBind('teams', divisionDirectorTeamId),
+      }
+
+      console.log('Submit Activity Updates payload', payload)
+      const submitResult = await Dga_aop_projectsesService.update(
+        projectId,
+        payload as unknown as Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>>,
+      )
+      assertOperationSuccess(submitResult, 'Failed to submit activity updates.')
+
+      let nextPendingWith = 'Division Director'
+      try {
+        const teamResult = await TeamsService.get(divisionDirectorTeamId, {
+          select: ['teamid', 'name'],
+        })
+        assertOperationSuccess(teamResult, 'Unable to load Division Director team name.')
+        nextPendingWith = getResultValue<Teams>(teamResult)?.name || nextPendingWith
+      } catch {
+        // Owner assignment succeeded; pending-with display can safely fall back.
+      }
+
+      setActivity((currentActivity) => currentActivity ? {
+        ...currentActivity,
+        _owningteam_value: divisionDirectorTeamId,
+        _owninguser_value: undefined,
+        dga_is_rejected: false,
+        dga_rejection_reason: '',
+        owneridname: nextPendingWith,
+        statuscode: 776140001,
+      } : currentActivity)
+      setPendingWith(nextPendingWith)
+      setErrors((currentErrors) => ({ ...currentErrors, submit: undefined }))
+      setSuccessMessage('Activity updates submitted to Division Director successfully.')
+      setIsActivityUpdateSubmitConfirmOpen(false)
+      refreshActivityAiSummary('submit-activity-updates')
+    } catch (error) {
+      setErrors((currentErrors) => ({
+        ...currentErrors,
+        submit: error instanceof Error ? error.message : 'Failed to submit activity updates.',
+      }))
+      setIsActivityUpdateSubmitConfirmOpen(false)
+    } finally {
+      setIsSubmittingActivityUpdates(false)
+    }
+  }, [
+    activity?._dga_project_planning_instance_value,
+    isSubmittingActivityUpdates,
+    projectId,
+    refreshActivityAiSummary,
+    validateSubmitActivityUpdates,
+  ])
+
+  const executionApproveDescription = useMemo(() => {
+    if (canApproveExecutionAsDivisionDirector) {
+      return 'This action will approve the submitted project updates at the Division Director level and forward them to the Strategy Team for review. Are you sure you want to proceed?'
+    }
+
+    if (canApproveExecutionAsStrategyTeam) {
+      return 'This action will approve the submitted project updates at the Sector Director level, and the approved changes will be reflected. Are you sure you want to proceed?'
+    }
+
+    if (canApproveExecutionAsExecutiveDirector) {
+      return 'This action will approve the submitted project updates at the Strategy Team level. You will need to send it to the Executive Director after approval to move it forward. Are you sure you want to proceed?'
+    }
+
+    return 'This action will approve the submitted project updates. Are you sure you want to proceed?'
+  }, [
+    canApproveExecutionAsDivisionDirector,
+    canApproveExecutionAsExecutiveDirector,
+    canApproveExecutionAsStrategyTeam,
+  ])
+
+  const handleApproveExecutionUpdates = useCallback(() => {
+    if (!canReviewExecutionUpdates || isApprovingExecutionUpdates) return
+    setIsExecutionApproveConfirmOpen(true)
+  }, [canReviewExecutionUpdates, isApprovingExecutionUpdates])
+
+  const handleConfirmApproveExecutionUpdates = useCallback(async () => {
+    if (!canReviewExecutionUpdates || isApprovingExecutionUpdates) return
+
+    setIsApprovingExecutionUpdates(true)
+    setSuccessMessage('')
+
+    try {
+      const next = await (async () => {
+        if (canApproveExecutionAsDivisionDirector) {
+          const strategyTeam = await resolveStrategyTeam()
+          return {
+            owner: strategyTeam,
+            relatedChanges: activity?.dga_project_related_changes,
+            statuscode: 776140003 as Dga_aop_projectsesBase['statuscode'],
+            success: 'Activity updates approved and forwarded to Strategy Team.',
+          }
+        }
+
+        if (canApproveExecutionAsStrategyTeam) {
+          const executiveDirectorTeam = await resolvePlanningInstanceTeam('_dga_executive_director_team_value', 'Executive Director')
+          return {
+            owner: executiveDirectorTeam,
+            relatedChanges: activity?.dga_project_related_changes,
+            statuscode: 776140002 as Dga_aop_projectsesBase['statuscode'],
+            success: 'Activity updates approved and forwarded to Executive Director.',
+          }
+        }
+
+        const divisionMemberTeam = await resolvePlanningInstanceTeam('_dga_division_member_team_value', 'Division Member')
+        return {
+          owner: divisionMemberTeam,
+          relatedChanges: approveProjectRelatedChanges(activity?.dga_project_related_changes),
+          statuscode: 776140011 as Dga_aop_projectsesBase['statuscode'],
+          success: 'Activity updates approved successfully.',
+        }
+      })()
+
+      const payload = {
+        dga_is_rejected: false,
+        dga_project_related_changes: next.relatedChanges,
+        dga_rejection_reason: '',
+        statuscode: next.statuscode,
+        'ownerid@odata.bind': toEntityBind('teams', next.owner.id),
+      }
+
+      console.log('Approve execution updates payload', payload)
+      const approveResult = await Dga_aop_projectsesService.update(
+        projectId,
+        payload as unknown as Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>>,
+      )
+      assertOperationSuccess(approveResult, 'Failed to approve activity updates.')
+
+      setActivity((currentActivity) => currentActivity ? {
+        ...currentActivity,
+        _owningteam_value: next.owner.id,
+        _owninguser_value: undefined,
+        dga_is_rejected: false,
+        dga_project_related_changes: next.relatedChanges,
+        dga_rejection_reason: '',
+        owneridname: next.owner.name,
+        statuscode: next.statuscode,
+      } : currentActivity)
+      setPendingWith(next.owner.name)
+      setErrors((currentErrors) => ({ ...currentErrors, submit: undefined }))
+      setSuccessMessage(next.success)
+      setIsExecutionApproveConfirmOpen(false)
+      refreshActivityAiSummary('approve-execution-updates')
+    } catch (error) {
+      setErrors((currentErrors) => ({
+        ...currentErrors,
+        submit: error instanceof Error ? error.message : 'Failed to approve activity updates.',
+      }))
+      setIsExecutionApproveConfirmOpen(false)
+    } finally {
+      setIsApprovingExecutionUpdates(false)
+    }
+  }, [
+    activity?.dga_project_related_changes,
+    canApproveExecutionAsDivisionDirector,
+    canApproveExecutionAsStrategyTeam,
+    canReviewExecutionUpdates,
+    isApprovingExecutionUpdates,
+    projectId,
+    refreshActivityAiSummary,
+    resolvePlanningInstanceTeam,
+    resolveStrategyTeam,
+  ])
+
+  const handleOpenRejectExecutionUpdates = useCallback(() => {
+    if (!canReviewExecutionUpdates || isRejectingExecutionUpdates) return
+    setExecutionRejectionReason('')
+    setExecutionRejectionError('')
+    setIsExecutionRejectModalOpen(true)
+  }, [canReviewExecutionUpdates, isRejectingExecutionUpdates])
+
+  const handleConfirmRejectExecutionUpdates = useCallback(async () => {
+    if (!canReviewExecutionUpdates || isRejectingExecutionUpdates) return
+
+    const reason = executionRejectionReason.trim()
+    if (!reason) {
+      setExecutionRejectionError('Enter rejection reason.')
+      return
+    }
+
+    setIsRejectingExecutionUpdates(true)
+    setSuccessMessage('')
+
+    try {
+      const divisionMemberTeam = await resolvePlanningInstanceTeam('_dga_division_member_team_value', 'Division Member')
+      const rejectedRelatedChanges = rejectProjectRelatedChanges(activity?.dga_project_related_changes)
+      const payload = {
+        dga_is_rejected: true,
+        dga_project_related_changes: rejectedRelatedChanges,
+        dga_rejection_reason: reason,
+        statuscode: 776140011 as Dga_aop_projectsesBase['statuscode'],
+        'ownerid@odata.bind': toEntityBind('teams', divisionMemberTeam.id),
+      }
+
+      console.log('Reject execution updates payload', payload)
+      const rejectResult = await Dga_aop_projectsesService.update(
+        projectId,
+        payload as unknown as Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>>,
+      )
+      assertOperationSuccess(rejectResult, 'Failed to reject activity updates.')
+
+      setActivity((currentActivity) => currentActivity ? {
+        ...currentActivity,
+        _owningteam_value: divisionMemberTeam.id,
+        _owninguser_value: undefined,
+        dga_is_rejected: true,
+        dga_project_related_changes: rejectedRelatedChanges,
+        dga_rejection_reason: reason,
+        owneridname: divisionMemberTeam.name,
+        statuscode: 776140011,
+      } : currentActivity)
+      setForm((currentForm) => applyActivityInformationRelatedChanges(currentForm, rejectedRelatedChanges))
+      setPendingWith(divisionMemberTeam.name)
+      setErrors((currentErrors) => ({ ...currentErrors, submit: undefined }))
+      setExecutionRejectionReason('')
+      setExecutionRejectionError('')
+      setSuccessMessage('Activity updates rejected and returned to Division Member.')
+      setIsExecutionRejectModalOpen(false)
+      refreshActivityAiSummary('reject-execution-updates')
+    } catch (error) {
+      setExecutionRejectionError(error instanceof Error ? error.message : 'Failed to reject activity updates.')
+    } finally {
+      setIsRejectingExecutionUpdates(false)
+    }
+  }, [
+    activity?.dga_project_related_changes,
+    canReviewExecutionUpdates,
+    executionRejectionReason,
+    isRejectingExecutionUpdates,
+    projectId,
+    refreshActivityAiSummary,
+    resolvePlanningInstanceTeam,
+  ])
 
   const handleProjectRelatedChangesUpdate = useCallback((relatedChanges: string) => {
     setActivity((currentActivity) => currentActivity
@@ -1461,13 +1924,14 @@ export function EditActivity() {
             errors={errors}
             form={form}
             hasFullEdit={editPermissions.activityInfoHasFullEdit}
-            showExecutionTracking={hasExecutionActivityStarted}
+            showExecutionTracking={shouldShowExecutionFields}
             isReadOnly={editPermissions.activityInfoReadOnly}
             isAdeoVisible={isAdeoVisible}
             isBudgetNo={isBudgetNo}
             isPaymentOnly={isPaymentOnly}
             isStrategic={isStrategic}
             projectId={projectId}
+            onActivityDataChanged={() => refreshActivityAiSummary('activity-information-related-crud')}
             updateForm={updateForm}
           />
         )
@@ -1475,6 +1939,7 @@ export function EditActivity() {
         return (
           <ObjectivesTab
             isReadOnly={editPermissions.objectivesReadOnly}
+            onActivityDataChanged={() => refreshActivityAiSummary('objectives-save')}
             onHeaderActionChange={setObjectiveHeaderAction}
             projectId={projectId}
             statusCode={statusCode}
@@ -1486,9 +1951,10 @@ export function EditActivity() {
             activityPlannedEndDate={form.plannedEndDate}
             activityPlannedStartDate={form.plannedStartDate}
             canEditExecutionFieldsOnly={editPermissions.canEditMilestoneExecutionOnly}
-            isExecutionPhase={hasExecutionActivityStarted}
+            isExecutionPhase={shouldShowExecutionFields}
             isReadOnly={editPermissions.milestonesReadOnly}
             isAdeoVisible={isAdeoVisible}
+            onActivityDataChanged={() => refreshActivityAiSummary('milestone-crud')}
             onProjectRelatedChangesChange={handleProjectRelatedChangesUpdate}
             projectId={projectId}
             projectRelatedChanges={activity?.dga_project_related_changes}
@@ -1503,6 +1969,7 @@ export function EditActivity() {
             canEditExecutionFieldsOnly={editPermissions.canEditExecutionStatusOnly}
             isExecutionPhase={isExecutionPhase}
             isReadOnly={editPermissions.procurementReadOnly}
+            onActivityDataChanged={() => refreshActivityAiSummary('procurement-crud')}
             onProjectRelatedChangesChange={handleProjectRelatedChangesUpdate}
             projectId={projectId}
             projectRelatedChanges={activity?.dga_project_related_changes}
@@ -1519,6 +1986,7 @@ export function EditActivity() {
             currentHierarchyId={currentRoleDivisionalHierarchy?.hierarchyId}
             divisionName={form.divisionName}
             hierarchies={allHierarchies}
+            onActivityDataChanged={() => refreshActivityAiSummary('engagement-plan-crud')}
             projectId={projectId}
             selectedRole={selectedRole}
             sectorName={form.sectorName}
@@ -1533,6 +2001,7 @@ export function EditActivity() {
             isExecutionPhase={isExecutionPhase}
             isReadOnly={editPermissions.budgetReadOnly}
             onHeaderActionChange={setBudgetHeaderAction}
+            onActivityDataChanged={() => refreshActivityAiSummary('budget-crud')}
             plannedEndDate={form.plannedEndDate}
             plannedStartDate={form.plannedStartDate}
             onProjectRelatedChangesChange={handleProjectRelatedChangesUpdate}
@@ -1902,14 +2371,38 @@ export function EditActivity() {
                 Request Clarification
               </Button>
             ) : null}
+            {canReviewExecutionUpdates ? (
+              <Button
+                disabled={isApprovingExecutionUpdates || Boolean(errors.context)}
+                icon={<Send size={16} />}
+                onClick={handleApproveExecutionUpdates}
+              >
+                {isApprovingExecutionUpdates ? 'Approving...' : 'Approve Activity'}
+              </Button>
+            ) : null}
+            {canReviewExecutionUpdates ? (
+              <Button
+                className="button--danger"
+                disabled={isRejectingExecutionUpdates || Boolean(errors.context)}
+                icon={<AlertTriangle size={16} />}
+                onClick={handleOpenRejectExecutionUpdates}
+                variant="secondary"
+              >
+                {isRejectingExecutionUpdates ? 'Rejecting...' : 'Reject Activity'}
+              </Button>
+            ) : null}
             {isDivisionMember && editPermissions.canStartActivity ? (
               <Button disabled={isStartingActivity || Boolean(errors.context)} icon={<Send size={16} />} onClick={handleStartActivity}>
                 {isStartingActivity ? 'Starting...' : 'Start Activity'}
               </Button>
             ) : null}
             {canShowSubmitActivityUpdates ? (
-              <Button icon={<Send size={16} />} onClick={handleSubmitActivityUpdates}>
-                Submit Activity Updates
+              <Button
+                disabled={isSubmittingActivityUpdates || Boolean(errors.context)}
+                icon={<Send size={16} />}
+                onClick={handleSubmitActivityUpdates}
+              >
+                {isSubmittingActivityUpdates ? 'Submitting...' : 'Submit Activity Updates'}
               </Button>
             ) : null}
             <Button icon={<FileText size={16} />} variant="ghost" className="edit-activity__card-btn">
@@ -1919,6 +2412,25 @@ export function EditActivity() {
         </div>
       </header>
 
+      {showExecutionPendingNotice ? (
+        <div className="create-activity__notice create-activity__notice--warning" role="status">
+          There have been updates to this activity that are currently under approval. Please review the latest changes.
+        </div>
+      ) : null}
+
+      {showExecutionRejectedNotice ? (
+        <div className="create-activity__notice create-activity__notice--error create-activity__notice--multiline" role="alert">
+          <div>Your submitted activity updates were rejected and have been discarded. You may apply the updates again and resubmit for approval.</div>
+          <div>Rejection Reason: {activity?.dga_rejection_reason}</div>
+        </div>
+      ) : null}
+
+      {showExecutionApprovedNotice ? (
+        <div className="create-activity__notice create-activity__notice--success" role="status">
+          Your submitted activity updates have been approved. The approved values are now available as the latest execution baseline.
+        </div>
+      ) : null}
+
       {successMessage ? (
         <div className="create-activity__notice create-activity__notice--success" role="status">
           {successMessage}
@@ -1926,8 +2438,12 @@ export function EditActivity() {
       ) : null}
 
       {errors.submit ? (
-        <div className="create-activity__notice create-activity__notice--error" role="alert">
-          {errors.submit}
+        <div className="create-activity__notice create-activity__notice--error create-activity__notice--multiline" role="alert">
+          {errors.submit.split('\n').map((line, index) => (
+            <div className={line.trim().startsWith('•') ? 'create-activity__notice-list-item' : undefined} key={`${line}-${index}`}>
+              {line || '\u00A0'}
+            </div>
+          ))}
         </div>
       ) : null}
 
@@ -1963,7 +2479,7 @@ export function EditActivity() {
 
       {/* Stage content */}
       <div className="edit-activity__stage-content" role="tabpanel">
-        {hasExecutionActivityStarted ? (
+        {shouldShowExecutionFields ? (
           <ReviewChangesPanel
             key={activeTab}
             activeTab={activeTab}
@@ -2027,6 +2543,74 @@ export function EditActivity() {
         onConfirm={handleConfirmApproveAsDirectorGeneral}
         title="Approve Activity"
       />
+
+      <ConfirmationDialog
+        confirmLabel={isSubmittingActivityUpdates ? 'Submitting...' : 'Submit Updates'}
+        description="This action will submit your project updates for review and approval. Once submitted, you will not be able to edit them until reviewed. Are you sure you want to proceed?"
+        isOpen={isActivityUpdateSubmitConfirmOpen}
+        onCancel={() => {
+          if (!isSubmittingActivityUpdates) setIsActivityUpdateSubmitConfirmOpen(false)
+        }}
+        onConfirm={handleConfirmSubmitActivityUpdates}
+        title="Submit Activity Updates"
+      />
+
+      <ConfirmationDialog
+        confirmLabel={isApprovingExecutionUpdates ? 'Approving...' : 'Approve'}
+        description={executionApproveDescription}
+        isOpen={isExecutionApproveConfirmOpen}
+        onCancel={() => {
+          if (!isApprovingExecutionUpdates) setIsExecutionApproveConfirmOpen(false)
+        }}
+        onConfirm={handleConfirmApproveExecutionUpdates}
+        title="Approve Activity Updates"
+      />
+
+      <Modal
+        actions={(
+          <>
+            <Button
+              disabled={isRejectingExecutionUpdates}
+              onClick={() => {
+                if (!isRejectingExecutionUpdates) setIsExecutionRejectModalOpen(false)
+              }}
+              variant="secondary"
+            >
+              Cancel
+            </Button>
+            <Button
+              className="button--danger"
+              disabled={isRejectingExecutionUpdates}
+              onClick={handleConfirmRejectExecutionUpdates}
+            >
+              {isRejectingExecutionUpdates ? 'Rejecting...' : 'Confirm Reject'}
+            </Button>
+          </>
+        )}
+        isOpen={isExecutionRejectModalOpen}
+        onClose={() => {
+          if (!isRejectingExecutionUpdates) setIsExecutionRejectModalOpen(false)
+        }}
+        title="Reject Activity Updates"
+      >
+        <div className="edit-activity__procurement-drawer-section">
+          <p className="confirm-dialog__description">
+            Please provide a rejection reason. The submitted execution updates will be discarded and the activity will return to the Division Member.
+          </p>
+          <Textarea
+            disabled={isRejectingExecutionUpdates}
+            error={executionRejectionError}
+            label="Rejection Reason"
+            onChange={(event) => {
+              setExecutionRejectionReason(event.target.value)
+              if (executionRejectionError) setExecutionRejectionError('')
+            }}
+            required
+            rows={5}
+            value={executionRejectionReason}
+          />
+        </div>
+      </Modal>
     </div>
   )
 }

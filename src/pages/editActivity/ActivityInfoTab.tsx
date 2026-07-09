@@ -50,6 +50,7 @@ interface ActivityInfoTabProps {
   isBudgetNo: boolean
   isPaymentOnly: boolean
   isStrategic: boolean
+  onActivityDataChanged?: () => void
   projectId: string
   updateForm: (fields: Partial<ActivityForm>) => void
 }
@@ -81,6 +82,7 @@ export function ActivityInfoTab({
   isBudgetNo,
   isPaymentOnly,
   isStrategic,
+  onActivityDataChanged,
   projectId,
   updateForm,
 }: ActivityInfoTabProps) {
@@ -661,9 +663,15 @@ export function ActivityInfoTab({
           </Card>
         ) : null}
 
-        <MembersTab embedded isReadOnly={isReadOnly} projectId={projectId} />
+        <MembersTab embedded isReadOnly={isReadOnly} onActivityDataChanged={onActivityDataChanged} projectId={projectId} />
         {isAdeoVisible ? (
-          <DependenciesTab embedded isReadOnly={isReadOnly} onDependencyCountChange={handleDependencyCountChange} projectId={projectId} />
+          <DependenciesTab
+            embedded
+            isReadOnly={isReadOnly}
+            onActivityDataChanged={onActivityDataChanged}
+            onDependencyCountChange={handleDependencyCountChange}
+            projectId={projectId}
+          />
         ) : null}
       </>
     )
@@ -677,6 +685,7 @@ export function ActivityInfoTab({
     isPaymentOnly,
     isBudgetNo,
     isAdeoVisible,
+    onActivityDataChanged,
     projectId,
     requiresActivityStatusJustification,
     isReadOnly,

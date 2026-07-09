@@ -25,6 +25,7 @@ type ObjectiveErrors = Partial<Record<keyof ObjectiveForm, string>>
 
 type ObjectivesTabProps = {
   isReadOnly?: boolean
+  onActivityDataChanged?: () => void
   onHeaderActionChange?: (action: ObjectiveHeaderAction | null) => void
   projectId: string
   statusCode?: number
@@ -155,7 +156,13 @@ function buildProjectPayload(form: ObjectiveForm): Partial<Omit<Dga_aop_projects
   return payload
 }
 
-export function ObjectivesTab({ isReadOnly = false, onHeaderActionChange, projectId, statusCode = 1 }: ObjectivesTabProps) {
+export function ObjectivesTab({
+  isReadOnly = false,
+  onActivityDataChanged,
+  onHeaderActionChange,
+  projectId,
+  statusCode = 1,
+}: ObjectivesTabProps) {
   const uid = useId()
   const [form, setForm] = useState<ObjectiveForm>(EMPTY_FORM)
   const [savedForm, setSavedForm] = useState<ObjectiveForm>(EMPTY_FORM)
@@ -275,12 +282,13 @@ export function ObjectivesTab({ isReadOnly = false, onHeaderActionChange, projec
       assertOperationSuccess(result, 'Unable to save objective links.')
       setSavedForm(nextForm)
       setNotice(successMessage)
+      onActivityDataChanged?.()
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Unable to save objective links.')
     } finally {
       setIsSaving(false)
     }
-  }, [isReadOnly, isSaving, projectId])
+  }, [isReadOnly, isSaving, onActivityDataChanged, projectId])
 
   const applyFormChange = useCallback((updater: (currentForm: ObjectiveForm) => ObjectiveForm) => {
     if (isReadOnly) return

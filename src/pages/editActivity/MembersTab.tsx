@@ -50,6 +50,7 @@ const ACTIVITY_MEMBER_RELATIONSHIP = 'dga_aop_projects_systemuser_systemuser'
 type MembersTabProps = {
   embedded?: boolean
   isReadOnly?: boolean
+  onActivityDataChanged?: () => void
   projectId: string
 }
 
@@ -170,7 +171,7 @@ function mapAssociationsToMembers(
 
 // ── Component ──
 
-export function MembersTab({ embedded = false, isReadOnly = false, projectId }: MembersTabProps) {
+export function MembersTab({ embedded = false, isReadOnly = false, onActivityDataChanged, projectId }: MembersTabProps) {
   const [availableUsers, setAvailableUsers] = useState<MockUser[]>([])
   const [isUsersLoading, setIsUsersLoading] = useState(false)
   const [usersError, setUsersError] = useState('')
@@ -403,7 +404,8 @@ export function MembersTab({ embedded = false, isReadOnly = false, projectId }: 
     setMemberSelectionError('')
     setMembersNotice(`${selectedUserIds.length} member${selectedUserIds.length !== 1 ? 's' : ''} added successfully.`)
     setIsAddMembersModalOpen(false)
-  }, [isReadOnly, isSavingMembers, loadMembersContext, members, projectId, selectedMemberIds])
+    onActivityDataChanged?.()
+  }, [isReadOnly, isSavingMembers, loadMembersContext, members, onActivityDataChanged, projectId, selectedMemberIds])
 
   const handleRemoveMember = useCallback((member: ActivityMember) => {
     if (isReadOnly) return
@@ -429,12 +431,13 @@ export function MembersTab({ embedded = false, isReadOnly = false, projectId }: 
       await loadMembersContext()
       setMemberToDelete(null)
       setMembersNotice('Member removed successfully.')
+      onActivityDataChanged?.()
     } catch (error) {
       setMembersError(error instanceof Error ? error.message : 'Unable to remove member.')
     } finally {
       setIsRemovingMember(false)
     }
-  }, [isReadOnly, isRemovingMember, loadMembersContext, memberToDelete, projectId])
+  }, [isReadOnly, isRemovingMember, loadMembersContext, memberToDelete, onActivityDataChanged, projectId])
 
   const handleCancelDeleteMember = useCallback(() => {
     setMemberToDelete(null)

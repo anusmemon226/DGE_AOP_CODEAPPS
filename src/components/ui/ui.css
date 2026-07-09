@@ -1317,14 +1317,41 @@
 
 
 /* Danger button variant for confirmation dialogs */
-.button--danger {
+.button--danger,
+.button--primary.button--danger {
   background: var(--color-error);
+  border-color: var(--color-error);
   color: #fff;
 }
 
-.button--danger:hover {
+.button--danger:hover:not(:disabled),
+.button--primary.button--danger:hover:not(:disabled) {
   background: #b91c1c;
+  border-color: #b91c1c;
+  color: #fff;
   box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.28);
+}
+
+.button--secondary.button--danger {
+  background: rgba(220, 38, 38, 0.08);
+  border-color: rgba(220, 38, 38, 0.28);
+  color: var(--color-error);
+}
+
+.button--secondary.button--danger:hover:not(:disabled) {
+  background: var(--color-error);
+  border-color: var(--color-error);
+  color: #fff;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.18);
+}
+
+.button--secondary.button--danger:disabled,
+.button--secondary.button--danger:disabled:hover {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+  box-shadow: none;
+  color: var(--color-text-tertiary);
+  opacity: 0.72;
 }
 
 :root[data-theme='dark'] .modal__backdrop {
@@ -1340,13 +1367,32 @@
     0 0 0 1px rgba(148, 163, 184, 0.06);
 }
 
-:root[data-theme='dark'] .button--danger {
+:root[data-theme='dark'] .button--danger,
+:root[data-theme='dark'] .button--primary.button--danger {
   background: #ef4444;
+  border-color: #ef4444;
+  color: #fff;
 }
 
-:root[data-theme='dark'] .button--danger:hover {
+:root[data-theme='dark'] .button--danger:hover:not(:disabled),
+:root[data-theme='dark'] .button--primary.button--danger:hover:not(:disabled) {
   background: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
   box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.28);
+}
+
+:root[data-theme='dark'] .button--secondary.button--danger {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.32);
+  color: #fca5a5;
+}
+
+:root[data-theme='dark'] .button--secondary.button--danger:hover:not(:disabled) {
+  background: #dc2626;
+  border-color: #ef4444;
+  color: #fff;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.24);
 }
 
 @media (max-width: 460px) {

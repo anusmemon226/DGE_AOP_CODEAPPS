@@ -122,6 +122,7 @@ interface BudgetTabProps {
   hierarchyId?: string
   isExecutionPhase?: boolean
   isReadOnly?: boolean
+  onActivityDataChanged?: () => void
   onHeaderActionChange?: (action: BudgetHeaderAction | null) => void
   onProjectRelatedChangesChange?: (relatedChanges: string) => void
   plannedEndDate: string
@@ -462,6 +463,7 @@ export function BudgetTab({
   hierarchyId = '',
   isExecutionPhase = false,
   isReadOnly = false,
+  onActivityDataChanged,
   onHeaderActionChange,
   onProjectRelatedChangesChange,
   plannedEndDate,
@@ -834,6 +836,7 @@ export function BudgetTab({
       setMonthRecords(refreshedMonthRecords)
       setErrors({})
       setSuccessMessage('Budget information saved successfully.')
+      onActivityDataChanged?.()
     } catch (error) {
       setErrors((currentErrors) => ({
         ...currentErrors,
@@ -849,6 +852,7 @@ export function BudgetTab({
     isSaving,
     monthRecords,
     orderedMonthRecords,
+    onActivityDataChanged,
     projectId,
     showTotalActivityBudget,
   ])
@@ -943,6 +947,10 @@ export function BudgetTab({
     try {
       setIsSavingExecutionMonth(monthId)
       await saveBudgetMonthRelatedChanges(monthRecord, monthRecord.actualBudget, nextDeliveredValue)
+      const monthResult = await Dga_aop_project_budgetsService.update(monthId, {
+        dga_delivered_amount: nextDeliveredValue,
+      })
+      assertOperationSuccess(monthResult, `Failed to update ${monthRecord.monthName} delivered values.`)
 
       updateMonthRecord(monthId, (current) => ({
         ...current,
@@ -953,6 +961,7 @@ export function BudgetTab({
         [monthId]: numberToString(nextDeliveredValue),
       }))
       setSuccessMessage(`${monthRecord.monthName} delivered values saved successfully.`)
+      onActivityDataChanged?.()
     } catch (error) {
       setInlineDeliveredErrors((current) => ({
         ...current,
@@ -985,6 +994,12 @@ export function BudgetTab({
     try {
       setIsSavingExecutionMonth(monthId)
       await saveBudgetMonthRelatedChanges(monthRecord, nextActualAmount, nextDeliveredAmount)
+      const monthResult = await Dga_aop_project_budgetsService.update(monthId, {
+        dga_actual_budget: nextActualAmount,
+        dga_delivered_amount: nextDeliveredAmount,
+        dga_is_zero: nextZeroState,
+      })
+      assertOperationSuccess(monthResult, `Failed to update ${monthRecord.monthName} zero flag.`)
 
       updateMonthRecord(monthId, (current) => ({
         ...current,
@@ -1006,6 +1021,7 @@ export function BudgetTab({
           ? `${monthRecord.monthName} marked as zero successfully.`
           : `${monthRecord.monthName} zero flag removed successfully.`,
       )
+      onActivityDataChanged?.()
     } catch (error) {
       setErrors((current) => ({
         ...current,
@@ -1209,6 +1225,12 @@ export function BudgetTab({
       const nextDeliveredAmount = selectedDrawerMonth.isZero ? 0 : parseNum(deliveredDraft)
 
       await saveBudgetMonthRelatedChanges(selectedDrawerMonth, nextActualBudget, nextDeliveredAmount)
+      const monthResult = await Dga_aop_project_budgetsService.update(selectedDrawerMonth.id, {
+        dga_actual_budget: nextActualBudget,
+        dga_delivered_amount: nextDeliveredAmount,
+        dga_is_zero: selectedDrawerMonth.isZero,
+      })
+      assertOperationSuccess(monthResult, `Failed to update ${selectedDrawerMonth.monthName} budget totals.`)
 
       updateMonthRecord(selectedDrawerMonth.id, (current) => ({
         ...current,
@@ -1223,6 +1245,7 @@ export function BudgetTab({
         [selectedDrawerMonth.id]: numberToString(nextDeliveredAmount),
       }))
       setSuccessMessage(`${selectedDrawerMonth.monthName} budget details saved successfully.`)
+      onActivityDataChanged?.()
       closeDrawer()
     } catch (error) {
       setDetailDraftErrors((current) => ({

@@ -24,6 +24,7 @@ export * as Dga_engagement_sub_typesModel from './models/Dga_engagement_sub_type
 export * as Dga_objectivesModel from './models/Dga_objectivesModel';
 export * as Dga_procurement_plansModel from './models/Dga_procurement_plansModel';
 export * as Dga_project_planning_instancesModel from './models/Dga_project_planning_instancesModel';
+export * as PowerApps_V2__Create_UpdateAOPProjectRelatedAISummaryModel from './models/PowerApps_V2__Create_UpdateAOPProjectRelatedAISummaryModel';
 export * as PowerApps_V2__RetrieveAOPProjectDatafromExcelModel from './models/PowerApps_V2__RetrieveAOPProjectDatafromExcelModel';
 export * as RolesModel from './models/RolesModel';
 export * as SystemuserrolescollectionModel from './models/SystemuserrolescollectionModel';
@@ -52,6 +53,7 @@ export * from './services/Dga_engagement_sub_typesService';
 export * from './services/Dga_objectivesService';
 export * from './services/Dga_procurement_plansService';
 export * from './services/Dga_project_planning_instancesService';
+export * from './services/PowerApps_V2__Create_UpdateAOPProjectRelatedAISummaryService';
 export * from './services/PowerApps_V2__RetrieveAOPProjectDatafromExcelService';
 export * from './services/RolesService';
 export * from './services/SystemuserrolescollectionService';

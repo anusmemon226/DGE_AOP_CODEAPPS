@@ -21,6 +21,18 @@
         "workflowDisplayName": "PowerApps (V2) – Retrieve AOP Project Data from Excel",
         "workflowName": "76ff6ba9-c8d2-78fd-f0d6-3924624f4cab"
       }
+    },
+    "ca0adada-dd2c-40f4-9164-90bcf26b38b7": {
+      "id": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
+      "displayName": "Logic flows",
+      "dataSources": [
+        "powerapps_v2__create_updateaopprojectrelatedaisummary"
+      ],
+      "workflowDetails": {
+        "workflowEntityId": "8eb98d27-797b-f111-ab0e-000d3ae0324d",
+        "workflowDisplayName": "Power Apps (V2) - Create/Update AOP Project Related AI Summary",
+        "workflowName": "75a524b3-7809-c62d-2eb1-9bb05b2f4146"
+      }
     }
   },
   "databaseReferences": {

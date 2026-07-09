@@ -94,6 +94,7 @@ type ProcurementTabProps = {
   canEditExecutionFieldsOnly?: boolean
   isExecutionPhase?: boolean
   isReadOnly?: boolean
+  onActivityDataChanged?: () => void
   onProjectRelatedChangesChange?: (relatedChanges: string) => void
   projectId: string
   projectRelatedChanges?: string | null
@@ -262,6 +263,20 @@ function getStatusLabel(value: string): string {
 function formatFileSize(size: number) {
   if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`
   return `${Math.max(1, Math.round(size / 1024))} KB`
+}
+
+function getQuarterNumber(quarter?: string | null) {
+  const match = String(quarter ?? '').match(/[1-4]/)
+  return match ? Number(match[0]) : 0
+}
+
+function getCurrentQuarterNumber() {
+  return Math.floor(new Date().getMonth() / 3) + 1
+}
+
+function isFutureQuarter(quarter?: string | null) {
+  const quarterNumber = getQuarterNumber(quarter)
+  return quarterNumber > 0 && quarterNumber > getCurrentQuarterNumber()
 }
 
 function getOperationErrorMessage(result: unknown, fallbackMessage: string) {
@@ -672,6 +687,7 @@ export function ProcurementTab({
   canEditExecutionFieldsOnly = false,
   isExecutionPhase = false,
   isReadOnly = false,
+  onActivityDataChanged,
   onProjectRelatedChangesChange,
   projectId,
   projectRelatedChanges,
@@ -890,7 +906,10 @@ export function ProcurementTab({
   const isExecutionTenderNotRaised = isExecutionTenderRequired && executionForm.tenderType === '2'
   const shouldShowExecutionRaisedFields = isExecutionTenderNotRequired || isExecutionTenderRaised
   const shouldShowAttachContract = shouldShowExecutionRaisedFields && ['8', '15'].includes(executionForm.procurementStatus)
-  const canEditExecutionSection = !isReadOnly || canEditExecutionFieldsOnly
+  const isFutureQuarterLocked = isExecutionPhase
+    && Boolean(editingProcurement)
+    && isFutureQuarter(form.purchaseRequestRaisingQuarter || form.expectedAwardingQuarter)
+  const canEditExecutionSection = (!isReadOnly || canEditExecutionFieldsOnly) && !isFutureQuarterLocked
   const executionProcurementStatusOptions = useMemo(() => {
     if (executionForm.tenderRequired === '0') return PROCUREMENT_STATUS_YES_RAISED
     if (isExecutionTenderRequired && executionForm.tenderType === '1') return PROCUREMENT_STATUS_YES_RAISED
@@ -1317,6 +1336,11 @@ export function ProcurementTab({
       return
     }
 
+    if (isFutureQuarterLocked) {
+      setProcurementError('This procurement is scheduled for a future quarter. Execution updates are locked until that quarter starts.')
+      return
+    }
+
     const isExecutionOnlySave = isExecutionPhase && isReadOnly && canEditExecutionSection
 
     if (isExecutionOnlySave) {
@@ -1372,6 +1396,7 @@ export function ProcurementTab({
 
       handleCloseDrawer()
       await loadProcurements()
+      onActivityDataChanged?.()
     } catch (error) {
       setProcurementError(error instanceof Error ? error.message : 'Unable to save procurement plan.')
     } finally {
@@ -1393,6 +1418,7 @@ export function ProcurementTab({
       setProcurementToDelete(null)
       setProcurementNotice('Procurement plan deleted successfully.')
       await loadProcurements()
+      onActivityDataChanged?.()
     } catch (error) {
       setProcurementError(error instanceof Error ? error.message : 'Unable to delete procurement plan.')
     } finally {
@@ -1404,6 +1430,8 @@ export function ProcurementTab({
 
   function renderDrawerForm() {
     const title = editingProcurement ? 'Edit Procurement' : 'Create Procurement'
+    const isDrawerReadOnly = isReadOnly || isFutureQuarterLocked
+    const canSaveProcurement = isExecutionPhase ? canEditExecutionSection : !isReadOnly
 
     return (
       <SideDrawer
@@ -1412,7 +1440,7 @@ export function ProcurementTab({
             <Button onClick={handleCloseDrawer} variant="secondary">
               Cancel
             </Button>
-            <Button disabled={(!canEditExecutionSection && isReadOnly) || isSavingProcurement} onClick={handleSave}>
+            <Button disabled={!canSaveProcurement || isSavingProcurement} onClick={handleSave}>
               {isSavingProcurement ? 'Saving...' : editingProcurement ? 'Update Procurement' : 'Create Procurement'}
             </Button>
           </div>
@@ -1422,6 +1450,12 @@ export function ProcurementTab({
         title={title}
       >
         <div className="edit-activity__procurement-drawer">
+          {isFutureQuarterLocked ? (
+            <div className="create-activity__notice create-activity__notice--warning">
+              This procurement is scheduled for a future quarter. You can review the details now, but execution updates will be enabled when that quarter starts.
+            </div>
+          ) : null}
+
           {lookupError ? (
             <div className="edit-activity__members-modal-error">
               {lookupError}
@@ -1450,7 +1484,7 @@ export function ProcurementTab({
               <div className="edit-activity__procurement-drawer-section">
                 <RadioGroup
                   className="radio-group--tender-required"
-                  disabled={isReadOnly}
+                  disabled={isDrawerReadOnly}
                   error={formErrors.tenderRequired}
                   label="Tender Required"
                   name={`${uid}-tender-required`}
@@ -1463,7 +1497,7 @@ export function ProcurementTab({
                 {isTenderRequired && (
                   <RadioGroup
                     className="radio-group--tender-type"
-                    disabled={isReadOnly}
+                    disabled={isDrawerReadOnly}
                     error={formErrors.tenderType}
                     label="Tender Type"
                     name={`${uid}-tender-type`}
@@ -1477,7 +1511,7 @@ export function ProcurementTab({
                 {procurementStatusOptions.length > 0 && (
                   <RadioGroup
                     className="create-activity__radio--status"
-                    disabled={isReadOnly}
+                    disabled={isDrawerReadOnly}
                     error={formErrors.procurementStatus}
                     label="Procurement Status"
                     name={`${uid}-procurement-status`}
@@ -1703,7 +1737,7 @@ export function ProcurementTab({
 
             <div className="edit-activity__procurement-drawer-section">
             <Input
-              disabled={isReadOnly}
+              disabled={isDrawerReadOnly}
               error={formErrors.procurementName}
               label="Procurement Name"
               onChange={(e) => handleFieldChange({ procurementName: e.target.value })}
@@ -1712,7 +1746,7 @@ export function ProcurementTab({
             />
 
             <Select
-              disabled={isReadOnly}
+              disabled={isDrawerReadOnly}
               error={formErrors.requestType}
               id={`${uid}-request-type`}
               label="Request Type"
@@ -1724,13 +1758,13 @@ export function ProcurementTab({
 
             <div className="create-activity__form-row create-activity__form-row--two">
               <Input
-                disabled={isReadOnly}
+                disabled={isDrawerReadOnly}
                 label="Contract Number (if applicable)"
                 onChange={(e) => handleFieldChange({ contractNumber: e.target.value })}
                 value={form.contractNumber}
               />
               <Input
-                disabled={isReadOnly}
+                disabled={isDrawerReadOnly}
                 label="Recommended Suppliers"
                 onChange={(e) => handleFieldChange({ recommendedSuppliers: e.target.value })}
                 value={form.recommendedSuppliers}
@@ -1739,7 +1773,7 @@ export function ProcurementTab({
 
             <div className="create-activity__form-row create-activity__form-row--two">
               <Select
-                disabled={isReadOnly}
+                disabled={isDrawerReadOnly}
                 error={formErrors.tenderingMethod}
                 id={`${uid}-tendering-method`}
                 label="Tendering Method"
@@ -1749,7 +1783,7 @@ export function ProcurementTab({
                 value={form.tenderingMethod}
               />
               <Select
-                disabled={isReadOnly}
+                disabled={isDrawerReadOnly}
                 error={formErrors.solicitationChannel}
                 id={`${uid}-solicitation-channel`}
                 label="Solicitation Channel"
@@ -1762,7 +1796,7 @@ export function ProcurementTab({
 
             <div className="create-activity__form-row create-activity__form-row--two">
               <Select
-                disabled={isReadOnly}
+                disabled={isDrawerReadOnly}
                 error={formErrors.costCenter}
                 id={`${uid}-cost-center`}
                 label="Cost Center"
@@ -1782,7 +1816,7 @@ export function ProcurementTab({
             <div className="create-activity__form-row create-activity__form-row--two">
               <RadioGroup
                 className="radio-group--opex-capex"
-                disabled={isReadOnly}
+                disabled={isDrawerReadOnly}
                 error={formErrors.opexCapex}
                 label="Opex/Capex"
                 name={`${uid}-opex-capex`}
@@ -1793,7 +1827,7 @@ export function ProcurementTab({
               />
               <RadioGroup
                 className="radio-group--strategic-plan"
-                disabled={isReadOnly}
+                disabled={isDrawerReadOnly}
                 error={formErrors.alignedStrategicPlan}
                 label="Aligned with Strategic Plan"
                 name={`${uid}-strategic-plan`}
@@ -1806,7 +1840,7 @@ export function ProcurementTab({
 
             <RadioGroup
               className="radio-group--outcome"
-              disabled={isReadOnly}
+              disabled={isDrawerReadOnly}
               error={formErrors.outcome}
               label="Outcome"
               name={`${uid}-outcome`}
@@ -1818,7 +1852,7 @@ export function ProcurementTab({
 
             <div className="create-activity__form-row create-activity__form-row--two">
               <Select
-                disabled={isReadOnly}
+                disabled={isDrawerReadOnly}
                 id={`${uid}-category-description`}
                 label="Category Description"
                 onChange={(value) => handleFieldChange({ categoryDescription: value })}
@@ -1855,7 +1889,7 @@ export function ProcurementTab({
 
             <div className="edit-activity__procurement-drawer-section">
               <Textarea
-                disabled={isReadOnly}
+                disabled={isDrawerReadOnly}
                 error={formErrors.endUserComments}
                 label="End User Comments"
                 onChange={(e) => handleFieldChange({ endUserComments: e.target.value })}
@@ -1865,7 +1899,7 @@ export function ProcurementTab({
               />
 
               <Textarea
-                disabled={isReadOnly}
+                disabled={isDrawerReadOnly}
                 error={formErrors.itemServiceDescription}
                 label="Item/Service Description"
                 onChange={(e) => handleFieldChange({ itemServiceDescription: e.target.value })}
@@ -1876,7 +1910,7 @@ export function ProcurementTab({
 
               <div className="create-activity__form-row create-activity__form-row--two">
                 <CurrencyInput
-                  disabled={isReadOnly}
+                  disabled={isDrawerReadOnly}
                   error={formErrors.totalEstimatedValue}
                   label="Total Activity Estimated Value"
                   onBlur={() => handleCurrencyBlur('totalEstimatedValue')}
@@ -1885,7 +1919,7 @@ export function ProcurementTab({
                   value={form.totalEstimatedValue}
                 />
                 <CurrencyInput
-                  disabled={isReadOnly}
+                  disabled={isDrawerReadOnly}
                   error={formErrors.prExpectedValue2026}
                   label="PR Expected Value in 2026"
                   onBlur={() => handleCurrencyBlur('prExpectedValue2026')}
@@ -1896,7 +1930,7 @@ export function ProcurementTab({
               </div>
 
               <Input
-                disabled={isReadOnly}
+                disabled={isDrawerReadOnly}
                 error={formErrors.expectedContractDuration}
                 hint="Duration in months"
                 label="Expected Contract Duration (in months)"
@@ -1923,7 +1957,7 @@ export function ProcurementTab({
 
               <div className="create-activity__form-row create-activity__form-row--two">
                 <DatePicker
-                  disabled={isReadOnly}
+                  disabled={isDrawerReadOnly}
                   error={formErrors.plannedPrCreationDate}
                   id={`${uid}-pr-creation-date`}
                   label="Planned PR Creation Date"
@@ -1943,7 +1977,7 @@ export function ProcurementTab({
 
               <div className="create-activity__form-row create-activity__form-row--two">
                 <DatePicker
-                  disabled={isReadOnly}
+                  disabled={isDrawerReadOnly}
                   error={formErrors.expectedAwardingDate}
                   id={`${uid}-awarding-date`}
                   label="Expected Awarding Date"

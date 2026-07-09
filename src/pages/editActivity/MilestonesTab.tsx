@@ -146,6 +146,7 @@ interface MilestonesTabProps {
   isReadOnly?: boolean
   canEditExecutionFieldsOnly?: boolean
   isAdeoVisible: boolean
+  onActivityDataChanged?: () => void
   onProjectRelatedChangesChange?: (relatedChanges: string) => void
   projectId: string
   projectRelatedChanges?: string | null
@@ -241,6 +242,20 @@ function getQuarterBadgeClass(quarter: string) {
   const quarterKey = quarter.replace(/\s+/g, '-').toLowerCase()
 
   return `edit-activity__milestone-quarter-badge edit-activity__milestone-quarter-badge--${quarterKey}`
+}
+
+function getQuarterNumber(quarter?: string | null) {
+  const match = String(quarter ?? '').match(/[1-4]/)
+  return match ? Number(match[0]) : 0
+}
+
+function getCurrentQuarterNumber() {
+  return Math.floor(new Date().getMonth() / 3) + 1
+}
+
+function isFutureQuarter(quarter?: string | null) {
+  const quarterNumber = getQuarterNumber(quarter)
+  return quarterNumber > 0 && quarterNumber > getCurrentQuarterNumber()
 }
 
 function buildMilestoneCreatePayload(
@@ -351,6 +366,7 @@ export function MilestonesTab({
   isReadOnly = false,
   canEditExecutionFieldsOnly = false,
   isAdeoVisible,
+  onActivityDataChanged,
   onProjectRelatedChangesChange,
   projectId,
   projectRelatedChanges,
@@ -644,6 +660,10 @@ export function MilestonesTab({
   async function handleSave() {
     if (isReadOnly && !canEditExecutionFieldsOnly) return
     if (canEditExecutionFieldsOnly && !editingMilestone) return
+    if (isExecutionPhase && editingMilestone && isFutureQuarter(form.quarter)) {
+      setError('This milestone is scheduled for a future quarter. Execution updates are locked until that quarter starts.')
+      return
+    }
     if (!validate()) return
     if (!projectId) {
       setError('Activity id is missing from the edit URL.')
@@ -708,6 +728,7 @@ export function MilestonesTab({
       if (!isExecutionPhase) {
         await loadMilestones()
       }
+      onActivityDataChanged?.()
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Unable to save milestone.')
     } finally {
@@ -727,6 +748,7 @@ export function MilestonesTab({
       setMilestones((prev) => prev.filter((m) => m.id !== milestoneToDelete.id))
       setMilestoneToDelete(null)
       setNotice('Milestone deleted successfully.')
+      onActivityDataChanged?.()
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : 'Unable to delete milestone.')
     } finally {
@@ -945,8 +967,9 @@ export function MilestonesTab({
   function renderDrawerForm() {
     const title = editingMilestone ? 'Edit Milestone' : 'Create Milestone'
     const showExecutionFields = isExecutionPhase && Boolean(editingMilestone)
-    const canEditExecutionSection = !isReadOnly || (canEditExecutionFieldsOnly && showExecutionFields)
-    const isBaseSectionReadOnly = isReadOnly || canEditExecutionFieldsOnly
+    const isFutureQuarterLocked = showExecutionFields && isFutureQuarter(form.quarter)
+    const canEditExecutionSection = (!isReadOnly || (canEditExecutionFieldsOnly && showExecutionFields)) && !isFutureQuarterLocked
+    const isBaseSectionReadOnly = isReadOnly || canEditExecutionFieldsOnly || isFutureQuarterLocked
     const requiresCancellationReason = form.executionStatus === EXECUTION_STATUS_REQUIRES_CANCELLATION_REASON
     const requiresExecutionJustification = Boolean(
       form.executionStatus && EXECUTION_STATUS_REQUIRES_JUSTIFICATION.has(form.executionStatus),
@@ -968,6 +991,12 @@ export function MilestonesTab({
         title={title}
       >
         <div className="edit-activity__milestones-drawer">
+          {isFutureQuarterLocked ? (
+            <div className="create-activity__notice create-activity__notice--warning">
+              This milestone is scheduled for a future quarter. You can review the details now, but execution updates will be enabled when that quarter starts.
+            </div>
+          ) : null}
+
           <div className="edit-activity__procurement-section">
             <div className="create-activity__section-header">
               <div className="create-activity__section-header-inner">
