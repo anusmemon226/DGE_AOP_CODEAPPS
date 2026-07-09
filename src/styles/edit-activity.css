@@ -4578,7 +4578,7 @@
   display: grid;
   gap: 0.45rem;
   grid-template-columns: 4rem minmax(0, 1fr);
-  padding: 1.85rem 1rem 1rem 0;
+  padding: 1.85rem 1rem 1rem 0.5rem;
 }
 
 .edit-activity__execution-budget-monthly-y-axis {

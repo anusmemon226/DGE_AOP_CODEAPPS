@@ -98,6 +98,12 @@ export function ActivityInfoTab({
   const requiresActivityStatusJustification = Boolean(
     form.activityStatus && EXECUTION_ACTIVITY_STATUS_REQUIRES_JUSTIFICATION.has(form.activityStatus),
   )
+  const executionActivityStatusOptions = useMemo(() => (
+    EXECUTION_ACTIVITY_STATUS_OPTIONS.map((option) => ({
+      ...option,
+      disabled: showExecutionTracking && option.value === '776140007',
+    }))
+  ), [showExecutionTracking])
 
   // ── Guidance Panel ──
   const guidancePanel = useMemo(() => {
@@ -334,7 +340,7 @@ export function ActivityInfoTab({
                   label="Activity Status"
                   name="activity-status"
                   onChange={(value) => updateForm({ activityStatus: value as ActivityForm['activityStatus'] })}
-                  options={EXECUTION_ACTIVITY_STATUS_OPTIONS}
+                  options={executionActivityStatusOptions}
                   required
                   value={form.activityStatus}
                 />
@@ -675,6 +681,7 @@ export function ActivityInfoTab({
     requiresActivityStatusJustification,
     isReadOnly,
     canEditField,
+    executionActivityStatusOptions,
     handleDependencyCountChange,
   ])
 

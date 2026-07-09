@@ -25,9 +25,21 @@ import {
   type Dga_aop_project_milestone_detailses,
   type Dga_aop_project_milestone_detailsesBase,
 } from '../../generated/models/Dga_aop_project_milestone_detailsesModel'
+import type { Dga_aop_projectsesBase } from '../../generated/models/Dga_aop_projectsesModel'
 import { Dga_aop_project_milestone_detailsesService } from '../../generated/services/Dga_aop_project_milestone_detailsesService'
+import { Dga_aop_projectsesService } from '../../generated/services/Dga_aop_projectsesService'
 import { formatDateDisplay } from '../../utils/formatting'
 import { getQuarter } from './helpers/sharedHelpers'
+import {
+  cleanRecordId,
+  getProjectRelatedChangeAt,
+  isEmptyRelatedValue,
+  parseProjectRelatedChanges,
+  relatedOldValue,
+  resolveProjectRelatedValue,
+  stringifyMergedProjectRelatedChanges,
+  type ProjectRelatedChanges,
+} from './helpers/projectRelatedChanges'
 
 // ── Types ──
 
@@ -134,7 +146,9 @@ interface MilestonesTabProps {
   isReadOnly?: boolean
   canEditExecutionFieldsOnly?: boolean
   isAdeoVisible: boolean
+  onProjectRelatedChangesChange?: (relatedChanges: string) => void
   projectId: string
+  projectRelatedChanges?: string | null
 }
 
 function getOperationErrorMessage(result: unknown, fallbackMessage: string) {
@@ -270,6 +284,66 @@ function buildMilestoneUpdatePayload(form: MilestoneFormData): Partial<Omit<Dga_
   }
 }
 
+function getMilestoneRelatedValue(
+  relatedChanges: string | null | undefined,
+  milestoneId: string,
+  fieldName: string,
+): unknown {
+  return resolveProjectRelatedValue(getProjectRelatedChangeAt(
+    parseProjectRelatedChanges(relatedChanges),
+    ['milestones', 'by_record', cleanRecordId(milestoneId), fieldName],
+  ))
+}
+
+function buildMilestoneFormFromRelatedChanges(
+  relatedChanges: string | null | undefined,
+  milestone: Milestone,
+): MilestoneFormData {
+  const value = (fieldName: string) => getMilestoneRelatedValue(relatedChanges, milestone.id, fieldName)
+
+  return {
+    name: milestone.name,
+    plannedStartDate: milestone.plannedStartDate,
+    plannedEndDate: milestone.plannedEndDate,
+    actualStartDate: isEmptyRelatedValue(value('dga_actual_start_date')) ? milestone.actualStartDate : String(value('dga_actual_start_date')),
+    actualEndDate: isEmptyRelatedValue(value('dga_actual_end_date')) ? milestone.actualEndDate : String(value('dga_actual_end_date')),
+    actualProgress: isEmptyRelatedValue(value('dga_actual_progress')) ? milestone.actualProgress : String(value('dga_actual_progress')),
+    cancellationReason: isEmptyRelatedValue(value('dga_cancellation_reason')) ? milestone.cancellationReason : String(value('dga_cancellation_reason')),
+    executionJustification: isEmptyRelatedValue(value('dga_justification')) ? milestone.executionJustification : String(value('dga_justification')),
+    executionStatus: isEmptyRelatedValue(value('statuscode')) ? milestone.executionStatus : String(value('statuscode')) as ExecutionMilestoneStatusValue,
+    quarter: milestone.quarter,
+    status: milestone.status,
+    assignee: milestone.assignee,
+    weightage: milestone.weightage,
+    makhrajAlMarhala: milestone.makhrajAlMarhala,
+    marhalaAlMashroua: milestone.marhalaAlMashroua || '\u200B',
+    description: milestone.description,
+  }
+}
+
+function buildMilestoneRelatedChanges(
+  milestone: Milestone,
+  form: MilestoneFormData,
+  uploadedFile: UploadedFile | null,
+): ProjectRelatedChanges {
+  return {
+    milestones: {
+      by_record: {
+        [cleanRecordId(milestone.id)]: {
+          name: milestone.name,
+          dga_actual_start_date: relatedOldValue(form.actualStartDate),
+          dga_actual_end_date: relatedOldValue(form.actualEndDate),
+          statuscode: relatedOldValue(form.executionStatus ? Number(form.executionStatus) : ''),
+          dga_actual_progress: relatedOldValue(form.actualProgress ? Number(form.actualProgress) : ''),
+          dga_cancellation_reason: relatedOldValue(form.cancellationReason),
+          dga_justification: relatedOldValue(form.executionJustification),
+          uploaded_file: relatedOldValue(uploadedFile?.name ?? ''),
+        },
+      },
+    },
+  }
+}
+
 export function MilestonesTab({
   activityPlannedEndDate,
   activityPlannedStartDate,
@@ -277,7 +351,9 @@ export function MilestonesTab({
   isReadOnly = false,
   canEditExecutionFieldsOnly = false,
   isAdeoVisible,
+  onProjectRelatedChangesChange,
   projectId,
+  projectRelatedChanges,
 }: MilestonesTabProps) {
   // ── Data state ──
   const [milestones, setMilestones] = useState<Milestone[]>([])
@@ -287,6 +363,7 @@ export function MilestonesTab({
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [viewMode, setViewMode] = useState<'list' | 'quarter'>('list')
+  const [localProjectRelatedChanges, setLocalProjectRelatedChanges] = useState<{ projectId: string; value: string } | null>(null)
 
   // ── CRUD state ──
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
@@ -296,6 +373,9 @@ export function MilestonesTab({
   const [milestoneToDelete, setMilestoneToDelete] = useState<Milestone | null>(null)
   const [uploadedFile, setUploadedFile] = useState<UploadedFile | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const effectiveProjectRelatedChanges = localProjectRelatedChanges?.projectId === projectId
+    ? localProjectRelatedChanges.value
+    : projectRelatedChanges ?? ''
 
   const loadMilestones = useCallback(async () => {
     if (!projectId) {
@@ -433,24 +513,7 @@ export function MilestonesTab({
 
   function handleOpenEdit(milestone: Milestone) {
     setEditingMilestone(milestone)
-    setForm({
-      name: milestone.name,
-      plannedStartDate: milestone.plannedStartDate,
-      plannedEndDate: milestone.plannedEndDate,
-      quarter: milestone.quarter,
-      actualStartDate: milestone.actualStartDate,
-      actualEndDate: milestone.actualEndDate,
-      actualProgress: milestone.actualProgress,
-      cancellationReason: milestone.cancellationReason,
-      executionJustification: milestone.executionJustification,
-      executionStatus: milestone.executionStatus,
-      status: milestone.status,
-      assignee: milestone.assignee,
-      weightage: milestone.weightage,
-      makhrajAlMarhala: milestone.makhrajAlMarhala,
-      marhalaAlMashroua: milestone.marhalaAlMashroua || '\u200B',
-      description: milestone.description,
-    })
+    setForm(buildMilestoneFormFromRelatedChanges(effectiveProjectRelatedChanges, milestone))
     setUploadedFile(null)
     setFormErrors({})
     setError('')
@@ -592,7 +655,41 @@ export function MilestonesTab({
     setNotice('')
 
     try {
-      if (editingMilestone) {
+      if (editingMilestone && isExecutionPhase) {
+        const projectResult = await Dga_aop_projectsesService.get(projectId, {
+          select: ['dga_project_related_changes'],
+        })
+        assertOperationSuccess(projectResult, 'Unable to load activity change tracking.')
+
+        const nextRelatedChanges = stringifyMergedProjectRelatedChanges(
+          projectResult.data?.dga_project_related_changes,
+          buildMilestoneRelatedChanges(editingMilestone, form, uploadedFile),
+        )
+        const result = await Dga_aop_projectsesService.update(projectId, {
+          dga_project_related_changes: nextRelatedChanges,
+        } as Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>>)
+        assertOperationSuccess(result, 'Unable to update milestone execution changes.')
+
+        setLocalProjectRelatedChanges({ projectId, value: nextRelatedChanges })
+        onProjectRelatedChangesChange?.(nextRelatedChanges)
+        setMilestones((current) =>
+          current.map((milestone) =>
+            milestone.id === editingMilestone.id
+              ? {
+                  ...milestone,
+                  actualStartDate: form.actualStartDate,
+                  actualEndDate: form.actualEndDate,
+                  actualProgress: form.actualProgress,
+                  cancellationReason: form.cancellationReason,
+                  executionJustification: form.executionJustification,
+                  executionStatus: form.executionStatus,
+                  status: statusCodeToUi(form.executionStatus ? Number(form.executionStatus) : undefined),
+                }
+              : milestone,
+          ),
+        )
+        setNotice('Milestone execution changes updated successfully.')
+      } else if (editingMilestone) {
         const result = await Dga_aop_project_milestone_detailsesService.update(
           editingMilestone.id,
           buildMilestoneUpdatePayload({ ...form, quarter: calculateQuarter(form) }),
@@ -608,7 +705,9 @@ export function MilestonesTab({
       }
 
       handleCloseDrawer()
-      await loadMilestones()
+      if (!isExecutionPhase) {
+        await loadMilestones()
+      }
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Unable to save milestone.')
     } finally {

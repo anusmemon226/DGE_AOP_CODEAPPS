@@ -1,7 +1,5 @@
-import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
-import { jsPDF } from 'jspdf'
-import autoTable from 'jspdf-autotable'
-import { Bot, Check, CheckCircle2, ClipboardList, Download, FileText, Lightbulb, LockKeyhole, Paperclip, RefreshCcw, Save, Send, Sparkles, Trash2, WandSparkles } from 'lucide-react'
+import { useEffect, useState, type ChangeEvent } from 'react'
+import { Bot, Check, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, FileSpreadsheet, FileText, Lightbulb, LockKeyhole, Paperclip, RefreshCcw, Save, Send, Sparkles, Trash2, UploadCloud, WandSparkles } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import {
@@ -119,22 +117,73 @@ type CopilotAttachment = {
   file: File
 }
 
-type OutputFormat = 'pdf' | 'csv'
-
-type GeneratedOutputFile = {
-  contentBytes: string
-  format: OutputFormat
-  mimeType: string
-  name: string
-  tableCount: number
-}
-
 type RetrieveAopProjectDataFromExcelInput = {
   file?: {
     name?: string
     contentBytes?: string
     mimeType?: string
   }
+}
+
+type AiImportPhase = 'idle' | 'uploaded' | 'processing' | 'ready' | 'error'
+
+type AiMappingSection = 'project' | 'milestones' | 'procurements' | 'dependencies' | 'budgets' | 'engagementPlans'
+
+type AiHeaderMapping = {
+  logical_name: string
+  matched_header: string
+  status: string
+}
+
+type AiMappingBySection = Partial<Record<AiMappingSection, AiHeaderMapping[]>>
+
+type AiMappingResponse = {
+  source?: string
+  mapping?: AiMappingBySection
+  notes?: string[]
+}
+
+type AiImportedChildRecord = {
+  fields: Record<string, string>
+  id: string
+  section: Exclude<AiMappingSection, 'project'>
+  title: string
+}
+
+type AiImportedActivityPreview = {
+  children: Record<Exclude<AiMappingSection, 'project'>, AiImportedChildRecord[]>
+  dataQuality: {
+    detectedFields: number
+    missingFields: number
+    unmatchedRecords: number
+  }
+  id: string
+  projectFields: Record<string, string>
+  rowIndex: number
+  sheetName: string
+  sourceTable: number
+  title: string
+  warnings: string[]
+}
+
+type ParsedWorkbookTable = ExcelTableRegion & {
+  section: AiMappingSection | 'unknown'
+  verticalKeyValue: boolean
+}
+
+type ParsedProjectRecord = {
+  fields: Record<string, string>
+  id: string
+  rowIndex: number
+  sheetName: string
+  sourceTable: number
+}
+
+type ParsedChildRecord = AiImportedChildRecord & {
+  projectKey: string
+  rowIndex: number
+  sheetName: string
+  sourceTable: number
 }
 
 const INITIAL_FORM: CreateActivityForm = {
@@ -198,20 +247,55 @@ const YES_NO_OPTIONS = [
   { label: 'No', value: '0', className: 'choice--no' },
 ] as const satisfies SelectOption<YesNoValue | ''>[]
 
-const COPILOT_PROMPTS = [
-  'New digital service initiative starting Q3',
-  'Operational activity for internal process improvement',
-  'Payment-only activity for existing contract',
-  'What should I include for ADEO reporting?',
-] as const
-
 const MAX_ATTACHMENT_SIZE = 8 * 1024 * 1024
 const EXCEL_XLSX_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-const PDF_MIME_TYPE = 'application/pdf'
 const CSV_MIME_TYPE = 'text/csv'
 const EXCEL_UPLOAD_ERROR = 'Only Excel .xlsx files are supported for AI draft generation.'
 const NO_TABLES_FOUND_ERROR = 'No table data was found in the uploaded Excel file.'
 const MIN_TABLE_NON_EMPTY_CELLS = 3
+const AI_IMPORT_SECTIONS: AiMappingSection[] = ['project', 'milestones', 'procurements', 'dependencies', 'budgets', 'engagementPlans']
+const AI_CHILD_SECTIONS: Array<Exclude<AiMappingSection, 'project'>> = ['milestones', 'procurements', 'dependencies', 'budgets', 'engagementPlans']
+const AI_SECTION_LABELS: Record<AiMappingSection, string> = {
+  project: 'Activity Details',
+  milestones: 'Milestones',
+  procurements: 'Procurements',
+  dependencies: 'Dependencies',
+  budgets: 'Budgets',
+  engagementPlans: 'Engagement Plans',
+}
+const AI_SECTION_ALIASES: Record<AiMappingSection, string[]> = {
+  project: ['project details', 'project summary', 'projects', 'project', 'activity details', 'activity'],
+  milestones: ['milestones', 'milestone'],
+  procurements: ['procurements', 'procurement', 'procurement plans', 'procurement plan'],
+  dependencies: ['dependencies', 'dependency'],
+  budgets: ['budgets', 'budget', 'monthly budget plan', 'monthly budgets', 'aop monthly budgets'],
+  engagementPlans: ['engagement plans', 'engagement plan', 'engagements', 'engagement'],
+}
+const AI_LOGICAL_SECTION_HINTS: Record<AiMappingSection, string[]> = {
+  project: ['dga_project_name', 'dga_activity_type', 'dga_project_phase', 'dga_sector', 'dga_department', 'dga_activity_lead'],
+  milestones: ['dga_weightage', 'dga_milestone_description', 'dga_actual_start_date'],
+  procurements: ['dga_pr_ticket_number', 'dga_purchase_request_raising_by_quarter', 'dga_expected_awarding_by_quarter', 'dga_item_service_description'],
+  dependencies: ['dga_type_of_support', 'dga_date_of_support', 'dga_name_of_external_entity'],
+  budgets: ['dga_planned_budget'],
+  engagementPlans: ['dga_engagement_type', 'dga_sub_type', 'dga_type_of_activity'],
+}
+const AI_PREVIEW_FIELD_LABELS: Record<string, string> = {
+  dga_activity_lead: 'Activity Lead',
+  dga_activity_type: 'Activity Type',
+  dga_adeo_review_required: 'ADEO Required',
+  dga_department: 'Division',
+  dga_does_this_project_require_procurement: 'Procurement Required',
+  dga_doesthisprojectrequirebudgetallocation: 'Budget Required',
+  dga_name: 'Name',
+  dga_planned_budget: 'Planned Budget',
+  dga_planned_end_date: 'Planned End Date',
+  dga_planned_start_date: 'Planned Start Date',
+  dga_project_name: 'Activity Name',
+  dga_project_phase: 'Project Phase',
+  dga_project_type: 'Project Type',
+  dga_sector: 'Sector',
+  dga_strategic_vs_operation: 'Scope',
+}
 
 type ExcelTableRegion = {
   columns: string[]
@@ -328,6 +412,19 @@ function isBlankRow(row: unknown[]) {
   return row.every(isBlankCell)
 }
 
+function getNonEmptyCellCount(row: unknown[]) {
+  return row.filter((cell) => !isBlankCell(cell)).length
+}
+
+function isPlaceholderDataRow(row: string[]) {
+  const normalizedValues = row.map(normalizeHeader).filter(Boolean)
+  const joined = normalizedValues.join(' ')
+
+  return normalizedValues.length === 0 ||
+    joined.includes('no records provided') ||
+    joined.includes('total planned budget')
+}
+
 function getColumnLabel(index: number) {
   let label = ''
   let value = index + 1
@@ -365,7 +462,126 @@ function getContiguousBands(indices: number[]) {
   return bands
 }
 
-function getTableRegionsFromSheet(sheetName: string, sheet: XLSX.WorkSheet): ExcelTableRegion[] {
+function getSectionFromLabel(value: string): AiMappingSection | 'unknown' {
+  const normalizedValue = normalizeHeader(value)
+
+  for (const section of AI_IMPORT_SECTIONS) {
+    if (AI_SECTION_ALIASES[section].some((alias) => normalizedValue.includes(alias))) {
+      return section
+    }
+  }
+
+  return 'unknown'
+}
+
+function getSectionBeforeRow(rows: string[][], rowIndex: number): AiMappingSection | 'unknown' {
+  for (let index = rowIndex - 1; index >= 0; index -= 1) {
+    const row = rows[index]
+    const firstValue = row.find((cell) => !isBlankCell(cell)) ?? ''
+    const section = getSectionFromLabel(firstValue)
+
+    if (section !== 'unknown') {
+      return section
+    }
+  }
+
+  return 'unknown'
+}
+
+function inferSectionFromHeaderRow(headerRow: string[], fallbackSection: AiMappingSection | 'unknown') {
+  if (fallbackSection !== 'unknown') {
+    return fallbackSection
+  }
+
+  const normalizedHeaders = headerRow.map(normalizeHeader).filter(Boolean)
+
+  for (const section of AI_IMPORT_SECTIONS) {
+    if (AI_LOGICAL_SECTION_HINTS[section].some((hint) => normalizedHeaders.includes(hint))) {
+      return section
+    }
+  }
+
+  if (normalizedHeaders.includes('month') && normalizedHeaders.includes('planned budget')) {
+    return 'budgets'
+  }
+
+  for (const section of AI_IMPORT_SECTIONS) {
+    if (AI_SECTION_ALIASES[section].some((alias) => normalizedHeaders.some((header) => header.includes(alias)))) {
+      return section
+    }
+  }
+
+  if (normalizedHeaders.includes('field') && normalizedHeaders.includes('value')) {
+    return 'project'
+  }
+
+  return 'unknown'
+}
+
+function isFieldValueHeader(row: string[]) {
+  return normalizeHeader(row[0] ?? '') === 'field' && normalizeHeader(row[1] ?? '') === 'value'
+}
+
+function getTablesFromBlock(blockRows: string[][], sheetName: string, startingTableNumber: number): ParsedWorkbookTable[] {
+  const tables: ParsedWorkbookTable[] = []
+  const rows = blockRows.filter((row) => !isBlankRow(row))
+  const fieldValueIndex = rows.findIndex(isFieldValueHeader)
+
+  if (fieldValueIndex >= 0) {
+    const section = getSectionBeforeRow(rows, fieldValueIndex)
+    const dataRows = rows
+      .slice(fieldValueIndex + 1)
+      .filter((row) => !isPlaceholderDataRow(row) && !isBlankCell(row[0]) && !isBlankCell(row[1]))
+
+    if (dataRows.length > 0) {
+      tables.push({
+        columns: ['Field', 'Value'],
+        rows: dataRows.map((row) => [row[0], row[1]]),
+        section: section === 'unknown' ? 'project' : section,
+        sheetName,
+        tableNumber: startingTableNumber,
+        verticalKeyValue: true,
+      })
+    }
+
+    return tables
+  }
+
+  const headerIndex = rows.findIndex((row, index) => {
+    if (getNonEmptyCellCount(row) < 2 || isPlaceholderDataRow(row)) {
+      return false
+    }
+
+    const section = inferSectionFromHeaderRow(row, getSectionBeforeRow(rows, index))
+
+    return section !== 'unknown' || row.some((cell) => normalizeHeader(cell).startsWith('dga_'))
+  })
+
+  if (headerIndex < 0) {
+    return tables
+  }
+
+  const columns = rows[headerIndex].map((value, index) => value || getColumnLabel(index))
+  const section = inferSectionFromHeaderRow(columns, getSectionBeforeRow(rows, headerIndex))
+  const dataRows = rows
+    .slice(headerIndex + 1)
+    .filter((row) => !isPlaceholderDataRow(row))
+
+  if (section !== 'unknown' && dataRows.length > 0) {
+    tables.push({
+      columns,
+      rows: dataRows,
+      section,
+      sheetName,
+      tableNumber: startingTableNumber,
+      verticalKeyValue: false,
+    })
+  }
+
+  return tables
+}
+
+function getTableRegionsFromSheet(sheetName: string, sheet: XLSX.WorkSheet): ParsedWorkbookTable[] {
   const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
     blankrows: true,
     defval: '',
@@ -401,7 +617,7 @@ function getTableRegionsFromSheet(sheetName: string, sheet: XLSX.WorkSheet): Exc
     rowBands.push([bandStart, normalizedRows.length - 1])
   }
 
-  const detectedTables: ExcelTableRegion[] = []
+  const detectedTables: ParsedWorkbookTable[] = []
 
   rowBands.forEach(([startRow, endRow]) => {
     const usedColumnIndices = Array.from({ length: maxColumnCount }, (_, columnIndex) => columnIndex)
@@ -422,104 +638,21 @@ function getTableRegionsFromSheet(sheetName: string, sheet: XLSX.WorkSheet): Exc
         .filter((row) => !isBlankRow(row))
       const nonEmptyCellCount = tableRows.flat().filter((cell) => !isBlankCell(cell)).length
 
-      if (tableRows.length < 2 || tableRows[0].length < 2 || nonEmptyCellCount < MIN_TABLE_NON_EMPTY_CELLS) {
+      if (tableRows.length < 2 || nonEmptyCellCount < MIN_TABLE_NON_EMPTY_CELLS) {
         return
       }
 
-      const [headerRow, ...bodyRows] = tableRows
-      const columns = headerRow.map((value, index) => value || getColumnLabel(index))
-
-      detectedTables.push({
-        columns,
-        rows: bodyRows,
-        sheetName,
-        tableNumber: detectedTables.length + 1,
-      })
+      detectedTables.push(...getTablesFromBlock(tableRows, sheetName, detectedTables.length + 1))
     })
   })
 
   return detectedTables
 }
 
-function buildPdfFileName(excelFileName: string) {
-  const baseName = excelFileName.replace(/\.xlsx$/i, '').trim() || 'aop-project-data'
-
-  return `${baseName}.pdf`
-}
-
 function buildCsvFileName(excelFileName: string) {
   const baseName = excelFileName.replace(/\.xlsx$/i, '').trim() || 'aop-project-data'
 
   return `${baseName}.csv`
-}
-
-function generateTablesPdfBase64(fileName: string, tables: ExcelTableRegion[]) {
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' })
-  const pageWidth = doc.internal.pageSize.getWidth()
-  const pageHeight = doc.internal.pageSize.getHeight()
-  const marginX = 36
-  let cursorY = 42
-
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(16)
-  doc.text('AOP Project Data Extract', marginX, cursorY)
-  cursorY += 20
-
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
-  doc.setTextColor(90, 105, 130)
-  doc.text(`Source Excel: ${fileName}`, marginX, cursorY)
-  cursorY += 24
-
-  tables.forEach((table, index) => {
-    if (cursorY > pageHeight - 100) {
-      doc.addPage()
-      cursorY = 42
-    }
-
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(11)
-    doc.setTextColor(17, 24, 39)
-    doc.text(`${table.sheetName} - Table ${table.tableNumber}`, marginX, cursorY)
-    cursorY += 10
-
-    autoTable(doc, {
-      body: table.rows,
-      head: [table.columns],
-      margin: { bottom: 34, left: marginX, right: marginX, top: 34 },
-      pageBreak: 'auto',
-      showHead: 'everyPage',
-      startY: cursorY,
-      styles: {
-        cellPadding: 4,
-        font: 'helvetica',
-        fontSize: 7.5,
-        overflow: 'linebreak',
-        textColor: [17, 24, 39],
-        valign: 'middle',
-      },
-      headStyles: {
-        fillColor: [235, 239, 255],
-        fontStyle: 'bold',
-        textColor: [55, 94, 251],
-      },
-      alternateRowStyles: {
-        fillColor: [248, 250, 252],
-      },
-      tableWidth: pageWidth - marginX * 2,
-      theme: 'grid',
-    })
-
-    const lastAutoTable = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable
-    cursorY = (lastAutoTable?.finalY ?? cursorY) + 22
-
-    if (index < tables.length - 1 && cursorY > pageHeight - 90) {
-      doc.addPage()
-      cursorY = 42
-    }
-  })
-
-  return doc.output('datauristring').split(',')[1] ?? ''
 }
 
 function escapeCsvValue(value: string) {
@@ -572,34 +705,297 @@ async function extractExcelTables(file: File) {
   return tables
 }
 
-async function convertExcelFile(file: File, format: OutputFormat): Promise<GeneratedOutputFile> {
+async function convertExcelFileToCsv(file: File) {
   const tables = await extractExcelTables(file)
-  const contentBytes = format === 'pdf'
-    ? generateTablesPdfBase64(file.name, tables)
-    : generateTablesCsvBase64(tables)
+  const contentBytes = generateTablesCsvBase64(tables)
 
   if (!contentBytes) {
-    throw new Error(`Unable to generate a ${format.toUpperCase()} from the uploaded Excel file. Please try again.`)
+    throw new Error('Unable to generate a CSV from the uploaded Excel file. Please try again.')
   }
 
   return {
     contentBytes,
-    format,
-    mimeType: format === 'pdf' ? PDF_MIME_TYPE : CSV_MIME_TYPE,
-    name: format === 'pdf' ? buildPdfFileName(file.name) : buildCsvFileName(file.name),
-    tableCount: tables.length,
+    mimeType: CSV_MIME_TYPE,
+    name: buildCsvFileName(file.name),
+    tables,
   }
 }
 
-function base64ToBlob(base64: string, mimeType: string) {
-  const binary = window.atob(base64)
-  const bytes = new Uint8Array(binary.length)
+function unwrapOperationData(result: unknown): unknown {
+  const shaped = result as { data?: unknown; value?: unknown; result?: unknown; output?: unknown }
 
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index)
+  return shaped.data ?? shaped.value ?? shaped.result ?? result
+}
+
+function extractAiOutputText(result: unknown): string {
+  let data = unwrapOperationData(result)
+
+  if (typeof (data as { success?: unknown })?.success === 'string') {
+    try {
+      data = JSON.parse((data as { success: string }).success)
+    } catch {
+      return (data as { success: string }).success
+    }
   }
 
-  return new Blob([bytes], { type: mimeType })
+  if (typeof data === 'string') {
+    try {
+      data = JSON.parse(data)
+    } catch {
+      return String(data)
+    }
+  }
+
+  const output = (data as { output?: unknown })?.output
+
+  if (Array.isArray(output)) {
+    for (const item of output) {
+      const content = (item as { content?: unknown })?.content
+
+      if (!Array.isArray(content)) {
+        continue
+      }
+
+      const textItem = content.find((entry) => typeof (entry as { text?: unknown })?.text === 'string')
+      const text = (textItem as { text?: string } | undefined)?.text
+
+      if (text) {
+        return text
+      }
+    }
+  }
+
+  const directText = (data as { text?: unknown; response?: unknown })?.text ?? (data as { response?: unknown })?.response
+
+  return typeof directText === 'string' ? directText : ''
+}
+
+function parseAiMappingResponse(result: unknown): AiMappingResponse {
+  const text = extractAiOutputText(result)
+
+  if (!text.trim()) {
+    throw new Error('AI Assistant response did not include mapping text.')
+  }
+
+  try {
+    return JSON.parse(text) as AiMappingResponse
+  } catch {
+    const jsonStart = text.indexOf('{')
+    const jsonEnd = text.lastIndexOf('}')
+
+    if (jsonStart >= 0 && jsonEnd > jsonStart) {
+      return JSON.parse(text.slice(jsonStart, jsonEnd + 1)) as AiMappingResponse
+    }
+
+    throw new Error('AI Assistant response could not be parsed into a header mapping.')
+  }
+}
+
+function normalizeHeader(value: string) {
+  return value.trim().replace(/\s+/g, ' ').toLowerCase()
+}
+
+function getFoundMappings(mapping: AiMappingBySection | undefined, section: AiMappingSection) {
+  return (mapping?.[section] ?? []).filter((item) => item.status === 'Found' && item.matched_header?.trim() && item.logical_name?.trim())
+}
+
+function getMissingMappingCount(mapping: AiMappingBySection | undefined) {
+  return AI_IMPORT_SECTIONS.reduce(
+    (count, section) => count + (mapping?.[section] ?? []).filter((item) => item.status !== 'Found' || !item.matched_header?.trim()).length,
+    0,
+  )
+}
+
+function getFoundMappingCount(mapping: AiMappingBySection | undefined) {
+  return AI_IMPORT_SECTIONS.reduce((count, section) => count + getFoundMappings(mapping, section).length, 0)
+}
+
+function getRowValueByHeader(table: ExcelTableRegion, row: string[], header: string) {
+  const targetHeader = normalizeHeader(header)
+  const columnIndex = table.columns.findIndex((column) => normalizeHeader(column) === targetHeader)
+
+  if (columnIndex < 0) {
+    return ''
+  }
+
+  return normalizeCellValue(row[columnIndex])
+}
+
+function getRowValueByMapping(table: ExcelTableRegion, row: string[], mapping: AiHeaderMapping) {
+  return getRowValueByHeader(table, row, mapping.matched_header) || getRowValueByHeader(table, row, mapping.logical_name)
+}
+
+function mapRowFields(table: ExcelTableRegion, row: string[], mappings: AiHeaderMapping[]) {
+  return mappings.reduce<Record<string, string>>((fields, mapping) => {
+    const value = getRowValueByMapping(table, row, mapping)
+
+    if (value) {
+      fields[mapping.logical_name] = value
+    }
+
+    return fields
+  }, {})
+}
+
+function mapVerticalFields(table: ExcelTableRegion, mappings: AiHeaderMapping[]) {
+  return mappings.reduce<Record<string, string>>((fields, mapping) => {
+    const valueRow = table.rows.find((row) => {
+      const key = normalizeHeader(row[0] ?? '')
+
+      return key === normalizeHeader(mapping.matched_header) || key === normalizeHeader(mapping.logical_name)
+    })
+    const value = normalizeCellValue(valueRow?.[1])
+
+    if (value) {
+      fields[mapping.logical_name] = value
+    }
+
+    return fields
+  }, {})
+}
+
+function mapTableRecordFields(table: ParsedWorkbookTable, row: string[], mappings: AiHeaderMapping[]) {
+  return table.verticalKeyValue ? mapVerticalFields(table, mappings) : mapRowFields(table, row, mappings)
+}
+
+function formatLogicalName(logicalName: string) {
+  return AI_PREVIEW_FIELD_LABELS[logicalName] ?? logicalName
+    .replace(/^dga_/, '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase())
+}
+
+function getChildTitle(section: Exclude<AiMappingSection, 'project'>, fields: Record<string, string>, fallbackIndex: number) {
+  if (fields.dga_name) {
+    return fields.dga_name
+  }
+
+  if (section === 'budgets' && fields.dga_name) {
+    return fields.dga_name
+  }
+
+  return `${AI_SECTION_LABELS[section]} ${fallbackIndex}`
+}
+
+function getProjectMatchKey(fields: Record<string, string>) {
+  return normalizeHeader(fields.dga_project_name || fields.dga_aop_project || fields.dga_name || '')
+}
+
+function createEmptyChildren(): AiImportedActivityPreview['children'] {
+  return {
+    budgets: [],
+    dependencies: [],
+    engagementPlans: [],
+    milestones: [],
+    procurements: [],
+  }
+}
+
+function buildImportedActivityPreviews(tables: ParsedWorkbookTable[], mappingResponse: AiMappingResponse): AiImportedActivityPreview[] {
+  const mapping = mappingResponse.mapping
+  const projectMappings = getFoundMappings(mapping, 'project')
+  const missingFields = getMissingMappingCount(mapping)
+  const projectRecords: ParsedProjectRecord[] = []
+  const childRecords: ParsedChildRecord[] = []
+
+  tables.forEach((table) => {
+    if (table.section === 'project') {
+      const rowsToMap = table.verticalKeyValue ? [table.rows[0] ?? []] : table.rows
+
+      rowsToMap.forEach((row, rowIndex) => {
+        const fields = mapTableRecordFields(table, row, projectMappings)
+
+        if (Object.values(fields).some(Boolean)) {
+          projectRecords.push({
+            fields,
+            id: `${table.sheetName}-${table.tableNumber}-${rowIndex}`,
+            rowIndex: rowIndex + 1,
+            sheetName: table.sheetName,
+            sourceTable: table.tableNumber,
+          })
+        }
+      })
+
+      return
+    }
+
+    if (!AI_CHILD_SECTIONS.includes(table.section as Exclude<AiMappingSection, 'project'>)) {
+      return
+    }
+
+    const section = table.section as Exclude<AiMappingSection, 'project'>
+    const mappings = getFoundMappings(mapping, section)
+    const rowsToMap = table.verticalKeyValue ? [table.rows[0] ?? []] : table.rows
+
+    rowsToMap.forEach((row, rowIndex) => {
+      const fields = mapTableRecordFields(table, row, mappings)
+
+      if (!Object.values(fields).some(Boolean)) {
+        return
+      }
+
+      childRecords.push({
+        fields,
+        id: `${table.sheetName}-${table.tableNumber}-${rowIndex}-${section}`,
+        projectKey: getProjectMatchKey(fields),
+        rowIndex: rowIndex + 1,
+        section,
+        sheetName: table.sheetName,
+        sourceTable: table.tableNumber,
+        title: getChildTitle(section, fields, childRecords.filter((record) => record.section === section).length + 1),
+      })
+    })
+  })
+
+  const previews = projectRecords.map<AiImportedActivityPreview>((record, index) => ({
+    children: createEmptyChildren(),
+    dataQuality: {
+      detectedFields: Object.keys(record.fields).length,
+      missingFields,
+      unmatchedRecords: 0,
+    },
+    id: record.id,
+    projectFields: record.fields,
+    rowIndex: record.rowIndex,
+    sheetName: record.sheetName,
+    sourceTable: record.sourceTable,
+    title: record.fields.dga_project_name ?? record.fields.dga_name ?? `AOP Activity ${index + 1}`,
+    warnings: [],
+  }))
+  const previewByProjectKey = new Map(previews.map((preview) => [getProjectMatchKey(preview.projectFields), preview]))
+  const unmatchedRecords: ParsedChildRecord[] = []
+
+  childRecords.forEach((record) => {
+    const targetPreview = record.projectKey
+      ? previewByProjectKey.get(record.projectKey)
+      : previews.length === 1
+        ? previews[0]
+        : undefined
+
+    if (targetPreview) {
+      targetPreview.children[record.section].push(record)
+      return
+    }
+
+    unmatchedRecords.push(record)
+  })
+
+  if (unmatchedRecords.length > 0 && previews.length > 0) {
+    previews[0].dataQuality.unmatchedRecords = unmatchedRecords.length
+    previews[0].warnings.push(`${unmatchedRecords.length} related record${unmatchedRecords.length === 1 ? '' : 's'} could not be matched to an activity.`)
+  }
+
+  previews.forEach((preview) => {
+    if (!preview.projectFields.dga_project_name) {
+      preview.warnings.push('Activity name was not detected.')
+    }
+
+    if (!preview.projectFields.dga_planned_start_date || !preview.projectFields.dga_planned_end_date) {
+      preview.warnings.push('Planned dates are incomplete.')
+    }
+  })
+
+  return previews
 }
 
 function getOptionLabel<TValue extends string>(options: readonly SelectOption<TValue>[], value: TValue | '') {
@@ -888,21 +1284,6 @@ async function assignActivityToDivisionMemberTeam(projectId: string, planningIns
   assertOperationSuccess(result, 'Activity was created, but owner assignment to the Division Member team failed.')
 }
 
-function getDraftWarnings(draft: CreateActivityForm) {
-  const warnings: string[] = []
-  const errors = validateForm(draft)
-
-  Object.entries(errors).forEach(([field, message]) => {
-    warnings.push(`${field}: ${message}`)
-  })
-
-  if (!draft.plannedStartDate || !draft.plannedEndDate) {
-    warnings.push('Dates were not inferred from the Copilot prompt. Add them before saving.')
-  }
-
-  return warnings
-}
-
 function resolveCreationContext({
   allHierarchies,
   currentRole,
@@ -1004,20 +1385,20 @@ export function CreateActivity() {
   const [createdProjectId, setCreatedProjectId] = useState('')
   const [creationWarning, setCreationWarning] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
-  const [copilotPrompt, setCopilotPrompt] = useState('')
-  const [copilotDraft, setCopilotDraft] = useState<CreateActivityForm | null>(null)
   const [attachments, setAttachments] = useState<CopilotAttachment[]>([])
   const [attachmentError, setAttachmentError] = useState('')
   const [isCopilotGenerating, setIsCopilotGenerating] = useState(false)
   const [copilotGenerationStatus, setCopilotGenerationStatus] = useState('')
-  const [selectedOutputFormat, setSelectedOutputFormat] = useState<OutputFormat | ''>('')
-  const [generatedOutputFile, setGeneratedOutputFile] = useState<GeneratedOutputFile | null>(null)
+  const [aiImportPhase, setAiImportPhase] = useState<AiImportPhase>('idle')
+  const [aiMappingResponse, setAiMappingResponse] = useState<AiMappingResponse | null>(null)
+  const [aiImportedActivities, setAiImportedActivities] = useState<AiImportedActivityPreview[]>([])
+  const [selectedAiActivityIds, setSelectedAiActivityIds] = useState<string[]>([])
+  const [expandedAiActivityIds, setExpandedAiActivityIds] = useState<string[]>([])
   const cycle = assessmentCycles.find((item) => item.dga_assessment_cycleid === selectedCycle)
   const isStrategic = form.activityScope === '1'
   const isPaymentOnly = form.activityClassification === '576610002'
   const isBudgetNo = form.budgetRequired === '0'
   const isAdeoVisible = form.adeoReported === '1'
-  const draftWarnings = useMemo(() => copilotDraft ? getDraftWarnings(copilotDraft) : [], [copilotDraft])
   const creationModeSwitch = (
     <div className="copilot-mode-switch" aria-label="Creation mode">
       <button
@@ -1091,7 +1472,7 @@ export function CreateActivity() {
           sectorId: nextContext.sector.dga_divisional_hierarchyid,
           sectorName: nextContext.sector.dga_name,
         })
-        setCopilotDraft(null)
+        resetAiImportState()
         setSuccessMessage('')
         setCreationWarning('')
         setCreatedProjectId('')
@@ -1188,10 +1569,11 @@ export function CreateActivity() {
 
   function addAttachments(files: FileList | File[]) {
     setAttachmentError('')
-    setCopilotDraft(null)
     setCopilotGenerationStatus('')
-    setGeneratedOutputFile(null)
-    setSelectedOutputFormat('')
+    setAiMappingResponse(null)
+    setAiImportedActivities([])
+    setSelectedAiActivityIds([])
+    setExpandedAiActivityIds([])
 
     const [file] = Array.from(files)
 
@@ -1202,12 +1584,14 @@ export function CreateActivity() {
     if (file.size > MAX_ATTACHMENT_SIZE) {
       setAttachmentError(`${file.name} is larger than the 8 MB limit.`)
       setAttachments([])
+      setAiImportPhase('error')
       return
     }
 
     if (!isXlsxFile(file)) {
       setAttachmentError(EXCEL_UPLOAD_ERROR)
       setAttachments([])
+      setAiImportPhase('error')
       return
     }
 
@@ -1218,12 +1602,7 @@ export function CreateActivity() {
       type: 'Excel workbook',
       file,
     }])
-  }
-
-  function handleOutputFormatChange(format: OutputFormat) {
-    setAttachmentError('')
-    setGeneratedOutputFile(null)
-    setSelectedOutputFormat(format)
+    setAiImportPhase('uploaded')
   }
 
   function handleFileInput(event: ChangeEvent<HTMLInputElement>) {
@@ -1234,34 +1613,38 @@ export function CreateActivity() {
     event.target.value = ''
   }
 
-  function applyPromptChip(prompt: string) {
-    setCopilotPrompt((currentPrompt) => currentPrompt.trim() ? `${currentPrompt.trim()}\n${prompt}` : prompt)
-    setCopilotDraft(null)
+  function resetAiImportState() {
+    setAttachments([])
+    setAttachmentError('')
+    setCopilotGenerationStatus('')
+    setAiImportPhase('idle')
+    setAiMappingResponse(null)
+    setAiImportedActivities([])
+    setSelectedAiActivityIds([])
+    setExpandedAiActivityIds([])
   }
 
   async function createCopilotDraft() {
     const [attachment] = attachments
 
     if (!attachment) {
-      setAttachmentError('Upload an Excel .xlsx file before starting the draft.')
-      return
-    }
-
-    if (!selectedOutputFormat) {
-      setAttachmentError('Select whether you want to convert the Excel file to PDF or CSV before starting the draft.')
+      setAttachmentError('Upload an Excel .xlsx file before creating an AI draft preview.')
+      setAiImportPhase('error')
       return
     }
 
     setAttachmentError('')
-    setCopilotDraft(null)
-    setGeneratedOutputFile(null)
+    setAiMappingResponse(null)
+    setAiImportedActivities([])
+    setSelectedAiActivityIds([])
+    setExpandedAiActivityIds([])
     setIsCopilotGenerating(true)
-    setCopilotGenerationStatus(`Preparing ${selectedOutputFormat.toUpperCase()}...`)
+    setAiImportPhase('processing')
+    setCopilotGenerationStatus('Reading workbook...')
 
     try {
-      const convertedFile = await convertExcelFile(attachment.file, selectedOutputFormat)
-      setGeneratedOutputFile(convertedFile)
-      setCopilotGenerationStatus('Starting Draft...')
+      const convertedFile = await convertExcelFileToCsv(attachment.file)
+      setCopilotGenerationStatus('Analyzing headers...')
       const payload: RetrieveAopProjectDataFromExcelInput = {
         file: {
           name: convertedFile.name,
@@ -1274,72 +1657,39 @@ export function CreateActivity() {
       )
       console.log('Create activity AI draft converted payload', {
         fileName: convertedFile.name,
-        format: convertedFile.format,
         mimeType: convertedFile.mimeType,
-        tableCount: convertedFile.tableCount,
+        tableCount: convertedFile.tables.length,
       })
       assertOperationSuccess(result, 'AI Assistant could not process the uploaded Excel file.')
       console.log('Create activity AI draft response', result)
+      setCopilotGenerationStatus('Preparing draft preview...')
+      const mappingResponse = parseAiMappingResponse(result)
+      const previews = buildImportedActivityPreviews(convertedFile.tables, mappingResponse)
+
+      if (previews.length === 0) {
+        throw new Error('No project-like activity data was found in the uploaded Excel file. Please include a Project Details section or a project table with activity fields.')
+      }
+
+      setAiMappingResponse(mappingResponse)
+      setAiImportedActivities(previews)
+      setExpandedAiActivityIds(previews.slice(0, 1).map((preview) => preview.id))
+      setAiImportPhase('ready')
     } catch (error) {
       setAttachmentError(error instanceof Error ? error.message : 'AI Assistant could not process the uploaded Excel file.')
+      setAiImportPhase('error')
     } finally {
       setIsCopilotGenerating(false)
       setCopilotGenerationStatus('')
     }
   }
 
-  function applyCopilotDraft() {
-    if (!copilotDraft) {
-      return
-    }
-
-    setForm(copilotDraft)
-    setErrors({})
-    setActiveTab('manual')
-    setSuccessMessage('AI-assisted draft applied. Review the form and save when ready.')
-  }
-
   function removeAttachment(attachmentId: string) {
     setAttachments((currentAttachments) => currentAttachments.filter((item) => item.id !== attachmentId))
-    setGeneratedOutputFile(null)
-    setSelectedOutputFormat('')
-    setCopilotDraft(null)
-  }
-
-  function downloadGeneratedOutputFile() {
-    if (!generatedOutputFile) {
-      return
-    }
-
-    const blob = base64ToBlob(generatedOutputFile.contentBytes, generatedOutputFile.mimeType)
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-
-    link.href = url
-    link.download = generatedOutputFile.name
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(url)
-  }
-
-  function renderGeneratedOutputFile() {
-    if (!generatedOutputFile) {
-      return null
-    }
-
-    return (
-      <div className="copilot-generated-output">
-        <FileText size={17} />
-        <div>
-          <strong>{generatedOutputFile.name}</strong>
-          <span>{generatedOutputFile.tableCount} table{generatedOutputFile.tableCount === 1 ? '' : 's'} prepared as {generatedOutputFile.format.toUpperCase()} for workflow upload</span>
-        </div>
-        <Button className="copilot-generated-output__button" icon={<Download size={15} />} onClick={downloadGeneratedOutputFile} variant="secondary">
-          Download {generatedOutputFile.format.toUpperCase()}
-        </Button>
-      </div>
-    )
+    setAiImportPhase('idle')
+    setAiMappingResponse(null)
+    setAiImportedActivities([])
+    setSelectedAiActivityIds([])
+    setExpandedAiActivityIds([])
   }
 
   function renderAttachmentList(className = '') {
@@ -1369,29 +1719,201 @@ export function CreateActivity() {
     )
   }
 
-  function renderOutputFormatChoice() {
-    if (attachments.length === 0) {
+  function toggleAiActivitySelection(activityId: string) {
+    setSelectedAiActivityIds((currentIds) => currentIds.includes(activityId)
+      ? currentIds.filter((id) => id !== activityId)
+      : [...currentIds, activityId])
+  }
+
+  function toggleAiActivityExpanded(activityId: string) {
+    setExpandedAiActivityIds((currentIds) => currentIds.includes(activityId)
+      ? currentIds.filter((id) => id !== activityId)
+      : [...currentIds, activityId])
+  }
+
+  function toggleSelectAllAiActivities() {
+    setSelectedAiActivityIds((currentIds) => currentIds.length === aiImportedActivities.length
+      ? []
+      : aiImportedActivities.map((activity) => activity.id))
+  }
+
+  function handleImportAsDraft() {
+    if (selectedAiActivityIds.length === 0) {
+      return
+    }
+
+    setSuccessMessage(`${selectedAiActivityIds.length} draft activity preview${selectedAiActivityIds.length === 1 ? '' : 's'} selected. Draft creation will be enabled in the next step.`)
+  }
+
+  function renderMappingSummary() {
+    if (!aiMappingResponse?.mapping) {
       return null
     }
 
+    const foundCount = getFoundMappingCount(aiMappingResponse.mapping)
+    const missingCount = getMissingMappingCount(aiMappingResponse.mapping)
+
     return (
-      <div className="copilot-output-choice" aria-label="Choose converted file format">
-        <span>Convert Excel to</span>
-        <div>
+      <div className="copilot-import__mapping">
+        <div className="copilot-import__mapping-header">
+          <div>
+            <span>AI Header Mapping</span>
+            <strong>{foundCount} fields detected</strong>
+          </div>
+          <span>{missingCount} not detected</span>
+        </div>
+        <div className="copilot-import__mapping-grid">
+          {AI_IMPORT_SECTIONS.map((section) => {
+            const found = getFoundMappings(aiMappingResponse.mapping, section)
+            const missing = (aiMappingResponse.mapping?.[section] ?? []).length - found.length
+
+            return (
+              <div className="copilot-import__mapping-card" key={section}>
+                <strong>{AI_SECTION_LABELS[section]}</strong>
+                <span>{found.length} found · {Math.max(0, missing)} missing</span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  function renderFieldPairs(fields: Record<string, string>, limit?: number) {
+    const entries = Object.entries(fields).filter(([, value]) => value)
+    const visibleEntries = typeof limit === 'number' ? entries.slice(0, limit) : entries
+
+    if (visibleEntries.length === 0) {
+      return <span className="copilot-import__empty-text">No mapped values found.</span>
+    }
+
+    return (
+      <div className="copilot-import__field-grid">
+        {visibleEntries.map(([logicalName, value]) => (
+          <div key={logicalName}>
+            <span>{formatLogicalName(logicalName)}</span>
+            <strong>{value}</strong>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  function renderChildSection(activity: AiImportedActivityPreview, section: Exclude<AiMappingSection, 'project'>) {
+    const records = activity.children[section]
+
+    return (
+      <div className="copilot-import__child-section" key={section}>
+        <div className="copilot-import__child-section-header">
+          <strong>{AI_SECTION_LABELS[section]}</strong>
+          <span>{records.length}</span>
+        </div>
+        {records.length > 0 ? (
+          <div className="copilot-import__child-list">
+            {records.map((record) => (
+              <div className="copilot-import__child-record" key={record.id}>
+                <strong>{record.title}</strong>
+                {renderFieldPairs(record.fields, 4)}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <span className="copilot-import__empty-text">No {AI_SECTION_LABELS[section].toLowerCase()} detected for this row.</span>
+        )}
+      </div>
+    )
+  }
+
+  function renderAiImportedActivity(activity: AiImportedActivityPreview) {
+    const isSelected = selectedAiActivityIds.includes(activity.id)
+    const isExpanded = expandedAiActivityIds.includes(activity.id)
+    const childCount = AI_CHILD_SECTIONS.reduce((count, section) => count + activity.children[section].length, 0)
+
+    return (
+      <article className={isSelected ? 'copilot-import__activity copilot-import__activity--selected' : 'copilot-import__activity'} key={activity.id}>
+        <div className="copilot-import__activity-main">
+          <Checkbox
+            checked={isSelected}
+            label=""
+            onChange={() => toggleAiActivitySelection(activity.id)}
+          />
           <button
-            className={selectedOutputFormat === 'pdf' ? 'copilot-output-choice__option copilot-output-choice__option--active' : 'copilot-output-choice__option'}
-            onClick={() => handleOutputFormatChange('pdf')}
+            aria-label={isExpanded ? `Collapse ${activity.title}` : `Expand ${activity.title}`}
+            className="copilot-import__expand"
+            onClick={() => toggleAiActivityExpanded(activity.id)}
             type="button"
           >
-            PDF
+            {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
           </button>
-          <button
-            className={selectedOutputFormat === 'csv' ? 'copilot-output-choice__option copilot-output-choice__option--active' : 'copilot-output-choice__option'}
-            onClick={() => handleOutputFormatChange('csv')}
-            type="button"
-          >
-            CSV
+          <button className="copilot-import__activity-title" onClick={() => toggleAiActivityExpanded(activity.id)} type="button">
+            <strong>{activity.title}</strong>
+            <span>{activity.sheetName} · Table {activity.sourceTable} · Row {activity.rowIndex}</span>
           </button>
+          <div className="copilot-import__activity-meta">
+            <span>{activity.dataQuality.detectedFields} fields</span>
+            <span>{childCount} child section{childCount === 1 ? '' : 's'}</span>
+          </div>
+        </div>
+        <div className="copilot-import__activity-quick">
+          {renderFieldPairs({
+            dga_sector: activity.projectFields.dga_sector,
+            dga_department: activity.projectFields.dga_department,
+            dga_planned_start_date: activity.projectFields.dga_planned_start_date,
+            dga_planned_end_date: activity.projectFields.dga_planned_end_date,
+            dga_does_this_project_require_procurement: activity.projectFields.dga_does_this_project_require_procurement,
+            dga_doesthisprojectrequirebudgetallocation: activity.projectFields.dga_doesthisprojectrequirebudgetallocation,
+          })}
+        </div>
+        {activity.warnings.length > 0 ? (
+          <div className="copilot-import__warnings">
+            {activity.warnings.map((warning) => (
+              <span key={warning}>{warning}</span>
+            ))}
+          </div>
+        ) : null}
+        {isExpanded ? (
+          <div className="copilot-import__activity-details">
+            <div className="copilot-import__project-details">
+              <strong>Activity Details</strong>
+              {renderFieldPairs(activity.projectFields)}
+            </div>
+            <div className="copilot-import__child-grid">
+              {AI_CHILD_SECTIONS.map((section) => renderChildSection(activity, section))}
+            </div>
+          </div>
+        ) : null}
+      </article>
+    )
+  }
+
+  function renderAiImportResults() {
+    if (aiImportPhase !== 'ready') {
+      return null
+    }
+
+    const allSelected = aiImportedActivities.length > 0 && selectedAiActivityIds.length === aiImportedActivities.length
+
+    return (
+      <div className="copilot-import__results">
+        {renderMappingSummary()}
+        <div className="copilot-import__results-toolbar">
+          <div>
+            <span>Draft Preview</span>
+            <strong>{aiImportedActivities.length} activit{aiImportedActivities.length === 1 ? 'y' : 'ies'} extracted</strong>
+          </div>
+          <div className="copilot-import__results-actions">
+            <Checkbox
+              checked={allSelected}
+              label="Select all"
+              onChange={toggleSelectAllAiActivities}
+            />
+            <Button disabled={selectedAiActivityIds.length === 0} icon={<CheckCircle2 size={16} />} onClick={handleImportAsDraft}>
+              Import as Draft
+            </Button>
+          </div>
+        </div>
+        <div className="copilot-import__activity-list">
+          {aiImportedActivities.map(renderAiImportedActivity)}
         </div>
       </div>
     )
@@ -2206,114 +2728,62 @@ export function CreateActivity() {
               <div className="copilot-assistant__icons" aria-hidden="true">
                 <Sparkles size={30} />
                 <Bot size={28} />
-                <FileText size={20} />
+                <FileSpreadsheet size={20} />
               </div>
-              <h2>Start your activity with AI.</h2>
+              <h2>Create AOP Activity using AI.</h2>
               <p>
-                Describe the initiative, attach supporting evidence, or ask about any field. Once the conversation begins,
-                a working draft form will appear for you to refine.
+                Upload an Excel file relevant to AOP. AI will detect matching headers, map them to AOP fields,
+                and prepare a draft import preview for your review.
               </p>
             </div>
 
-            <div className="copilot-composer">
-              <textarea
-                aria-label="Describe the activity you want to create"
-                onChange={(event) => {
-                  setCopilotPrompt(event.target.value)
-                  setCopilotDraft(null)
-                }}
-                placeholder="Describe the activity you want to create..."
-                value={copilotPrompt}
-              />
-              <div className="copilot-composer__footer">
-                <div className="copilot-composer__tools">
-                  <label className="copilot-tool-button">
-                    <Paperclip size={16} />
-                    Upload Excel
-                    <input accept=".xlsx" onChange={handleFileInput} type="file" />
-                  </label>
-                  <button className="copilot-tool-button" onClick={() => applyPromptChip('Review if this activity requires ADEO reporting, procurement, budget, or strategic categorization.')} type="button">
-                    <Sparkles size={16} />
-                    Check Considerations
-                  </button>
+            <div className="copilot-import">
+              <div className="copilot-import__upload">
+                <div className="copilot-import__upload-icon">
+                  <UploadCloud size={32} />
                 </div>
-                <Button disabled={attachments.length === 0 || !selectedOutputFormat || isCopilotGenerating} icon={<Send size={16} />} onClick={createCopilotDraft}>
-                  {isCopilotGenerating ? copilotGenerationStatus || 'Starting Draft...' : 'Start Draft'}
-                </Button>
+                <div>
+                  <strong>Upload Excel file relevant to AOP</strong>
+                  <p>Use a workbook with activity rows. Multiple sheets and tables are supported.</p>
+                </div>
+                <label className="copilot-import__upload-button">
+                  <FileSpreadsheet size={16} />
+                  Choose Excel File
+                  <input accept=".xlsx" onChange={handleFileInput} type="file" />
+                </label>
               </div>
-            </div>
 
-            {attachmentError ? <span className="field__error copilot-assistant__error">{attachmentError}</span> : null}
-            {renderAttachmentList()}
-            {renderOutputFormatChoice()}
-            {renderGeneratedOutputFile()}
+              {renderAttachmentList('copilot-import__attachments')}
 
-            <div className="copilot-chips">
-              {COPILOT_PROMPTS.map((prompt) => (
-                <button key={prompt} onClick={() => applyPromptChip(prompt)} type="button">
-                  <Sparkles size={15} />
-                  {prompt}
-                </button>
-              ))}
-            </div>
+              <div className="copilot-import__steps">
+                {[
+                  { label: 'Reading workbook', active: aiImportPhase === 'processing' },
+                  { label: 'Converting to CSV', active: aiImportPhase === 'processing' },
+                  { label: 'Analyzing headers', active: aiImportPhase === 'processing' },
+                  { label: 'Preparing draft preview', active: aiImportPhase === 'ready' },
+                ].map((step, index) => (
+                  <div className={step.active ? 'copilot-import__step copilot-import__step--active' : 'copilot-import__step'} key={step.label}>
+                    <span>{index + 1}</span>
+                    <strong>{step.label}</strong>
+                  </div>
+                ))}
+              </div>
 
-            {copilotDraft ? (
-              <Card className="copilot-review">
-                <div className="copilot-message copilot-message--assistant">
-                  <CheckCircle2 size={16} />
-                  <div>
-                    <strong>Draft generated</strong>
-                    <p>Review the generated field summary and apply it to the manual form when ready.</p>
-                  </div>
-                </div>
-                <div className="copilot-summary-grid">
-                  <div>
-                    <span>Activity Name</span>
-                    <strong>{copilotDraft.activityName}</strong>
-                  </div>
-                  <div>
-                    <span>Activity Type</span>
-                    <strong>{getOptionLabel(ACTIVITY_TYPE_OPTIONS, copilotDraft.activityType)}</strong>
-                  </div>
-                  <div>
-                    <span>Scope</span>
-                    <strong>{getOptionLabel(ACTIVITY_SCOPE_OPTIONS, copilotDraft.activityScope)}</strong>
-                  </div>
-                  <div>
-                    <span>Classification</span>
-                    <strong>{getOptionLabel(CLASSIFICATION_OPTIONS, copilotDraft.activityClassification)}</strong>
-                  </div>
-                  <div>
-                    <span>ADEO</span>
-                    <strong>{getOptionLabel(YES_NO_OPTIONS, copilotDraft.adeoReported)}</strong>
-                  </div>
-                  <div>
-                    <span>Attachments</span>
-                    <strong>{attachments.length}</strong>
-                  </div>
-                </div>
-                <div className="copilot-review__text">
-                  <FileText size={16} />
-                  <p>{copilotDraft.summary || 'No summary generated yet.'}</p>
-                </div>
-                {draftWarnings.length > 0 ? (
-                  <div className="copilot-warnings">
-                    <strong>Needs review before save</strong>
-                    {draftWarnings.slice(0, 6).map((warning) => (
-                      <span key={warning}>{warning}</span>
-                    ))}
-                  </div>
+              {attachmentError ? <span className="field__error copilot-assistant__error">{attachmentError}</span> : null}
+
+              <div className="copilot-import__actions">
+                <Button disabled={attachments.length === 0 || isCopilotGenerating} icon={<Send size={16} />} onClick={createCopilotDraft}>
+                  {isCopilotGenerating ? copilotGenerationStatus || 'Preparing draft preview...' : 'Create Draft Preview'}
+                </Button>
+                {attachments.length > 0 ? (
+                  <Button disabled={isCopilotGenerating} onClick={resetAiImportState} variant="secondary">
+                    Reset Upload
+                  </Button>
                 ) : null}
-                <div className="copilot-actions">
-                  <Button onClick={() => setCopilotDraft(null)} variant="secondary">
-                    Edit Prompt
-                  </Button>
-                  <Button icon={<CheckCircle2 size={16} />} onClick={applyCopilotDraft}>
-                    Apply to Form
-                  </Button>
-                </div>
-              </Card>
-            ) : null}
+              </div>
+
+              {renderAiImportResults()}
+            </div>
           </section>
         </div>
       )}

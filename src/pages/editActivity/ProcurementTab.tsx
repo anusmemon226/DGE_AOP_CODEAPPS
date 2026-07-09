@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useId, useMemo, useState } from 'react'
-import { FileText, LockKeyhole } from 'lucide-react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { FileText, LockKeyhole, Upload, X } from 'lucide-react'
 import {
   Badge,
   Button,
@@ -14,9 +14,11 @@ import {
   Textarea,
 } from '../../components/ui'
 import type { Dga_aop_cost_centers } from '../../generated/models/Dga_aop_cost_centersModel'
+import type { Dga_aop_projectsesBase } from '../../generated/models/Dga_aop_projectsesModel'
 import type { Dga_categories } from '../../generated/models/Dga_categoriesModel'
 import type { Dga_procurement_plans, Dga_procurement_plansBase } from '../../generated/models/Dga_procurement_plansModel'
 import { Dga_aop_cost_centersService } from '../../generated/services/Dga_aop_cost_centersService'
+import { Dga_aop_projectsesService } from '../../generated/services/Dga_aop_projectsesService'
 import { Dga_categoriesService } from '../../generated/services/Dga_categoriesService'
 import { Dga_procurement_plansService } from '../../generated/services/Dga_procurement_plansService'
 import { formatCurrencyAmount } from '../../utils/formatting'
@@ -64,6 +66,20 @@ type Procurement = {
 
 type ProcurementFormData = Omit<Procurement, 'id'>
 type FormErrors = Partial<Record<keyof ProcurementFormData, string>>
+type ExecutionProcurementFormData = {
+  actualContractDuration: string
+  actualContractValue: string
+  attachContractFile: File | null
+  justification: string
+  justificationDate: string
+  procurementStatus: string
+  progressUpdate: string
+  prTicketNumber: string
+  stageUpdateDate: string
+  tenderRequired: TenderRequiredValue
+  tenderType: TenderTypeValue
+}
+type ExecutionProcurementFormErrors = Partial<Record<keyof ExecutionProcurementFormData, string>>
 type ProcurementCostCenter = Dga_aop_cost_centers & {
   dga_cost_center?: string
 }
@@ -75,8 +91,12 @@ type ProcurementTabProps = {
   activityScope: ActivityScopeValue
   activityPlannedEndDate: string
   activityPlannedStartDate: string
+  canEditExecutionFieldsOnly?: boolean
+  isExecutionPhase?: boolean
   isReadOnly?: boolean
+  onProjectRelatedChangesChange?: (relatedChanges: string) => void
   projectId: string
+  projectRelatedChanges?: string | null
 }
 
 // ── Constants ──
@@ -109,6 +129,20 @@ const EMPTY_FORM: ProcurementFormData = {
   expectedAwardingQuarter: '',
 }
 
+const EMPTY_EXECUTION_FORM: ExecutionProcurementFormData = {
+  actualContractDuration: '',
+  actualContractValue: '',
+  attachContractFile: null,
+  justification: '',
+  justificationDate: '',
+  procurementStatus: '',
+  progressUpdate: '',
+  prTicketNumber: '',
+  stageUpdateDate: '',
+  tenderRequired: '',
+  tenderType: '',
+}
+
 const TENDER_REQUIRED_OPTIONS = [
   { label: 'Yes', value: '1' },
   { label: 'No', value: '0' },
@@ -128,6 +162,7 @@ const PROCUREMENT_STATUS_YES_RAISED = [
   { label: 'Awarded', value: '2' },
   { label: 'Contracting', value: '7' },
   { label: 'Execution Started', value: '8' },
+  { label: 'Completed', value: '15' },
   { label: 'Postponed', value: '5' },
 ] as const
 
@@ -222,6 +257,11 @@ const STATUS_TONES: Record<string, 'neutral' | 'info' | 'success' | 'warning'> =
 function getStatusLabel(value: string): string {
   const all = [...PROCUREMENT_STATUS_YES_RAISED, ...PROCUREMENT_STATUS_NO, ...PROCUREMENT_STATUS_YES_NOT_RAISED]
   return all.find((s) => s.value === value)?.label ?? value
+}
+
+function formatFileSize(size: number) {
+  if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`
+  return `${Math.max(1, Math.round(size / 1024))} KB`
 }
 
 function getOperationErrorMessage(result: unknown, fallbackMessage: string) {
@@ -375,6 +415,180 @@ function planToProcurement(record: Dga_procurement_plans): Procurement | null {
   }
 }
 
+type ProjectRelatedChange = {
+  new_value: unknown
+  old_value: unknown
+  planned_value?: unknown
+}
+
+type ProjectRelatedChanges = {
+  [key: string]: ProjectRelatedChange | ProjectRelatedChanges | string | number | boolean | null | undefined
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function parseProjectRelatedChanges(value?: string | null): ProjectRelatedChanges {
+  if (!value?.trim()) {
+    return {}
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown
+
+    if (!isPlainObject(parsed)) {
+      return {}
+    }
+
+    return parsed as ProjectRelatedChanges
+  } catch {
+    return {}
+  }
+}
+
+function mergeProjectRelatedChanges(base: ProjectRelatedChanges, override: ProjectRelatedChanges): ProjectRelatedChanges {
+  const merged: ProjectRelatedChanges = { ...base }
+
+  Object.entries(override).forEach(([key, value]) => {
+    const existingValue = merged[key]
+
+    if (isPlainObject(existingValue) && isPlainObject(value) && !('old_value' in value) && !('new_value' in value)) {
+      merged[key] = mergeProjectRelatedChanges(existingValue as ProjectRelatedChanges, value as ProjectRelatedChanges)
+      return
+    }
+
+    merged[key] = value
+  })
+
+  return merged
+}
+
+function getProjectRelatedChangeAt(changes: ProjectRelatedChanges, path: string[]): ProjectRelatedChange | undefined {
+  let current: unknown = changes
+
+  for (const segment of path) {
+    if (!isPlainObject(current)) {
+      return undefined
+    }
+
+    current = (current as ProjectRelatedChanges)[segment]
+  }
+
+  if (isPlainObject(current) && ('old_value' in current || 'new_value' in current)) {
+    return current as ProjectRelatedChange
+  }
+
+  return undefined
+}
+
+function isEmptyRelatedValue(value: unknown) {
+  return value === undefined || value === null || String(value).trim() === ''
+}
+
+function resolveProjectRelatedValue(change: ProjectRelatedChange | undefined): unknown {
+  if (!change) return undefined
+
+  if (isEmptyRelatedValue(change.new_value)) {
+    return change.old_value
+  }
+
+  if (String(change.old_value ?? '') === String(change.new_value ?? '')) {
+    return change.new_value
+  }
+
+  return change.old_value
+}
+
+function relatedOldValue(value: unknown, plannedValue?: unknown): ProjectRelatedChange {
+  return {
+    ...(plannedValue !== undefined ? { planned_value: plannedValue } : {}),
+    old_value: value ?? '',
+    new_value: '',
+  }
+}
+
+function getExecutionProcurementRelatedField(
+  relatedChanges: string | null | undefined,
+  procurementId: string | undefined,
+  fieldName: string,
+): unknown {
+  const recordKey = procurementId ? procurementId.replace(/[{}]/g, '') : 'new'
+
+  return resolveProjectRelatedValue(getProjectRelatedChangeAt(
+    parseProjectRelatedChanges(relatedChanges),
+    ['procurements', 'by_record', recordKey, fieldName],
+  ))
+}
+
+function buildExecutionFormFromRelatedChanges(
+  relatedChanges: string | null | undefined,
+  procurement: Procurement,
+): ExecutionProcurementFormData {
+  const value = (fieldName: string) => getExecutionProcurementRelatedField(relatedChanges, procurement.id, fieldName)
+
+  return {
+    actualContractDuration: isEmptyRelatedValue(value('dga_actual_contract_duration_in_months'))
+      ? ''
+      : `${value('dga_actual_contract_duration_in_months')} ${Number(value('dga_actual_contract_duration_in_months')) === 1 ? 'Month' : 'Months'}`,
+    actualContractValue: isEmptyRelatedValue(value('dga_actual_contract_value')) ? '' : String(value('dga_actual_contract_value')),
+    attachContractFile: null,
+    justification: isEmptyRelatedValue(value('dga_justification_of_the_change')) ? '' : String(value('dga_justification_of_the_change')),
+    justificationDate: isEmptyRelatedValue(value('dga_justification_date')) ? '' : String(value('dga_justification_date')),
+    procurementStatus: isEmptyRelatedValue(value('dga_current_procurement_status')) ? '' : String(value('dga_current_procurement_status')),
+    progressUpdate: isEmptyRelatedValue(value('dga_progress_update')) ? '' : String(value('dga_progress_update')),
+    prTicketNumber: isEmptyRelatedValue(value('dga_pr_ticket_number')) ? '' : String(value('dga_pr_ticket_number')),
+    stageUpdateDate: isEmptyRelatedValue(value('dga_stage_update_date')) ? '' : String(value('dga_stage_update_date')),
+    tenderRequired: isEmptyRelatedValue(value('dga_does_this_project_require_tender'))
+      ? ''
+      : value('dga_does_this_project_require_tender') === true
+        ? '1'
+        : value('dga_does_this_project_require_tender') === false
+          ? '0'
+          : String(value('dga_does_this_project_require_tender')) as TenderRequiredValue,
+    tenderType: isEmptyRelatedValue(value('dga_tender_type')) ? '' : String(value('dga_tender_type')) as TenderTypeValue,
+  }
+}
+
+function buildExecutionProcurementRelatedChanges(
+  procurement: Procurement | null,
+  executionForm: ExecutionProcurementFormData,
+): ProjectRelatedChanges {
+  const recordKey = procurement?.id ? procurement.id.replace(/[{}]/g, '') : 'new'
+
+  return {
+    procurements: {
+      by_record: {
+        [recordKey]: {
+          name: procurement?.procurementName ?? '',
+          dga_does_this_project_require_tender: relatedOldValue(
+            yesNoToBoolean(executionForm.tenderRequired),
+            yesNoToBoolean(procurement?.tenderRequired ?? ''),
+          ),
+          dga_tender_type: relatedOldValue(
+            executionForm.tenderType ? Number(executionForm.tenderType) : '',
+            procurement?.tenderType ? Number(procurement.tenderType) : '',
+          ),
+          dga_current_procurement_status: relatedOldValue(
+            executionForm.procurementStatus ? Number(executionForm.procurementStatus) : '',
+            procurement?.procurementStatus ? Number(procurement.procurementStatus) : '',
+          ),
+          dga_pr_ticket_number: relatedOldValue(executionForm.prTicketNumber),
+          dga_actual_contract_value: relatedOldValue(currencyToNumber(executionForm.actualContractValue) ?? ''),
+          dga_actual_contract_duration_in_months: relatedOldValue(
+            executionForm.actualContractDuration.replace(/\s*Month(s?)$/i, '').replace(/\D/g, ''),
+          ),
+          dga_stage_update_date: relatedOldValue(executionForm.stageUpdateDate),
+          dga_progress_update: relatedOldValue(executionForm.progressUpdate),
+          attach_contract_file: relatedOldValue(executionForm.attachContractFile?.name ?? ''),
+          dga_justification_date: relatedOldValue(executionForm.justificationDate),
+          dga_justification_of_the_change: relatedOldValue(executionForm.justification),
+        } as ProjectRelatedChanges,
+      },
+    },
+  }
+}
+
 function buildProcurementPayload(form: ProcurementFormData, projectId?: string): ProcurementPlanPayload {
   const payload: ProcurementPlanPayload = {
     dga_aligned_with_strategic_plan: yesNoToBoolean(form.alignedStrategicPlan),
@@ -451,8 +665,19 @@ function getDateRangeErrors(
 
 // ── Component ──
 
-export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDate, activityScope, isReadOnly = false, projectId }: ProcurementTabProps) {
+export function ProcurementTab({
+  activityPlannedEndDate,
+  activityPlannedStartDate,
+  activityScope,
+  canEditExecutionFieldsOnly = false,
+  isExecutionPhase = false,
+  isReadOnly = false,
+  onProjectRelatedChangesChange,
+  projectId,
+  projectRelatedChanges,
+}: ProcurementTabProps) {
   const uid = useId()
+  const executionFileInputRef = useRef<HTMLInputElement | null>(null)
 
   // ── Data state ──
   const [procurements, setProcurements] = useState<Procurement[]>([])
@@ -463,6 +688,7 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
   const [isProcurementsLoading, setIsProcurementsLoading] = useState(false)
   const [isSavingProcurement, setIsSavingProcurement] = useState(false)
   const [isDeletingProcurement, setIsDeletingProcurement] = useState(false)
+  const [localProjectRelatedChanges, setLocalProjectRelatedChanges] = useState<{ projectId: string; value: string } | null>(null)
   const [procurementError, setProcurementError] = useState('')
   const [procurementNotice, setProcurementNotice] = useState('')
 
@@ -471,7 +697,12 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
   const [editingProcurement, setEditingProcurement] = useState<Procurement | null>(null)
   const [form, setForm] = useState<ProcurementFormData>(EMPTY_FORM)
   const [formErrors, setFormErrors] = useState<FormErrors>({})
+  const [executionForm, setExecutionForm] = useState<ExecutionProcurementFormData>(EMPTY_EXECUTION_FORM)
+  const [executionFormErrors, setExecutionFormErrors] = useState<ExecutionProcurementFormErrors>({})
   const [procurementToDelete, setProcurementToDelete] = useState<Procurement | null>(null)
+  const effectiveProjectRelatedChanges = localProjectRelatedChanges?.projectId === projectId
+    ? localProjectRelatedChanges.value
+    : projectRelatedChanges ?? ''
 
   const loadProcurementLookups = useCallback(async () => {
     setIsLookupLoading(true)
@@ -653,6 +884,19 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
     if (form.tenderRequired === '0') return PROCUREMENT_STATUS_NO
     return []
   }, [form.tenderRequired, form.tenderType, isTenderRequired])
+  const isExecutionTenderRequired = executionForm.tenderRequired === '1'
+  const isExecutionTenderNotRequired = executionForm.tenderRequired === '0'
+  const isExecutionTenderRaised = isExecutionTenderRequired && executionForm.tenderType === '1'
+  const isExecutionTenderNotRaised = isExecutionTenderRequired && executionForm.tenderType === '2'
+  const shouldShowExecutionRaisedFields = isExecutionTenderNotRequired || isExecutionTenderRaised
+  const shouldShowAttachContract = shouldShowExecutionRaisedFields && ['8', '15'].includes(executionForm.procurementStatus)
+  const canEditExecutionSection = !isReadOnly || canEditExecutionFieldsOnly
+  const executionProcurementStatusOptions = useMemo(() => {
+    if (executionForm.tenderRequired === '0') return PROCUREMENT_STATUS_YES_RAISED
+    if (isExecutionTenderRequired && executionForm.tenderType === '1') return PROCUREMENT_STATUS_YES_RAISED
+    if (isExecutionTenderRequired && executionForm.tenderType === '2') return PROCUREMENT_STATUS_YES_NOT_RAISED
+    return []
+  }, [executionForm.tenderRequired, executionForm.tenderType, isExecutionTenderRequired])
 
   // ── DataGrid columns ──
 
@@ -856,11 +1100,103 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
     }
   }
 
+  function handleExecutionFieldChange(fields: Partial<ExecutionProcurementFormData>) {
+    if (!canEditExecutionSection) return
+
+    const next: ExecutionProcurementFormData = { ...executionForm, ...fields }
+
+    if (fields.tenderRequired !== undefined) {
+      next.tenderType = ''
+      next.procurementStatus = ''
+      next.prTicketNumber = ''
+      next.actualContractValue = ''
+      next.actualContractDuration = ''
+      next.stageUpdateDate = ''
+      next.progressUpdate = ''
+      next.attachContractFile = null
+      next.justificationDate = ''
+      next.justification = ''
+    }
+
+    if (fields.tenderType !== undefined) {
+      next.procurementStatus = ''
+      next.prTicketNumber = ''
+      next.actualContractValue = ''
+      next.actualContractDuration = ''
+      next.stageUpdateDate = ''
+      next.progressUpdate = ''
+      next.attachContractFile = null
+      next.justificationDate = ''
+      next.justification = ''
+    }
+
+    if (fields.procurementStatus !== undefined && !['8', '15'].includes(fields.procurementStatus)) {
+      next.attachContractFile = null
+    }
+
+    setExecutionForm(next)
+
+    setExecutionFormErrors((prev) => {
+      const copy = { ...prev }
+      const changedExecutionKeys = Object.keys(fields) as Array<keyof ExecutionProcurementFormData>
+      changedExecutionKeys.forEach((key) => {
+        delete copy[key]
+      })
+
+      if (fields.tenderRequired !== undefined || fields.tenderType !== undefined) {
+        delete copy.tenderType
+        delete copy.procurementStatus
+        delete copy.prTicketNumber
+        delete copy.actualContractValue
+        delete copy.actualContractDuration
+        delete copy.stageUpdateDate
+        delete copy.progressUpdate
+        delete copy.attachContractFile
+        delete copy.justificationDate
+        delete copy.justification
+      }
+
+      return copy
+    })
+  }
+
+  function handleExecutionCurrencyBlur() {
+    const raw = executionForm.actualContractValue.replace(/,/g, '')
+    if (raw && !Number.isNaN(Number(raw))) {
+      handleExecutionFieldChange({ actualContractValue: formatCurrencyAmount(raw) })
+    }
+  }
+
+  function handleExecutionDurationBlur() {
+    const raw = executionForm.actualContractDuration.replace(/\s*Month(s?)$/i, '').replace(/\D/g, '')
+    if (!raw || Number.isNaN(Number(raw))) return
+
+    const duration = Number(raw)
+    handleExecutionFieldChange({ actualContractDuration: `${duration} ${duration === 1 ? 'Month' : 'Months'}` })
+  }
+
+  function handleExecutionFileChange(file: File | null) {
+    if (!canEditExecutionSection) return
+    handleExecutionFieldChange({ attachContractFile: file })
+  }
+
+  function handleRemoveExecutionFile() {
+    handleExecutionFileChange(null)
+    if (executionFileInputRef.current) {
+      executionFileInputRef.current.value = ''
+    }
+  }
+
   function handleOpenCreate() {
     if (isReadOnly) return
     setEditingProcurement(null)
     setForm(EMPTY_FORM)
     setFormErrors({})
+    setExecutionForm(EMPTY_EXECUTION_FORM)
+    setExecutionFormErrors({})
+    if (executionFileInputRef.current) {
+      executionFileInputRef.current.value = ''
+    }
     setProcurementError('')
     setProcurementNotice('')
     setIsDrawerOpen(true)
@@ -896,6 +1232,11 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
       expectedAwardingQuarter: procurement.expectedAwardingQuarter,
     })
     setFormErrors({})
+    setExecutionForm(buildExecutionFormFromRelatedChanges(effectiveProjectRelatedChanges, procurement))
+    setExecutionFormErrors({})
+    if (executionFileInputRef.current) {
+      executionFileInputRef.current.value = ''
+    }
     setProcurementError('')
     setProcurementNotice('')
     setIsDrawerOpen(true)
@@ -906,15 +1247,22 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
     setEditingProcurement(null)
     setForm(EMPTY_FORM)
     setFormErrors({})
+    setExecutionForm(EMPTY_EXECUTION_FORM)
+    setExecutionFormErrors({})
+    if (executionFileInputRef.current) {
+      executionFileInputRef.current.value = ''
+    }
   }
 
   function validate(): boolean {
     const errs: FormErrors = {}
 
-    if (!form.tenderRequired) errs.tenderRequired = 'Select whether tender is required'
-    if (isTenderRequired && !form.tenderType) errs.tenderType = 'Select tender type'
-    if (procurementStatusOptions.length > 0 && !form.procurementStatus) {
-      errs.procurementStatus = 'Select procurement status'
+    if (!isExecutionPhase) {
+      if (!form.tenderRequired) errs.tenderRequired = 'Select whether tender is required'
+      if (isTenderRequired && !form.tenderType) errs.tenderType = 'Select tender type'
+      if (procurementStatusOptions.length > 0 && !form.procurementStatus) {
+        errs.procurementStatus = 'Select procurement status'
+      }
     }
     if (!form.procurementName.trim()) errs.procurementName = 'Procurement name is required'
     if (!form.requestType) errs.requestType = 'Select request type'
@@ -943,12 +1291,39 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
     return Object.keys(nextErrors).length === 0
   }
 
+  function validateExecution(): boolean {
+    const errs: ExecutionProcurementFormErrors = {}
+
+    if (!executionForm.tenderRequired) errs.tenderRequired = 'Select whether tender is required.'
+    if (isExecutionTenderRequired && !executionForm.tenderType) errs.tenderType = 'Select tender type.'
+    if (executionProcurementStatusOptions.length > 0 && !executionForm.procurementStatus) {
+      errs.procurementStatus = 'Select procurement status.'
+    }
+
+    if (shouldShowExecutionRaisedFields) {
+      if (!executionForm.stageUpdateDate) errs.stageUpdateDate = 'Select stage update date.'
+      if (shouldShowAttachContract && !executionForm.attachContractFile) {
+        errs.attachContractFile = 'Attach contract file.'
+      }
+    }
+
+    setExecutionFormErrors(errs)
+    return Object.keys(errs).length === 0
+  }
+
   async function handleSave() {
-    if (isReadOnly) return
-    if (!validate()) return
     if (!projectId) {
       setProcurementError('Activity id is missing from the edit URL.')
       return
+    }
+
+    const isExecutionOnlySave = isExecutionPhase && isReadOnly && canEditExecutionSection
+
+    if (isExecutionOnlySave) {
+      if (!validateExecution()) return
+    } else {
+      if (isReadOnly) return
+      if (!validate()) return
     }
 
     setIsSavingProcurement(true)
@@ -956,6 +1331,30 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
     setProcurementNotice('')
 
     try {
+      if (isExecutionOnlySave) {
+        const projectResult = await Dga_aop_projectsesService.get(projectId, {
+          select: ['dga_project_related_changes'],
+        })
+        assertOperationSuccess(projectResult, 'Unable to load activity change tracking.')
+
+        const existingRelatedChanges = parseProjectRelatedChanges(projectResult.data?.dga_project_related_changes)
+        const nextRelatedChanges = JSON.stringify(mergeProjectRelatedChanges(
+          existingRelatedChanges,
+          buildExecutionProcurementRelatedChanges(editingProcurement, executionForm),
+        ))
+
+        const result = await Dga_aop_projectsesService.update(projectId, {
+          dga_project_related_changes: nextRelatedChanges,
+        } as Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>>)
+        assertOperationSuccess(result, 'Unable to update procurement execution tracking.')
+
+        setProcurementNotice('Procurement execution tracking updated successfully.')
+        setLocalProjectRelatedChanges({ projectId, value: nextRelatedChanges })
+        onProjectRelatedChangesChange?.(nextRelatedChanges)
+        handleCloseDrawer()
+        return
+      }
+
       if (editingProcurement) {
         const result = await Dga_procurement_plansService.update(
           editingProcurement.id,
@@ -1013,7 +1412,7 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
             <Button onClick={handleCloseDrawer} variant="secondary">
               Cancel
             </Button>
-            <Button disabled={isReadOnly || isSavingProcurement} onClick={handleSave}>
+            <Button disabled={(!canEditExecutionSection && isReadOnly) || isSavingProcurement} onClick={handleSave}>
               {isSavingProcurement ? 'Saving...' : editingProcurement ? 'Update Procurement' : 'Create Procurement'}
             </Button>
           </div>
@@ -1030,65 +1429,259 @@ export function ProcurementTab({ activityPlannedEndDate, activityPlannedStartDat
           ) : null}
 
           {/* ── Tender Information ── */}
-          <div className="edit-activity__procurement-section">
-            <div className="create-activity__section-header">
-              <div className="create-activity__section-header-inner">
-                <span className="create-activity__section-header-icon" aria-hidden="true">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                    <polyline points="14 2 14 8 20 8" />
-                  </svg>
-                </span>
-                <div>
-                  <span>Tender Information</span>
-                  <h2>Tender & Status</h2>
+          {!isExecutionPhase ? (
+            <div className="edit-activity__procurement-section">
+              <div className="create-activity__section-header">
+                <div className="create-activity__section-header-inner">
+                  <span className="create-activity__section-header-icon" aria-hidden="true">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                    </svg>
+                  </span>
+                  <div>
+                    <span>Tender Information</span>
+                    <h2>Tender & Status</h2>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="edit-activity__procurement-drawer-section">
-              <RadioGroup
-                className="radio-group--tender-required"
-                disabled={isReadOnly}
-                error={formErrors.tenderRequired}
-                label="Tender Required"
-                name={`${uid}-tender-required`}
-                onChange={(value) => handleFieldChange({ tenderRequired: value as TenderRequiredValue })}
-                options={TENDER_REQUIRED_OPTIONS}
-                required
-                value={form.tenderRequired}
-              />
-
-              {isTenderRequired && (
+              <div className="edit-activity__procurement-drawer-section">
                 <RadioGroup
-                  className="radio-group--tender-type"
+                  className="radio-group--tender-required"
                   disabled={isReadOnly}
-                  error={formErrors.tenderType}
-                  label="Tender Type"
-                  name={`${uid}-tender-type`}
-                  onChange={(value) => handleFieldChange({ tenderType: value as TenderTypeValue })}
-                  options={TENDER_TYPE_OPTIONS}
+                  error={formErrors.tenderRequired}
+                  label="Tender Required"
+                  name={`${uid}-tender-required`}
+                  onChange={(value) => handleFieldChange({ tenderRequired: value as TenderRequiredValue })}
+                  options={TENDER_REQUIRED_OPTIONS}
                   required
-                  value={form.tenderType}
+                  value={form.tenderRequired}
                 />
-              )}
 
-              {procurementStatusOptions.length > 0 && (
-                <RadioGroup
-                  className="create-activity__radio--status"
-                  disabled={isReadOnly}
-                  error={formErrors.procurementStatus}
-                  label="Procurement Status"
-                  name={`${uid}-procurement-status`}
-                  onChange={(value) => handleFieldChange({ procurementStatus: value })}
-                  options={procurementStatusOptions}
-                  required
-                  value={form.procurementStatus}
-                />
-              )}
+                {isTenderRequired && (
+                  <RadioGroup
+                    className="radio-group--tender-type"
+                    disabled={isReadOnly}
+                    error={formErrors.tenderType}
+                    label="Tender Type"
+                    name={`${uid}-tender-type`}
+                    onChange={(value) => handleFieldChange({ tenderType: value as TenderTypeValue })}
+                    options={TENDER_TYPE_OPTIONS}
+                    required
+                    value={form.tenderType}
+                  />
+                )}
+
+                {procurementStatusOptions.length > 0 && (
+                  <RadioGroup
+                    className="create-activity__radio--status"
+                    disabled={isReadOnly}
+                    error={formErrors.procurementStatus}
+                    label="Procurement Status"
+                    name={`${uid}-procurement-status`}
+                    onChange={(value) => handleFieldChange({ procurementStatus: value })}
+                    options={procurementStatusOptions}
+                    required
+                    value={form.procurementStatus}
+                  />
+                )}
+              </div>
             </div>
-          </div>
+          ) : null}
+
+          {isExecutionPhase ? (
+            <div className="edit-activity__procurement-section edit-activity__procurement-section--execution">
+              <div className="create-activity__section-header">
+                <div className="create-activity__section-header-inner">
+                  <span className="create-activity__section-header-icon" aria-hidden="true">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 11l3 3L22 4" />
+                      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                    </svg>
+                  </span>
+                  <div>
+                    <span>Execution Tracking</span>
+                    <h2>Tender & Contract Updates</h2>
+                  </div>
+                </div>
+              </div>
+
+              <div className="edit-activity__procurement-drawer-section">
+                <RadioGroup
+                  className="radio-group--tender-required"
+                  disabled={!canEditExecutionSection}
+                  error={executionFormErrors.tenderRequired}
+                  label="Tender Required"
+                  name={`${uid}-execution-tender-required`}
+                  onChange={(value) => handleExecutionFieldChange({ tenderRequired: value as TenderRequiredValue })}
+                  options={TENDER_REQUIRED_OPTIONS}
+                  required
+                  value={executionForm.tenderRequired}
+                />
+
+                {isExecutionTenderRequired ? (
+                  <RadioGroup
+                    className="radio-group--tender-type"
+                    disabled={!canEditExecutionSection}
+                    error={executionFormErrors.tenderType}
+                    label="Tender Type"
+                    name={`${uid}-execution-tender-type`}
+                    onChange={(value) => handleExecutionFieldChange({ tenderType: value as TenderTypeValue })}
+                    options={TENDER_TYPE_OPTIONS}
+                    required
+                    value={executionForm.tenderType}
+                  />
+                ) : null}
+
+                {executionProcurementStatusOptions.length > 0 ? (
+                  <RadioGroup
+                    className="create-activity__radio--status"
+                    disabled={!canEditExecutionSection}
+                    error={executionFormErrors.procurementStatus}
+                    label="Procurement Status"
+                    name={`${uid}-execution-procurement-status`}
+                    onChange={(value) => handleExecutionFieldChange({ procurementStatus: value })}
+                    options={executionProcurementStatusOptions}
+                    required
+                    value={executionForm.procurementStatus}
+                  />
+                ) : null}
+
+                {shouldShowExecutionRaisedFields ? (
+                  <>
+                    <div className="create-activity__form-row create-activity__form-row--two">
+                      <Input
+                        disabled={!canEditExecutionSection}
+                        error={executionFormErrors.prTicketNumber}
+                        label="PR / Ticket Number"
+                        onChange={(event) => handleExecutionFieldChange({ prTicketNumber: event.target.value })}
+                        value={executionForm.prTicketNumber}
+                      />
+                      <CurrencyInput
+                        disabled={!canEditExecutionSection}
+                        error={executionFormErrors.actualContractValue}
+                        label="Actual Contract Value"
+                        onBlur={handleExecutionCurrencyBlur}
+                        onChange={(event) => handleExecutionFieldChange({ actualContractValue: event.target.value.replace(/,/g, '') })}
+                        value={executionForm.actualContractValue}
+                      />
+                    </div>
+
+                    <Input
+                      disabled={!canEditExecutionSection}
+                      error={executionFormErrors.actualContractDuration}
+                      hint="Enter duration in months"
+                      label="Actual Contract Duration"
+                      onBlur={handleExecutionDurationBlur}
+                      onChange={(event) => handleExecutionFieldChange({ actualContractDuration: event.target.value.replace(/\D/g, '') })}
+                      onFocus={() => {
+                        const raw = executionForm.actualContractDuration.replace(/\s*Month(s?)$/i, '').replace(/\D/g, '')
+                        if (raw !== executionForm.actualContractDuration) {
+                          handleExecutionFieldChange({ actualContractDuration: raw })
+                        }
+                      }}
+                      value={executionForm.actualContractDuration}
+                    />
+
+                    <DatePicker
+                      disabled={!canEditExecutionSection}
+                      error={executionFormErrors.stageUpdateDate}
+                      id={`${uid}-execution-stage-update-date`}
+                      label="Stage Update Date"
+                      onChange={(value) => handleExecutionFieldChange({ stageUpdateDate: value })}
+                      required
+                      value={executionForm.stageUpdateDate}
+                    />
+
+                    <Textarea
+                      disabled={!canEditExecutionSection}
+                      error={executionFormErrors.progressUpdate}
+                      label="Progress Update"
+                      onChange={(event) => handleExecutionFieldChange({ progressUpdate: event.target.value })}
+                      rows={3}
+                      value={executionForm.progressUpdate}
+                    />
+
+                    {shouldShowAttachContract ? (
+                      <div className={`field ${!canEditExecutionSection ? 'field--disabled' : ''}`}>
+                        <span className="field__label">Attach Contract</span>
+                        <input
+                          className="edit-activity__file-upload-input"
+                          disabled={!canEditExecutionSection}
+                          onChange={(event) => handleExecutionFileChange(event.target.files?.[0] ?? null)}
+                          ref={executionFileInputRef}
+                          type="file"
+                        />
+                        <button
+                          className={`edit-activity__file-upload ${executionForm.attachContractFile ? 'edit-activity__file-upload--has-file' : ''}`}
+                          disabled={!canEditExecutionSection}
+                          onClick={() => executionFileInputRef.current?.click()}
+                          type="button"
+                        >
+                          <span className="edit-activity__file-upload-icon" aria-hidden="true">
+                            <Upload size={18} />
+                          </span>
+                          <span className="edit-activity__file-upload-copy">
+                            <strong>{executionForm.attachContractFile ? 'Contract selected' : 'Upload contract file'}</strong>
+                            <span>{executionForm.attachContractFile ? 'You can replace it before saving later.' : 'Static UI only for now. File will not be uploaded yet.'}</span>
+                          </span>
+                          <span className="edit-activity__file-upload-action">
+                            {executionForm.attachContractFile ? 'Replace file' : 'Choose file'}
+                          </span>
+                        </button>
+
+                        {executionForm.attachContractFile ? (
+                          <div className="edit-activity__file-upload-meta">
+                            <span className="edit-activity__file-upload-file">
+                              <strong>{executionForm.attachContractFile.name}</strong>
+                              <span>{formatFileSize(executionForm.attachContractFile.size)}</span>
+                            </span>
+                            {canEditExecutionSection ? (
+                              <button
+                                aria-label="Remove selected contract"
+                                className="edit-activity__file-upload-remove"
+                                onClick={handleRemoveExecutionFile}
+                                type="button"
+                              >
+                                <X size={14} />
+                              </button>
+                            ) : null}
+                          </div>
+                        ) : null}
+
+                        {executionFormErrors.attachContractFile ? <span className="field__error">{executionFormErrors.attachContractFile}</span> : null}
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
+
+                {isExecutionTenderNotRaised ? (
+                  <>
+                    <DatePicker
+                      disabled={!canEditExecutionSection}
+                      error={executionFormErrors.justificationDate}
+                      id={`${uid}-execution-justification-date`}
+                      label="Justification Date"
+                      onChange={(value) => handleExecutionFieldChange({ justificationDate: value })}
+                      value={executionForm.justificationDate}
+                    />
+
+                    <Textarea
+                      disabled={!canEditExecutionSection}
+                      error={executionFormErrors.justification}
+                      label="Justification"
+                      onChange={(event) => handleExecutionFieldChange({ justification: event.target.value })}
+                      rows={3}
+                      value={executionForm.justification}
+                    />
+                  </>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
 
           {/* ── Procurement Details ── */}
           <div className="edit-activity__procurement-section">

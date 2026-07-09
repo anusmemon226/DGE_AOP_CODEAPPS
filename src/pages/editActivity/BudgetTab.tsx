@@ -47,6 +47,16 @@ import {
   type BudgetFieldErrors,
   type BudgetFormData,
 } from './data/budgetData'
+import {
+  cleanRecordId,
+  getProjectRelatedChangeAt,
+  isEmptyRelatedValue,
+  parseProjectRelatedChanges,
+  relatedOldValue,
+  resolveProjectRelatedValue,
+  stringifyMergedProjectRelatedChanges,
+  type ProjectRelatedChanges,
+} from './helpers/projectRelatedChanges'
 
 export type BudgetHeaderAction = {
   canSave: boolean
@@ -113,9 +123,11 @@ interface BudgetTabProps {
   isExecutionPhase?: boolean
   isReadOnly?: boolean
   onHeaderActionChange?: (action: BudgetHeaderAction | null) => void
+  onProjectRelatedChangesChange?: (relatedChanges: string) => void
   plannedEndDate: string
   plannedStartDate: string
   projectId: string
+  projectRelatedChanges?: string | null
   statusCode?: number
 }
 
@@ -127,6 +139,7 @@ const BUDGET_PROJECT_SELECT_FIELDS = [
   'dga_allocated_budget',
   'dga_requested_budget',
   'dga_budget_review_comments',
+  'dga_project_related_changes',
 ] as const
 
 const BUDGET_MONTH_SELECT_FIELDS = [
@@ -308,6 +321,49 @@ function recordToMonth(record: Dga_aop_project_budgets): BudgetMonthRecord | nul
   }
 }
 
+function getBudgetMonthRelatedValue(
+  relatedChanges: string | null | undefined,
+  monthId: string,
+  fieldName: string,
+): unknown {
+  return resolveProjectRelatedValue(getProjectRelatedChangeAt(
+    parseProjectRelatedChanges(relatedChanges),
+    ['budget', 'by_month', cleanRecordId(monthId), fieldName],
+  ))
+}
+
+function applyBudgetRelatedChangesToMonth(
+  month: BudgetMonthRecord,
+  relatedChanges: string | null | undefined,
+): BudgetMonthRecord {
+  const actualBudget = getBudgetMonthRelatedValue(relatedChanges, month.id, 'dga_actual_budget')
+  const deliveredAmount = getBudgetMonthRelatedValue(relatedChanges, month.id, 'dga_delivered_amount')
+
+  return {
+    ...month,
+    actualBudget: isEmptyRelatedValue(actualBudget) ? month.actualBudget : Number(actualBudget),
+    deliveredAmount: isEmptyRelatedValue(deliveredAmount) ? month.deliveredAmount : Number(deliveredAmount),
+  }
+}
+
+function buildBudgetMonthRelatedChanges(
+  month: BudgetMonthRecord | BudgetDrawerMonth,
+  actualBudget: number,
+  deliveredAmount: number,
+): ProjectRelatedChanges {
+  return {
+    budget: {
+      by_month: {
+        [cleanRecordId(month.id)]: {
+          month_name: month.monthName,
+          dga_actual_budget: relatedOldValue(actualBudget),
+          dga_delivered_amount: relatedOldValue(deliveredAmount),
+        },
+      },
+    },
+  }
+}
+
 function recordToBudgetDetail(
   record: Dga_aop_project_budget_detailses,
   accountCodeOptions: Map<string, SelectOption<string>>,
@@ -407,9 +463,11 @@ export function BudgetTab({
   isExecutionPhase = false,
   isReadOnly = false,
   onHeaderActionChange,
+  onProjectRelatedChangesChange,
   plannedEndDate,
   plannedStartDate,
   projectId,
+  projectRelatedChanges,
   statusCode = 1,
 }: BudgetTabProps) {
   const [form, setForm] = useState<BudgetFormData>(INITIAL_BUDGET_FORM)
@@ -600,6 +658,10 @@ export function BudgetTab({
         const months = ((monthsResult.data ?? []) as Dga_aop_project_budgets[])
           .map(recordToMonth)
           .filter((record): record is BudgetMonthRecord => Boolean(record))
+          .map((month) => applyBudgetRelatedChangesToMonth(
+            month,
+            project.dga_project_related_changes ?? projectRelatedChanges,
+          ))
 
         const monthIds = months.map((record) => record.id).filter(Boolean)
         let details: BudgetDetailRecord[] = []
@@ -631,11 +693,11 @@ export function BudgetTab({
 
           const monthsWithDetails = months.map((month) => {
             const detailRows = detailsByMonthId.get(normalizeId(month.id)) ?? []
-            return {
+            return applyBudgetRelatedChangesToMonth({
               ...month,
               actualBudget: detailRows.length > 0 ? sumDetailAmounts(detailRows) : month.actualBudget,
               details: detailRows,
-            }
+            }, project.dga_project_related_changes ?? projectRelatedChanges)
           })
 
           const nextForm = buildForm(project, monthsWithDetails)
@@ -673,7 +735,7 @@ export function BudgetTab({
     return () => {
       isMounted = false
     }
-  }, [activityScope, hierarchyId, isExecutionPhase, projectId])
+  }, [activityScope, hierarchyId, isExecutionPhase, projectId, projectRelatedChanges])
 
   function handleFieldChange(fields: Partial<BudgetFormData>) {
     if (isReadOnly) return
@@ -816,6 +878,28 @@ export function BudgetTab({
     )
   }
 
+  async function saveBudgetMonthRelatedChanges(
+    monthRecord: BudgetMonthRecord | BudgetDrawerMonth,
+    actualBudget: number,
+    deliveredAmount: number,
+  ) {
+    const projectResult = await Dga_aop_projectsesService.get(projectId, {
+      select: ['dga_project_related_changes'],
+    })
+    assertOperationSuccess(projectResult, 'Failed to load activity change tracking.')
+
+    const nextRelatedChanges = stringifyMergedProjectRelatedChanges(
+      projectResult.data?.dga_project_related_changes,
+      buildBudgetMonthRelatedChanges(monthRecord, actualBudget, deliveredAmount),
+    )
+    const result = await Dga_aop_projectsesService.update(projectId, {
+      dga_project_related_changes: nextRelatedChanges,
+    } as Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>>)
+    assertOperationSuccess(result, `Failed to update ${monthRecord.monthName} budget changes.`)
+    onProjectRelatedChangesChange?.(nextRelatedChanges)
+    return nextRelatedChanges
+  }
+
   function handleDeliveredValueChange(monthId: string, value: string) {
     if (!executionMonthlyEditAllowed) return
 
@@ -858,12 +942,7 @@ export function BudgetTab({
 
     try {
       setIsSavingExecutionMonth(monthId)
-      const result = await Dga_aop_project_budgetsService.update(monthId, {
-        dga_actual_budget: monthRecord.actualBudget,
-        dga_delivered_amount: nextDeliveredValue,
-        dga_is_zero: false,
-      })
-      assertOperationSuccess(result, `Failed to update ${monthRecord.monthName} delivered values.`)
+      await saveBudgetMonthRelatedChanges(monthRecord, monthRecord.actualBudget, nextDeliveredValue)
 
       updateMonthRecord(monthId, (current) => ({
         ...current,
@@ -905,12 +984,7 @@ export function BudgetTab({
 
     try {
       setIsSavingExecutionMonth(monthId)
-      const result = await Dga_aop_project_budgetsService.update(monthId, {
-        dga_actual_budget: nextActualAmount,
-        dga_delivered_amount: nextDeliveredAmount,
-        dga_is_zero: nextZeroState,
-      })
-      assertOperationSuccess(result, `Failed to update ${monthRecord.monthName}.`)
+      await saveBudgetMonthRelatedChanges(monthRecord, nextActualAmount, nextDeliveredAmount)
 
       updateMonthRecord(monthId, (current) => ({
         ...current,
@@ -1134,12 +1208,7 @@ export function BudgetTab({
       }
       const nextDeliveredAmount = selectedDrawerMonth.isZero ? 0 : parseNum(deliveredDraft)
 
-      const monthResult = await Dga_aop_project_budgetsService.update(selectedDrawerMonth.id, {
-        dga_actual_budget: nextActualBudget,
-        dga_delivered_amount: nextDeliveredAmount,
-        dga_is_zero: selectedDrawerMonth.isZero,
-      })
-      assertOperationSuccess(monthResult, `Failed to update ${selectedDrawerMonth.monthName} budget summary.`)
+      await saveBudgetMonthRelatedChanges(selectedDrawerMonth, nextActualBudget, nextDeliveredAmount)
 
       updateMonthRecord(selectedDrawerMonth.id, (current) => ({
         ...current,

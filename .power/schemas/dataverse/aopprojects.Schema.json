@@ -252,6 +252,14 @@
           "required": true,
           "x-ms-keyType": "primary"
         },
+        "dga_budget": {
+          "type": "string",
+          "title": "Budget",
+          "x-ms-dataverse-attribute": "dga_budget",
+          "x-ms-dataverse-type": "MemoType",
+          "x-ms-schema-name": "dga_budget",
+          "maxLength": 1048576
+        },
         "dga_budget_review_comments": {
           "type": "string",
           "title": "Budget Review Comments",
@@ -393,6 +401,14 @@
           "x-ms-schema-name": "dga_departmentName",
           "x-ms-read-only": true,
           "maxLength": 200
+        },
+        "dga_dependency": {
+          "type": "string",
+          "title": "Dependency",
+          "x-ms-dataverse-attribute": "dga_dependency",
+          "x-ms-dataverse-type": "MemoType",
+          "x-ms-schema-name": "dga_dependency",
+          "maxLength": 1048576
         },
         "dga_description_summary": {
           "type": "string",
@@ -614,6 +630,14 @@
           "x-ms-schema-name": "dga_longtermimpactprojectlongtermimpact",
           "maxLength": 2000
         },
+        "dga_milestone": {
+          "type": "string",
+          "title": "Milestone",
+          "x-ms-dataverse-attribute": "dga_milestone",
+          "x-ms-dataverse-type": "MemoType",
+          "x-ms-schema-name": "dga_milestone",
+          "maxLength": 1048576
+        },
         "dga_multi_year_project": {
           "type": "string",
           "title": "Multi-Year Project",
@@ -717,6 +741,14 @@
           "x-ms-dataverse-type": "DateTimeType",
           "x-ms-schema-name": "dga_planned_start_date",
           "required": true
+        },
+        "dga_procurement_plan": {
+          "type": "string",
+          "title": "Procurement Plan",
+          "x-ms-dataverse-attribute": "dga_procurement_plan",
+          "x-ms-dataverse-type": "MemoType",
+          "x-ms-schema-name": "dga_procurement_plan",
+          "maxLength": 1048576
         },
         "dga_project_activity_status": {
           "type": "string",
@@ -897,6 +929,14 @@
           "x-ms-read-only": true,
           "maxLength": 200
         },
+        "dga_project_related_changes": {
+          "type": "string",
+          "title": "Project Related Changes",
+          "x-ms-dataverse-attribute": "dga_project_related_changes",
+          "x-ms-dataverse-type": "MemoType",
+          "x-ms-schema-name": "dga_project_related_changes",
+          "maxLength": 1048576
+        },
         "dga_project_type": {
           "type": "string",
           "title": "Project Type",
@@ -939,30 +979,30 @@
           "x-ms-dataverse-type": "LookupType",
           "x-ms-schema-name": "dga_record_creator"
         },
-        "dga_record_creator_team_id": {
+        "dga_record_creator_team": {
           "type": "string",
           "title": "Record Creator Team",
-          "x-ms-dataverse-attribute": "dga_record_creator_team_id",
+          "x-ms-dataverse-attribute": "dga_record_creator_team",
           "x-ms-dataverse-type": "LookupType",
-          "x-ms-schema-name": "dga_record_creator_team_id"
+          "x-ms-schema-name": "dga_record_creator_team"
         },
-        "dga_record_creator_team_idname": {
+        "dga_record_creator_teamname": {
           "type": "string",
-          "title": "dga_record_creator_team_idname",
-          "x-ms-dataverse-attribute": "dga_record_creator_team_idname",
+          "title": "dga_record_creator_teamname",
+          "x-ms-dataverse-attribute": "dga_record_creator_teamname",
           "x-ms-dataverse-type": "StringType",
-          "x-ms-schema-name": "dga_record_creator_team_idName",
+          "x-ms-schema-name": "dga_record_creator_teamName",
           "x-ms-read-only": true,
-          "maxLength": 200
+          "maxLength": 160
         },
-        "dga_record_creator_team_idyominame": {
+        "dga_record_creator_teamyominame": {
           "type": "string",
-          "title": "dga_record_creator_team_idyominame",
-          "x-ms-dataverse-attribute": "dga_record_creator_team_idyominame",
+          "title": "dga_record_creator_teamyominame",
+          "x-ms-dataverse-attribute": "dga_record_creator_teamyominame",
           "x-ms-dataverse-type": "StringType",
-          "x-ms-schema-name": "dga_record_creator_team_idYomiName",
+          "x-ms-schema-name": "dga_record_creator_teamYomiName",
           "x-ms-read-only": true,
-          "maxLength": 200
+          "maxLength": 160
         },
         "dga_record_creatorname": {
           "type": "string",

@@ -44,7 +44,6 @@ import { ReviewChangesPanel } from './editActivity/ReviewChangesPanel'
 import {
   assertOperationSuccess,
   buildActivityInfoUpdatePayload,
-  buildExecutionStatusUpdatePayload,
   getResultValue,
   normalizeControlledRules,
   projectToActivityForm,
@@ -122,6 +121,7 @@ const ACTIVITY_INFO_SELECT_FIELDS = [
   'statuscode',
   'dga_project_phase',
   'dga_project_activity_status',
+  'dga_project_related_changes',
   '_dga_project_planning_instance_value',
 ]
 
@@ -173,6 +173,144 @@ function formatStatusCode(code: number): string {
 
 function normalizeId(id?: string | null) {
   return id?.replace(/[{}]/g, '').toLowerCase() ?? ''
+}
+
+type ProjectRelatedChange = {
+  new_value: unknown
+  old_value: unknown
+}
+
+type ProjectRelatedChanges = {
+  [key: string]: ProjectRelatedChange | ProjectRelatedChanges
+}
+
+function emptyRelatedChange(): ProjectRelatedChange {
+  return {
+    old_value: '',
+    new_value: '',
+  }
+}
+
+function buildExecutionRelatedChangesTemplate(): ProjectRelatedChanges {
+  return {
+    activity_information: {
+      dga_project_activity_status: emptyRelatedChange(),
+      dga_justification_for_activity_status: emptyRelatedChange(),
+    },
+  }
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function mergeProjectRelatedChanges(base: ProjectRelatedChanges, override: ProjectRelatedChanges): ProjectRelatedChanges {
+  const merged: ProjectRelatedChanges = { ...base }
+
+  Object.entries(override).forEach(([key, value]) => {
+    const existingValue = merged[key]
+
+    if (isPlainObject(existingValue) && isPlainObject(value) && !('old_value' in value) && !('new_value' in value)) {
+      merged[key] = mergeProjectRelatedChanges(existingValue as ProjectRelatedChanges, value as ProjectRelatedChanges)
+      return
+    }
+
+    merged[key] = value
+  })
+
+  return merged
+}
+
+function getProjectRelatedChangeAt(changes: ProjectRelatedChanges, path: string[]): ProjectRelatedChange | undefined {
+  let current: ProjectRelatedChange | ProjectRelatedChanges | undefined = changes
+
+  for (const segment of path) {
+    if (!isPlainObject(current)) {
+      return undefined
+    }
+
+    current = (current as ProjectRelatedChanges)[segment]
+  }
+
+  if (isPlainObject(current) && ('old_value' in current || 'new_value' in current)) {
+    return current as ProjectRelatedChange
+  }
+
+  return undefined
+}
+
+function isEmptyRelatedValue(value: unknown) {
+  return value === undefined || value === null || String(value).trim() === ''
+}
+
+function resolveProjectRelatedValue(change: ProjectRelatedChange | undefined): unknown {
+  if (!change) return undefined
+
+  if (isEmptyRelatedValue(change.new_value)) {
+    return change.old_value
+  }
+
+  if (String(change.old_value ?? '') === String(change.new_value ?? '')) {
+    return change.new_value
+  }
+
+  return change.old_value
+}
+
+function applyActivityInformationRelatedChanges(form: ActivityForm, relatedChanges?: string | null): ActivityForm {
+  const changes = parseProjectRelatedChanges(relatedChanges)
+  const activityStatus = resolveProjectRelatedValue(getProjectRelatedChangeAt(
+    changes,
+    ['activity_information', 'dga_project_activity_status'],
+  ))
+  const activityStatusJustification = resolveProjectRelatedValue(getProjectRelatedChangeAt(
+    changes,
+    ['activity_information', 'dga_justification_for_activity_status'],
+  ))
+
+  return normalizeControlledRules({
+    ...form,
+    activityStatus: isEmptyRelatedValue(activityStatus)
+      ? form.activityStatus
+      : String(activityStatus) as ActivityForm['activityStatus'],
+    activityStatusJustification: isEmptyRelatedValue(activityStatusJustification)
+      ? form.activityStatusJustification
+      : String(activityStatusJustification),
+  })
+}
+
+function buildRelatedOldValueChange(
+  nextOldValue: unknown,
+): ProjectRelatedChange {
+  return {
+    old_value: nextOldValue ?? '',
+    new_value: '',
+  }
+}
+
+function parseProjectRelatedChanges(value?: string | null): ProjectRelatedChanges {
+  if (!value?.trim()) {
+    return {}
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown
+
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {}
+    }
+
+    return parsed as ProjectRelatedChanges
+  } catch {
+    return {}
+  }
+}
+
+function buildProjectRelatedChangesJson(
+  existingValue: string | undefined,
+  changes: ProjectRelatedChanges,
+) {
+  return JSON.stringify(mergeProjectRelatedChanges(parseProjectRelatedChanges(existingValue), changes))
 }
 
 function getResultArray<T>(result: unknown): T[] {
@@ -453,12 +591,15 @@ export function EditActivity() {
         setActivityLeadOptions(activityLeadUsers)
         setPendingWith(ownerName || 'Not assigned')
         setActivity(project)
-        setForm(projectToActivityForm(project, {
-          sectorId: project._dga_sector_value ?? sector?.dga_divisional_hierarchyid ?? '',
-          sectorName: sector?.dga_name ?? '',
-          divisionId: project._dga_department_value ?? division?.dga_divisional_hierarchyid ?? '',
-          divisionName: division?.dga_name ?? '',
-        }))
+        setForm(applyActivityInformationRelatedChanges(
+          projectToActivityForm(project, {
+            sectorId: project._dga_sector_value ?? sector?.dga_divisional_hierarchyid ?? '',
+            sectorName: sector?.dga_name ?? '',
+            divisionId: project._dga_department_value ?? division?.dga_divisional_hierarchyid ?? '',
+            divisionName: division?.dga_name ?? '',
+          }),
+          project.dga_project_related_changes,
+        ))
       } catch (error) {
         if (isMounted) {
           setErrors({ context: error instanceof Error ? error.message : 'Failed to load context.' })
@@ -552,11 +693,33 @@ export function EditActivity() {
 
     setIsSavingActivityInfo(true)
     try {
-      const payload = editPermissions.isPmoClassificationOnly
-        ? buildPmoActivityInfoUpdatePayload(form)
-        : editPermissions.canEditExecutionStatusOnly
-          ? buildExecutionStatusUpdatePayload(form)
-        : buildActivityInfoUpdatePayload(form, isExecutionPhase)
+      const payload = (() => {
+        if (editPermissions.isPmoClassificationOnly) {
+          return buildPmoActivityInfoUpdatePayload(form)
+        }
+
+        if (editPermissions.canEditExecutionStatusOnly) {
+          const projectRelatedChanges = buildProjectRelatedChangesJson(
+            activity?.dga_project_related_changes,
+            {
+              activity_information: {
+                dga_project_activity_status: buildRelatedOldValueChange(
+                  form.activityStatus ? Number(form.activityStatus) : '',
+                ),
+                dga_justification_for_activity_status: buildRelatedOldValueChange(
+                  form.activityStatusJustification,
+                ),
+              },
+            },
+          )
+
+          return {
+            dga_project_related_changes: projectRelatedChanges,
+          } satisfies Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>>
+        }
+
+        return buildActivityInfoUpdatePayload(form, isExecutionPhase)
+      })()
       console.log('Edit activity information payload', payload)
       const result = await Dga_aop_projectsesService.update(
         projectId,
@@ -574,10 +737,15 @@ export function EditActivity() {
         dga_adeo_review_required: payload.dga_adeo_review_required ?? currentActivity.dga_adeo_review_required,
         dga_does_this_project_require_procurement: payload.dga_does_this_project_require_procurement ?? currentActivity.dga_does_this_project_require_procurement,
         dga_doesthisprojectrequirebudgetallocation: payload.dga_doesthisprojectrequirebudgetallocation ?? currentActivity.dga_doesthisprojectrequirebudgetallocation,
-        dga_justification_for_activity_status: payload.dga_justification_for_activity_status ?? currentActivity.dga_justification_for_activity_status,
+        dga_justification_for_activity_status: editPermissions.canEditExecutionStatusOnly
+          ? currentActivity.dga_justification_for_activity_status
+          : payload.dga_justification_for_activity_status ?? currentActivity.dga_justification_for_activity_status,
         dga_planned_end_date: form.plannedEndDate,
         dga_planned_start_date: form.plannedStartDate,
-        dga_project_activity_status: payload.dga_project_activity_status ?? currentActivity.dga_project_activity_status,
+        dga_project_activity_status: editPermissions.canEditExecutionStatusOnly
+          ? currentActivity.dga_project_activity_status
+          : payload.dga_project_activity_status ?? currentActivity.dga_project_activity_status,
+        dga_project_related_changes: payload.dga_project_related_changes ?? currentActivity.dga_project_related_changes,
         dga_project_kpi: form.activityKpi,
         dga_registered_or_will_be_registered_in_epm: payload.dga_registered_or_will_be_registered_in_epm ?? currentActivity.dga_registered_or_will_be_registered_in_epm,
         dga_scope: form.scopeDescription,
@@ -1203,9 +1371,30 @@ export function EditActivity() {
     setSuccessMessage('')
 
     try {
+      const nextActivityStatus = 776140006 as Dga_aop_projectsesBase['dga_project_activity_status']
+      const nextActivityStatusJustification = ''
+      const projectRelatedChanges = buildProjectRelatedChangesJson(
+        activity?.dga_project_related_changes,
+        mergeProjectRelatedChanges(
+          buildExecutionRelatedChangesTemplate(),
+          {
+            activity_information: {
+              dga_project_activity_status: {
+                old_value: nextActivityStatus,
+                new_value: activity?.dga_project_activity_status ?? '',
+              },
+              dga_justification_for_activity_status: {
+                old_value: activity?.dga_justification_for_activity_status ?? '',
+                new_value: '',
+              },
+            },
+          },
+        ),
+      )
       const payload = {
-        dga_project_activity_status: 776140006 as Dga_aop_projectsesBase['dga_project_activity_status'],
-        dga_justification_for_activity_status: '',
+        dga_project_activity_status: nextActivityStatus,
+        dga_justification_for_activity_status: nextActivityStatusJustification,
+        dga_project_related_changes: projectRelatedChanges,
       }
 
       console.log('Start Activity payload', payload)
@@ -1217,8 +1406,9 @@ export function EditActivity() {
 
       setActivity((currentActivity) => currentActivity ? {
         ...currentActivity,
-        dga_project_activity_status: 776140006,
-        dga_justification_for_activity_status: '',
+        dga_project_activity_status: nextActivityStatus,
+        dga_justification_for_activity_status: nextActivityStatusJustification,
+        dga_project_related_changes: projectRelatedChanges,
       } : currentActivity)
       setForm((currentForm) => ({
         ...currentForm,
@@ -1235,11 +1425,28 @@ export function EditActivity() {
     } finally {
       setIsStartingActivity(false)
     }
-  }, [editPermissions.canStartActivity, isDivisionMember, isStartingActivity, projectId])
+  }, [
+    activity?.dga_justification_for_activity_status,
+    activity?.dga_project_activity_status,
+    activity?.dga_project_related_changes,
+    editPermissions.canStartActivity,
+    isDivisionMember,
+    isStartingActivity,
+    projectId,
+  ])
 
   const handleSubmitActivityUpdates = useCallback(() => {
     // TODO: Implement submit activity updates logic
     console.log('Submit Activity Updates')
+  }, [])
+
+  const handleProjectRelatedChangesUpdate = useCallback((relatedChanges: string) => {
+    setActivity((currentActivity) => currentActivity
+      ? {
+          ...currentActivity,
+          dga_project_related_changes: relatedChanges,
+        }
+      : currentActivity)
   }, [])
 
   // ── Tab content ──
@@ -1282,7 +1489,9 @@ export function EditActivity() {
             isExecutionPhase={hasExecutionActivityStarted}
             isReadOnly={editPermissions.milestonesReadOnly}
             isAdeoVisible={isAdeoVisible}
+            onProjectRelatedChangesChange={handleProjectRelatedChangesUpdate}
             projectId={projectId}
+            projectRelatedChanges={activity?.dga_project_related_changes}
           />
         )
       case 'procurements':
@@ -1291,8 +1500,12 @@ export function EditActivity() {
             activityPlannedEndDate={form.plannedEndDate}
             activityPlannedStartDate={form.plannedStartDate}
             activityScope={form.activityScope}
+            canEditExecutionFieldsOnly={editPermissions.canEditExecutionStatusOnly}
+            isExecutionPhase={isExecutionPhase}
             isReadOnly={editPermissions.procurementReadOnly}
+            onProjectRelatedChangesChange={handleProjectRelatedChangesUpdate}
             projectId={projectId}
+            projectRelatedChanges={activity?.dga_project_related_changes}
           />
         )
       case 'engagement-plans':
@@ -1322,7 +1535,9 @@ export function EditActivity() {
             onHeaderActionChange={setBudgetHeaderAction}
             plannedEndDate={form.plannedEndDate}
             plannedStartDate={form.plannedStartDate}
+            onProjectRelatedChangesChange={handleProjectRelatedChangesUpdate}
             projectId={projectId}
+            projectRelatedChanges={activity?.dga_project_related_changes}
             statusCode={statusCode}
           />
         )
@@ -1748,7 +1963,13 @@ export function EditActivity() {
 
       {/* Stage content */}
       <div className="edit-activity__stage-content" role="tabpanel">
-        {hasExecutionActivityStarted ? <ReviewChangesPanel key={activeTab} activeTab={activeTab} /> : null}
+        {hasExecutionActivityStarted ? (
+          <ReviewChangesPanel
+            key={activeTab}
+            activeTab={activeTab}
+            relatedChanges={activity?.dga_project_related_changes}
+          />
+        ) : null}
         {renderTabContent()}
       </div>
 

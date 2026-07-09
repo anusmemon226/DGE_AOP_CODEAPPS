@@ -52,9 +52,9 @@ export const Dga_aop_projectsesdga_project_activity_status = {
 } as const;
 export type Dga_aop_projectsesdga_project_activity_status = keyof typeof Dga_aop_projectsesdga_project_activity_status;
 export const Dga_aop_projectsesdga_project_categorized_under = {
-  576610000: 'Government of the Future Strategy',
-  576610001: 'DGE Corporate Strategy',
-  576610002: 'Abu Dhabi Government Digital Strategy'
+  576610000: 'GovernmentoftheFutureStrategy',
+  576610001: 'DGECorporateStrategy',
+  576610002: 'AbuDhabiGovernmentDigitalStrategy'
 } as const;
 export type Dga_aop_projectsesdga_project_categorized_under = keyof typeof Dga_aop_projectsesdga_project_categorized_under;
 export const Dga_aop_projectsesdga_project_phase = {
@@ -109,6 +109,7 @@ export interface Dga_aop_projectsesBase {
   dga_adeo_review_required?: boolean;
   dga_allocated_budget?: number;
   dga_aop_projectsid: string;
+  dga_budget?: string;
   dga_budget_review_comments?: string;
   dga_budget_reviewed?: boolean;
   dga_budget_source?: Dga_aop_projectsesdga_budget_source;
@@ -117,6 +118,7 @@ export interface Dga_aop_projectsesBase {
   dga_delete_request_comment?: string;
   dga_delete_request_rejection_comment?: string;
   "dga_department@odata.bind": string;
+  dga_dependency?: string;
   dga_description_summary?: string;
   "dga_dge_corporate_strategy_pillar@odata.bind"?: string;
   dga_does_this_project_require_procurement?: Dga_aop_projectsesdga_does_this_project_require_procurement;
@@ -129,6 +131,7 @@ export interface Dga_aop_projectsesBase {
   "dga_link_to_dge_strategic_objective@odata.bind"?: string;
   "dga_link_to_strategic_kpis@odata.bind"?: string;
   dga_longtermimpactprojectlongtermimpact?: string;
+  dga_milestone?: string;
   dga_multi_year_project?: boolean;
   dga_name: string;
   dga_new_outcome?: string;
@@ -136,6 +139,7 @@ export interface Dga_aop_projectsesBase {
   dga_outcome?: string;
   dga_planned_end_date: string;
   dga_planned_start_date: string;
+  dga_procurement_plan?: string;
   dga_project_activity_status?: Dga_aop_projectsesdga_project_activity_status;
   dga_project_categorized_under?: Dga_aop_projectsesdga_project_categorized_under;
   dga_project_description?: string;
@@ -146,9 +150,10 @@ export interface Dga_aop_projectsesBase {
   dga_project_phase?: Dga_aop_projectsesdga_project_phase;
   dga_project_plan_if_any?: string;
   "dga_project_planning_instance@odata.bind"?: string;
+  dga_project_related_changes?: string;
   dga_project_type: Dga_aop_projectsesdga_project_type;
   "dga_record_creator@odata.bind"?: string;
-  "dga_record_creator_team_id@odata.bind"?: string;
+  "dga_record_creator_team@odata.bind"?: string;
   dga_registered_or_will_be_registered_in_epm?: boolean;
   dga_rejection_reason?: string;
   dga_request_type?: Dga_aop_projectsesdga_request_type;
@@ -204,8 +209,8 @@ export interface Dga_aop_projectses extends Dga_aop_projectsesBase {
   dga_project_phasename?: string;
   dga_project_planning_instancename?: string;
   dga_project_typename?: string;
-  dga_record_creator_team_idname?: string;
-  dga_record_creator_team_idyominame?: string;
+  dga_record_creator_teamname?: string;
+  dga_record_creator_teamyominame?: string;
   dga_record_creatorname?: string;
   dga_record_creatoryominame?: string;
   dga_registered_or_will_be_registered_in_epmname?: string;
@@ -249,8 +254,8 @@ export interface Dga_aop_projectses extends Dga_aop_projectsesBase {
   _dga_project_planning_instance_value?: string;
   dga_record_creator?: object;
   _dga_record_creator_value?: string;
-  dga_record_creator_team_id?: object;
-  _dga_record_creator_team_id_value?: string;
+  dga_record_creator_team?: object;
+  _dga_record_creator_team_value?: string;
   dga_sector?: object;
   _dga_sector_value?: string;
   modifiedby?: object;

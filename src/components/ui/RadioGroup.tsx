@@ -3,6 +3,7 @@ import './ui.css'
 type RadioOption<TValue extends string> = {
   className?: string
   description?: string
+  disabled?: boolean
   label: string
   value: TValue
 }
@@ -37,16 +38,20 @@ export function RadioGroup<TValue extends string>({
         {required ? <span aria-hidden="true" className="field__required"> *</span> : null}
       </legend>
       <div className="radio-group__options">
-        {options.map((option) => (
+        {options.map((option) => {
+          const isOptionDisabled = disabled || Boolean(option.disabled)
+
+          return (
           <label className={`choice choice--radio ${option.className || ''}`.trim()} key={option.value}>
-            <input checked={option.value === value} disabled={disabled} name={name} onChange={() => onChange(option.value)} type="radio" />
+            <input checked={option.value === value} disabled={isOptionDisabled} name={name} onChange={() => onChange(option.value)} type="radio" />
             <span className="choice__box" aria-hidden="true" />
             <span className="choice__copy">
               <span>{option.label}</span>
               {option.description ? <small>{option.description}</small> : null}
             </span>
           </label>
-        ))}
+          )
+        })}
       </div>
       {error ? <span className="field__error">{error}</span> : null}
     </fieldset>
