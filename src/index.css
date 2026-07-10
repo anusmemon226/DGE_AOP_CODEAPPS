@@ -1,12 +1,12 @@
 :root {
   --font-family-base: Segoe UI,Noto Sans,Helvetica Neue,Arial,sans-serif;
-  --font-size-caption: 0.72rem;
-  --font-size-control: 0.84rem;
+  --font-size-caption: 0.75rem;
+  --font-size-control: 0.875rem;
   --font-size-body: 0.875rem;
-  --font-size-body-lg: 0.95rem;
+  --font-size-body-lg: 1rem;
   --font-size-title-sm: 1rem;
-  --font-size-title-md: 1.15rem;
-  --font-size-title-lg: 1.45rem;
+  --font-size-title-md: 1.125rem;
+  --font-size-title-lg: 1.5rem;
   --font-weight-regular: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
