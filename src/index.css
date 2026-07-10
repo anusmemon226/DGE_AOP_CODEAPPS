@@ -1,5 +1,16 @@
 :root {
   --font-family-base: Segoe UI,Noto Sans,Helvetica Neue,Arial,sans-serif;
+  --font-size-caption: 0.72rem;
+  --font-size-control: 0.84rem;
+  --font-size-body: 0.875rem;
+  --font-size-body-lg: 0.95rem;
+  --font-size-title-sm: 1rem;
+  --font-size-title-md: 1.15rem;
+  --font-size-title-lg: 1.45rem;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-strong: 700;
   --color-primary: #375EFB;
   --color-primary-hover: #2C4EE0;
   --color-primary-soft: #EBEFFF;
@@ -46,7 +57,7 @@
   --sidebar-collapsed-width: 4rem;
   font-family: var(--font-family-base);
   line-height: 1.5;
-  font-weight: 400;
+  font-weight: var(--font-weight-regular);
   color: var(--color-text-primary);
   background-color: var(--color-bg);
   font-synthesis: none;
@@ -108,6 +119,8 @@ html {
 body {
   background: var(--color-bg);
   font-family: var(--font-family-base);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-regular);
   margin: 0;
   min-height: 100vh;
 }

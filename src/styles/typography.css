@@ -1,0 +1,198 @@
+/* Global typography normalization
+   Keeps the enterprise UI crisp without heavy, inconsistent bolding. */
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  letter-spacing: -0.02em;
+}
+
+h1 {
+  font-weight: var(--font-weight-strong) !important;
+}
+
+h2,
+h3 {
+  font-weight: var(--font-weight-semibold) !important;
+}
+
+h4,
+h5,
+h6 {
+  font-weight: var(--font-weight-semibold) !important;
+}
+
+strong,
+b {
+  font-weight: var(--font-weight-semibold);
+}
+
+.button,
+button:not(.icon-button):not(.modal__close):not(.date-picker__grid button) {
+  font-size: var(--font-size-control) !important;
+  font-weight: var(--font-weight-semibold) !important;
+  letter-spacing: -0.005em;
+}
+
+.button--primary,
+.button--danger,
+.button--secondary,
+.button--ghost,
+.confirm-dialog__actions .button,
+.approvals-page__header-actions .button,
+.edit-activity__actions .button,
+.edit-activity__command-actions .button,
+.create-activity__hero-footer .button {
+  font-weight: var(--font-weight-semibold) !important;
+}
+
+.field__label,
+.input-field__label,
+.textarea-field__label,
+.select-field__label,
+.radio-group > .field__label,
+.checkbox-group > .field__label,
+.currency-input__label {
+  font-size: var(--font-size-caption) !important;
+  font-weight: var(--font-weight-semibold) !important;
+  letter-spacing: 0.035em;
+}
+
+.input-field__input,
+.textarea-field__textarea,
+.select-field__value,
+.select-menu__option,
+.currency-input__control input {
+  font-size: var(--font-size-body) !important;
+  font-weight: var(--font-weight-medium) !important;
+}
+
+.choice,
+.radio-group .choice,
+.checkbox-group .choice,
+.choice__copy,
+.choice__copy > span {
+  font-size: var(--font-size-control) !important;
+  font-weight: var(--font-weight-medium) !important;
+}
+
+.radio-group .choice:has(input:checked),
+.checkbox-group .choice:has(input:checked),
+.choice:has(input:checked) .choice__copy,
+.choice:has(input:checked) .choice__copy > span {
+  font-weight: var(--font-weight-semibold) !important;
+}
+
+.badge,
+.status-badge,
+.approval-status-badge,
+[class*='__chip'],
+[class*='__pill'],
+[class*='capsule'],
+[class*='badge'] {
+  font-size: var(--font-size-caption) !important;
+  font-weight: var(--font-weight-semibold) !important;
+}
+
+.tabs__tab,
+[class*='__tab'],
+[class*='view-btn'],
+[class*='view-toggle'] button {
+  font-size: 0.8rem !important;
+  font-weight: var(--font-weight-semibold) !important;
+}
+
+.data-grid th,
+.data-grid__header,
+.approvals-grid__head,
+.activities-grid__head,
+.activities-list-grid__head,
+table th {
+  font-size: var(--font-size-caption) !important;
+  font-weight: var(--font-weight-semibold) !important;
+  letter-spacing: 0.035em;
+}
+
+.data-grid td,
+.approvals-grid__row,
+.activities-grid__row,
+.activities-list-grid__row,
+table td {
+  font-size: var(--font-size-body) !important;
+  font-weight: var(--font-weight-medium);
+}
+
+.approvals-grid__name strong,
+.activities-grid__name strong,
+.activities-list-grid__name strong,
+.edit-activity__milestone-name,
+.edit-activity__procurement-name,
+.edit-activity__engagement-name {
+  font-weight: var(--font-weight-semibold) !important;
+}
+
+.approvals-grid__details-panel dt,
+.activities-grid__details-panel dt,
+.activities-list-grid__details-panel dt,
+.stat-card span,
+[class*='__eyebrow'],
+[class*='__meta-label'] {
+  font-size: var(--font-size-caption) !important;
+  font-weight: var(--font-weight-semibold) !important;
+  letter-spacing: 0.04em;
+}
+
+.approvals-grid__details-panel dd,
+.activities-grid__details-panel dd,
+.activities-list-grid__details-panel dd,
+.currency-display,
+[class*='__value'] {
+  font-weight: var(--font-weight-semibold) !important;
+}
+
+.modal__header h2,
+.confirm-dialog__title,
+.side-drawer__title,
+.card__title,
+.create-activity__section-title,
+.edit-activity__section-title,
+.edit-activity__card-title,
+.ai-summary-panel__title,
+.review-changes__title {
+  font-size: var(--font-size-title-sm) !important;
+  font-weight: var(--font-weight-semibold) !important;
+  letter-spacing: -0.015em;
+}
+
+.create-activity__hero-title,
+.edit-activity__hero-title,
+.approvals-page__header-text h1,
+.activities-list__header-text h1 {
+  font-weight: var(--font-weight-strong) !important;
+  letter-spacing: -0.025em;
+}
+
+.ai-summary-panel__label,
+.review-changes__label,
+.edit-activity__execution-budget-label,
+.edit-activity__execution-budget-stat-label {
+  font-size: var(--font-size-caption) !important;
+  font-weight: var(--font-weight-semibold) !important;
+}
+
+.ai-summary-panel__summary,
+.review-changes__value,
+.edit-activity__execution-budget-value,
+.edit-activity__execution-budget-currency {
+  font-size: var(--font-size-body) !important;
+  font-weight: var(--font-weight-medium) !important;
+}
+
+.ai-summary-panel__summary strong,
+.review-changes__field-name,
+.edit-activity__execution-budget-value strong {
+  font-weight: var(--font-weight-semibold) !important;
+}

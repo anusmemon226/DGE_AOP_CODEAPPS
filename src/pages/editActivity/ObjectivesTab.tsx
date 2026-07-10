@@ -512,7 +512,7 @@ export function ObjectivesTab({
                   className="radio-group--link-objective"
                   disabled={isReadOnly}
                   error={fieldErrors.digitalObjectiveId}
-                  label="Link to Digital Strategy objectives"
+                  label="Link to Digital Strategy Objectives"
                   name={`${uid}-link-objective`}
                   onChange={(value) => {
                     applyFormChange((currentForm) => ({ ...currentForm, digitalObjectiveId: value }))
@@ -536,7 +536,7 @@ export function ObjectivesTab({
                   className="radio-group--link-kpi"
                   disabled={isReadOnly}
                   error={fieldErrors.strategicKpiId}
-                  label="Link to strategic KPIs"
+                  label="Link to Strategic KPIs"
                   name={`${uid}-link-kpi`}
                   onChange={(value) => {
                     applyFormChange((currentForm) => ({ ...currentForm, strategicKpiId: value }))

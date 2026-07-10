@@ -11,6 +11,7 @@ import { UiShowcase } from './pages/UiShowcase'
 import { useAppSelector } from './store/hooks'
 import { canViewNavigationItem } from './utils/permissions'
 import './App.css'
+import './styles/typography.css'
 
 type RouteGuardProps = {
   children: ReactNode

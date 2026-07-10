@@ -1375,7 +1375,7 @@ export function CreateActivity() {
     divisionalHierarchies: allHierarchies,
     systemUser,
   } = useAppSelector((state) => state.user)
-  const [activeTab, setActiveTab] = useState<TabValue>('copilot')
+  const [activeTab, setActiveTab] = useState<TabValue>('manual')
   const [form, setForm] = useState<CreateActivityForm>(INITIAL_FORM)
   const [errors, setErrors] = useState<FieldErrors>({})
   const [context, setContext] = useState<ActivityContext | null>(null)

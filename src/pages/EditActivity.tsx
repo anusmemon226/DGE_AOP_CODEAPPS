@@ -25,10 +25,12 @@ import {
   type Dga_aop_projectsesBase,
 } from '../generated/models/Dga_aop_projectsesModel'
 import type { Dga_aop_project_budgetsBase } from '../generated/models/Dga_aop_project_budgetsModel'
+import type { Dga_aop_ai_summaries } from '../generated/models/Dga_aop_ai_summariesModel'
 import type { Dga_aop_project_milestone_detailsesBase } from '../generated/models/Dga_aop_project_milestone_detailsesModel'
 import type { Dga_procurement_plansBase } from '../generated/models/Dga_procurement_plansModel'
 import type { Dga_project_planning_instances } from '../generated/models/Dga_project_planning_instancesModel'
 import { Dga_aop_project_budgetsService } from '../generated/services/Dga_aop_project_budgetsService'
+import { Dga_aop_ai_summariesService } from '../generated/services/Dga_aop_ai_summariesService'
 import { Dga_aop_project_milestone_detailsesService } from '../generated/services/Dga_aop_project_milestone_detailsesService'
 import { Dga_aop_projectsesService } from '../generated/services/Dga_aop_projectsesService'
 import { Dga_project_planning_instancesService } from '../generated/services/Dga_project_planning_instancesService'
@@ -48,6 +50,8 @@ import { ClarificationTab } from './editActivity/ClarificationTab'
 import { EngagementPlanTab } from './editActivity/EngagementPlanTab'
 import { LogTab } from './editActivity/LogTab'
 import { ReviewChangesPanel } from './editActivity/ReviewChangesPanel'
+import { AiSummaryPanel } from './editActivity/AiSummaryPanel'
+import type { AiSummaryBlocks, AiSummaryMeta } from './editActivity/types/aiSummaryTypes'
 import {
   assertOperationSuccess,
   buildActivityInfoUpdatePayload,
@@ -184,6 +188,60 @@ function formatStatusCode(code: number): string {
 
 function normalizeId(id?: string | null) {
   return id?.replace(/[{}]/g, '').toLowerCase() ?? ''
+}
+
+type AiSummaryResponseJson = Partial<Record<
+  | 'ProjectSummary'
+  | 'milestoneSummary'
+  | 'ProcurementSummary'
+  | 'BudgetSummary'
+  | 'EngagementPlanSummary',
+  unknown
+>>
+
+type TabAiSummaries = Partial<Record<
+  'activityInfo' | 'milestones' | 'procurement' | 'engagementPlan' | 'budget',
+  AiSummaryBlocks
+>>
+
+function getAiSummaryText(value: unknown) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function parseAiSummaryResponseJson(responseJson?: string | null): AiSummaryResponseJson | null {
+  if (!responseJson?.trim()) return null
+
+  try {
+    const parsed = JSON.parse(responseJson) as unknown
+    if (typeof parsed === 'string') {
+      return parseAiSummaryResponseJson(parsed)
+    }
+    return parsed && typeof parsed === 'object' ? parsed as AiSummaryResponseJson : null
+  } catch {
+    return null
+  }
+}
+
+function mapAiSummaryResponse(response: AiSummaryResponseJson | null): TabAiSummaries {
+  if (!response) return {}
+
+  return {
+    activityInfo: {
+      summary: getAiSummaryText(response.ProjectSummary),
+    },
+    budget: {
+      summary: getAiSummaryText(response.BudgetSummary),
+    },
+    engagementPlan: {
+      summary: getAiSummaryText(response.EngagementPlanSummary),
+    },
+    milestones: {
+      summary: getAiSummaryText(response.milestoneSummary),
+    },
+    procurement: {
+      summary: getAiSummaryText(response.ProcurementSummary),
+    },
+  }
 }
 
 type ProjectRelatedChange = {
@@ -612,6 +670,62 @@ export function EditActivity() {
   const [isRejectingExecutionUpdates, setIsRejectingExecutionUpdates] = useState(false)
   const [executionRejectionReason, setExecutionRejectionReason] = useState('')
   const [executionRejectionError, setExecutionRejectionError] = useState('')
+  const [aiSummaryBlocks, setAiSummaryBlocks] = useState<TabAiSummaries>({})
+  const [aiSummaryMeta, setAiSummaryMeta] = useState<AiSummaryMeta | undefined>()
+  const [isAiSummaryLoading, setIsAiSummaryLoading] = useState(false)
+  const [aiSummaryError, setAiSummaryError] = useState('')
+
+  const loadActivityAiSummary = useCallback(async () => {
+    if (!projectId) {
+      setAiSummaryBlocks({})
+      setAiSummaryMeta(undefined)
+      return
+    }
+
+    setIsAiSummaryLoading(true)
+    setAiSummaryError('')
+
+    try {
+      const normalizedProjectId = normalizeId(projectId)
+      const result = await Dga_aop_ai_summariesService.getAll({
+        filter: `_dga_reference_record_id_value eq ${normalizedProjectId} or dga_summary_id eq '${normalizedProjectId}'`,
+        orderBy: ['modifiedon desc', 'createdon desc'],
+        select: [
+          'dga_aop_ai_summaryid',
+          'dga_response_json',
+          'dga_model_version',
+          'dga_response_time',
+          'dga_summary_id',
+          'createdon',
+          'modifiedon',
+          '_dga_reference_record_id_value',
+        ],
+        top: 5,
+      })
+      assertOperationSuccess(result, 'Unable to load AI summaries.')
+
+      const latestSummary = ((result.data ?? []) as Dga_aop_ai_summaries[])
+        .find((summary) => (
+          normalizeId(summary._dga_reference_record_id_value) === normalizedProjectId
+          || normalizeId(summary.dga_summary_id) === normalizedProjectId
+        ) && summary.dga_response_json)
+
+      const parsed = parseAiSummaryResponseJson(latestSummary?.dga_response_json)
+      setAiSummaryBlocks(mapAiSummaryResponse(parsed))
+      setAiSummaryMeta(latestSummary ? {
+        modelVersion: latestSummary.dga_model_version,
+        refreshedOn: latestSummary.modifiedon ?? latestSummary.createdon,
+        responseTime: latestSummary.dga_response_time,
+      } : undefined)
+    } catch (error) {
+      console.warn('Unable to load activity AI summaries', { error, projectId })
+      setAiSummaryBlocks({})
+      setAiSummaryMeta(undefined)
+      setAiSummaryError('AI summary is temporarily unavailable.')
+    } finally {
+      setIsAiSummaryLoading(false)
+    }
+  }, [projectId])
 
   const refreshActivityAiSummary = useCallback((reason: string) => {
     if (!projectId) return
@@ -620,6 +734,7 @@ export function EditActivity() {
       .then((result) => {
         assertOperationSuccess(result, 'AI summary refresh flow failed.')
         console.log('Activity AI summary refresh triggered', { projectId, reason, result })
+        void loadActivityAiSummary()
       })
       .catch((error) => {
         console.warn('Activity AI summary refresh failed', {
@@ -628,7 +743,7 @@ export function EditActivity() {
           reason,
         })
       })
-  }, [projectId])
+  }, [loadActivityAiSummary, projectId])
 
   // ── Loaded activity data ──
   const activityName = activity?.dga_name || form.activityName || 'Edit Activity'
@@ -895,6 +1010,10 @@ export function EditActivity() {
   ])
 
   // ── Form handlers ──
+
+  useEffect(() => {
+    void loadActivityAiSummary()
+  }, [loadActivityAiSummary])
 
   function updateForm(nextFields: Partial<ActivityForm>) {
     const changedFields = Object.keys(nextFields) as Array<keyof ActivityForm>
@@ -2107,10 +2226,14 @@ export function EditActivity() {
         return (
           <ActivityInfoTab
             activityLeadOptions={activityLeadOptions}
+            aiSummaryBlocks={aiSummaryBlocks.activityInfo}
+            aiSummaryError={aiSummaryError}
+            aiSummaryMeta={aiSummaryMeta}
             editableFields={editPermissions.activityInfoEditableFields}
             errors={errors}
             form={form}
             hasFullEdit={editPermissions.activityInfoHasFullEdit}
+            isAiSummaryLoading={isAiSummaryLoading}
             showExecutionTracking={shouldShowExecutionFields}
             isReadOnly={editPermissions.activityInfoReadOnly}
             isAdeoVisible={isAdeoVisible}
@@ -2183,8 +2306,12 @@ export function EditActivity() {
         return (
           <BudgetTab
             activityScope={form.activityScope}
+            aiSummaryBlocks={aiSummaryBlocks.budget}
+            aiSummaryError={aiSummaryError}
+            aiSummaryMeta={aiSummaryMeta}
             canEditExecutionBudget={editPermissions.canEditExecutionBudget}
             hierarchyId={form.divisionId}
+            isAiSummaryLoading={isAiSummaryLoading}
             isExecutionPhase={isExecutionPhase}
             isReadOnly={editPermissions.budgetReadOnly}
             onHeaderActionChange={setBudgetHeaderAction}
@@ -2201,6 +2328,43 @@ export function EditActivity() {
         return <ClarificationTab />
       case 'logs':
         return <LogTab />
+    }
+  }
+
+  function renderPostReviewAiSummary() {
+    switch (activeTab) {
+      case 'milestones':
+        return (
+          <AiSummaryPanel
+            error={aiSummaryError}
+            isLoading={isAiSummaryLoading}
+            meta={aiSummaryMeta}
+            summaries={aiSummaryBlocks.milestones}
+            title="Milestones"
+          />
+        )
+      case 'procurements':
+        return (
+          <AiSummaryPanel
+            error={aiSummaryError}
+            isLoading={isAiSummaryLoading}
+            meta={aiSummaryMeta}
+            summaries={aiSummaryBlocks.procurement}
+            title="Procurement"
+          />
+        )
+      case 'engagement-plans':
+        return (
+          <AiSummaryPanel
+            error={aiSummaryError}
+            isLoading={isAiSummaryLoading}
+            meta={aiSummaryMeta}
+            summaries={aiSummaryBlocks.engagementPlan}
+            title="Engagement Plan"
+          />
+        )
+      default:
+        return null
     }
   }
 
@@ -2673,6 +2837,7 @@ export function EditActivity() {
             relatedChanges={activity?.dga_project_related_changes}
           />
         ) : null}
+        {renderPostReviewAiSummary()}
         {renderTabContent()}
       </div>
 

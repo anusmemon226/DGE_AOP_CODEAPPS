@@ -57,6 +57,8 @@ import {
   stringifyMergedProjectRelatedChanges,
   type ProjectRelatedChanges,
 } from './helpers/projectRelatedChanges'
+import { AiSummaryPanel } from './AiSummaryPanel'
+import type { AiSummaryBlocks, AiSummaryMeta } from './types/aiSummaryTypes'
 
 export type BudgetHeaderAction = {
   canSave: boolean
@@ -118,8 +120,12 @@ type BudgetDetailGridRow = BudgetDetailRecord & {
 
 interface BudgetTabProps {
   activityScope: ActivityScopeValue
+  aiSummaryBlocks?: AiSummaryBlocks
+  aiSummaryError?: string
+  aiSummaryMeta?: AiSummaryMeta
   canEditExecutionBudget?: boolean
   hierarchyId?: string
+  isAiSummaryLoading?: boolean
   isExecutionPhase?: boolean
   isReadOnly?: boolean
   onActivityDataChanged?: () => void
@@ -459,8 +465,12 @@ function validateDetailDraft(draft: BudgetDetailDraft) {
 
 export function BudgetTab({
   activityScope,
+  aiSummaryBlocks,
+  aiSummaryError,
+  aiSummaryMeta,
   canEditExecutionBudget = false,
   hierarchyId = '',
+  isAiSummaryLoading = false,
   isExecutionPhase = false,
   isReadOnly = false,
   onActivityDataChanged,
@@ -1778,6 +1788,14 @@ export function BudgetTab({
           Monthly budget setup is incomplete. Missing rows: {missingMonths.join(', ')}. The activity creation plugin must create all 12 month rows before budget changes can be saved.
         </div>
       ) : null}
+
+      <AiSummaryPanel
+        error={aiSummaryError}
+        isLoading={isAiSummaryLoading}
+        meta={aiSummaryMeta}
+        summaries={aiSummaryBlocks}
+        title="Budget"
+      />
 
       <Card className="create-activity__section">
         <div className="create-activity__section-header">

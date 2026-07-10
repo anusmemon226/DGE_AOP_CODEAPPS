@@ -35,15 +35,21 @@ import {
 } from './helpers/activityInfoHelpers'
 import { MembersTab } from './MembersTab'
 import { DependenciesTab } from './DependenciesTab'
+import { AiSummaryPanel } from './AiSummaryPanel'
+import type { AiSummaryBlocks, AiSummaryMeta } from './types/aiSummaryTypes'
 
 // ── Props ──
 
 interface ActivityInfoTabProps {
   activityLeadOptions: SelectOption<string>[]
+  aiSummaryBlocks?: AiSummaryBlocks
+  aiSummaryError?: string
+  aiSummaryMeta?: AiSummaryMeta
   editableFields?: Array<keyof ActivityForm>
   errors: FieldErrors
   form: ActivityForm
   hasFullEdit?: boolean
+  isAiSummaryLoading?: boolean
   showExecutionTracking?: boolean
   isReadOnly?: boolean
   isAdeoVisible: boolean
@@ -72,10 +78,14 @@ function toggleStrategy(
 
 export function ActivityInfoTab({
   activityLeadOptions,
+  aiSummaryBlocks,
+  aiSummaryError,
+  aiSummaryMeta,
   editableFields,
   errors,
   form,
   hasFullEdit = false,
+  isAiSummaryLoading = false,
   showExecutionTracking = false,
   isReadOnly = false,
   isAdeoVisible,
@@ -697,6 +707,13 @@ export function ActivityInfoTab({
   return (
     <div className="create-activity__manual-layout">
       <div className="create-activity__manual-form">
+        <AiSummaryPanel
+          error={aiSummaryError}
+          isLoading={isAiSummaryLoading}
+          meta={aiSummaryMeta}
+          summaries={aiSummaryBlocks}
+          title="Activity Information"
+        />
         {formCards}
       </div>
       {guidancePanel}
