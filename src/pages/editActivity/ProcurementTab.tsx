@@ -431,7 +431,7 @@ function planToProcurement(record: Dga_procurement_plans): Procurement | null {
 }
 
 type ProjectRelatedChange = {
-  new_value: unknown
+  new_value?: unknown
   old_value: unknown
   planned_value?: unknown
 }
@@ -470,6 +470,25 @@ function mergeProjectRelatedChanges(base: ProjectRelatedChanges, override: Proje
 
     if (isPlainObject(existingValue) && isPlainObject(value) && !('old_value' in value) && !('new_value' in value)) {
       merged[key] = mergeProjectRelatedChanges(existingValue as ProjectRelatedChanges, value as ProjectRelatedChanges)
+      return
+    }
+
+    if (
+      isPlainObject(existingValue)
+      && isPlainObject(value)
+      && ('old_value' in existingValue || 'new_value' in existingValue)
+      && ('old_value' in value || 'new_value' in value)
+    ) {
+      merged[key] = {
+        ...existingValue,
+        ...value,
+        new_value: value.new_value === undefined || value.new_value === ''
+          ? existingValue.new_value ?? ''
+          : value.new_value,
+        planned_value: value.planned_value === undefined
+          ? existingValue.planned_value
+          : value.planned_value,
+      } as ProjectRelatedChange
       return
     }
 
@@ -519,7 +538,6 @@ function relatedOldValue(value: unknown, plannedValue?: unknown): ProjectRelated
   return {
     ...(plannedValue !== undefined ? { planned_value: plannedValue } : {}),
     old_value: value ?? '',
-    new_value: '',
   }
 }
 

@@ -1,5 +1,5 @@
 export type ProjectRelatedChange = {
-  new_value: unknown
+  new_value?: unknown
   old_value: unknown
   planned_value?: unknown
 }
@@ -42,6 +42,20 @@ export function mergeProjectRelatedChanges(base: ProjectRelatedChanges, override
 
     if (isPlainObject(existingValue) && isPlainObject(value) && !isRelatedChange(existingValue) && !isRelatedChange(value)) {
       merged[key] = mergeProjectRelatedChanges(existingValue as ProjectRelatedChanges, value as ProjectRelatedChanges)
+      return
+    }
+
+    if (isRelatedChange(existingValue) && isRelatedChange(value)) {
+      merged[key] = {
+        ...existingValue,
+        ...value,
+        new_value: value.new_value === undefined || value.new_value === ''
+          ? existingValue.new_value ?? ''
+          : value.new_value,
+        planned_value: value.planned_value === undefined
+          ? existingValue.planned_value
+          : value.planned_value,
+      }
       return
     }
 
@@ -94,7 +108,6 @@ export function relatedOldValue(value: unknown, plannedValue?: unknown): Project
   return {
     ...(plannedValue !== undefined ? { planned_value: plannedValue } : {}),
     old_value: value ?? '',
-    new_value: '',
   }
 }
 

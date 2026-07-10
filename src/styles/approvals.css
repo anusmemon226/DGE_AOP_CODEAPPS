@@ -98,6 +98,11 @@
   color: var(--color-error);
 }
 
+.approvals-page__reject-body {
+  display: grid;
+  gap: 1rem;
+}
+
 .approvals-page__toolbar {
   align-items: end;
   display: flex;

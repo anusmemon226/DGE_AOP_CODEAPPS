@@ -11,7 +11,7 @@ import {
   Rows,
   Sparkles,
 } from 'lucide-react'
-import { Badge, Button, ConfirmationDialog, EmptyState, SearchInput, Select, type SelectOption } from '../components/ui'
+import { Badge, Button, ConfirmationDialog, EmptyState, Modal, SearchInput, Select, Textarea, type SelectOption } from '../components/ui'
 import type { Dga_project_planning_instances } from '../generated/models/Dga_project_planning_instancesModel'
 import { Dga_aop_projectsesService } from '../generated/services/Dga_aop_projectsesService'
 import { Dga_project_planning_instancesService } from '../generated/services/Dga_project_planning_instancesService'
@@ -30,6 +30,11 @@ import { useAppDispatch, useAppSelector } from '../store/hooks'
 import { getResultValue } from './editActivity/helpers/activityInfoHelpers'
 import { formatDate } from './editActivity/helpers/sharedHelpers'
 import { getResultArray, validatePersistedActivitySubmission } from './editActivity/helpers/submissionValidation'
+import {
+  approveProjectRelatedChanges,
+  persistApprovedExecutionRelatedChanges,
+  rejectProjectRelatedChanges,
+} from './editActivity/helpers/executionApprovalHelpers'
 import '../styles/approvals.css'
 
 type ApprovalPhase = 'Planning' | 'Execution'
@@ -62,6 +67,7 @@ type ApprovalRecord = {
   requestedBudget: string
   createdOn: string
   modifiedOn: string
+  projectRelatedChanges: string
 }
 
 type ApprovalUpdatePayload = Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>> & {
@@ -98,6 +104,9 @@ const APPROVAL_STATUS_BY_ROLE: Array<{ match: string; statusCode: number }> = [
   { match: 'director general', statusCode: 776140014 },
 ]
 
+const EXECUTION_APPROVAL_STATUS_CODES = new Set([776140001, 776140003, 776140002])
+const MIXED_APPROVAL_SELECTION_MESSAGE = 'Planning and execution approvals cannot be processed together. Please select one approval type at a time.'
+
 const APPROVAL_PROJECT_SELECT = [
   'dga_aop_projectsid',
   'dga_name',
@@ -122,6 +131,7 @@ const APPROVAL_PROJECT_SELECT = [
   'dga_project_categorized_under',
   'dga_total_project_budget',
   'dga_requested_budget',
+  'dga_project_related_changes',
   'createdon',
   'modifiedon',
 ]
@@ -203,6 +213,17 @@ function escapeODataValue(value: string) {
 function getApprovalStatusForRole(roleName?: string) {
   const normalizedRole = normalizeRoleName(roleName ?? '')
   return APPROVAL_STATUS_BY_ROLE.find((role) => normalizedRole.includes(role.match))?.statusCode
+}
+
+function isExecutionApprovalRecord(approval: ApprovalRecord) {
+  return approval.projectPhase === 'Execution' && EXECUTION_APPROVAL_STATUS_CODES.has(approval.statusCode)
+}
+
+function canRoleRejectExecutionUpdates(roleName?: string) {
+  const normalizedRole = normalizeRoleName(roleName ?? '')
+  return normalizedRole.includes('division director')
+    || normalizedRole.includes('strategy team')
+    || normalizedRole.includes('executive director')
 }
 
 function getOperationErrorMessage(result: unknown, fallbackMessage: string) {
@@ -353,6 +374,7 @@ function mapProjectToApproval(
     requestedBudget: formatAmount(project.dga_requested_budget),
     createdOn: project.createdon ?? '',
     modifiedOn: project.modifiedon ?? project.createdon ?? '',
+    projectRelatedChanges: project.dga_project_related_changes ?? '',
   }
 }
 
@@ -369,9 +391,13 @@ export function Approvals() {
   const [approvals, setApprovals] = useState<ApprovalRecord[]>([])
   const [loading, setLoading] = useState(false)
   const [isApprovalConfirmOpen, setIsApprovalConfirmOpen] = useState(false)
+  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false)
   const [isApproving, setIsApproving] = useState(false)
+  const [isRejecting, setIsRejecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [actionError, setActionError] = useState('')
+  const [rejectionReason, setRejectionReason] = useState('')
+  const [rejectionError, setRejectionError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [phaseFilter, setPhaseFilter] = useState('')
   const [approvalFilter, setApprovalFilter] = useState('')
@@ -424,6 +450,24 @@ export function Approvals() {
     () => approvals.filter((approval) => selectedIds.includes(approval.id)),
     [approvals, selectedIds],
   )
+  const selectedExecutionCount = selectedApprovals.filter(isExecutionApprovalRecord).length
+  const selectedPlanningCount = selectedApprovals.length - selectedExecutionCount
+  const hasMixedApprovalSelection = selectedExecutionCount > 0 && selectedPlanningCount > 0
+  const selectedApprovalMode: 'planning' | 'execution' | null = selectedApprovals.length === 0 || hasMixedApprovalSelection
+    ? null
+    : selectedExecutionCount > 0
+      ? 'execution'
+      : 'planning'
+  const canRejectSelectedExecutionApprovals = selectedApprovalMode === 'execution'
+    && canRoleRejectExecutionUpdates(currentRole?.roleName)
+  const approvalActionDisabled = selectedIds.length === 0
+    || loading
+    || isApproving
+    || isRejecting
+    || !hasApprovalQueue
+    || hasMixedApprovalSelection
+  const rejectActionDisabled = approvalActionDisabled || !canRejectSelectedExecutionApprovals
+  const mixedSelectionNotice = hasMixedApprovalSelection ? MIXED_APPROVAL_SELECTION_MESSAGE : ''
   const hierarchyNameById = useMemo(() => {
     return divisionalHierarchies.reduce<Record<string, string>>((map, hierarchy) => {
       const id = normalizeId(hierarchy.dga_divisional_hierarchyid)
@@ -611,9 +655,30 @@ export function Approvals() {
   function handleApproveSelected() {
     setNotice('')
     setActionError('')
+    if (hasMixedApprovalSelection) {
+      setActionError(MIXED_APPROVAL_SELECTION_MESSAGE)
+      return
+    }
+
     if (selectedIds.length > 0 && hasApprovalQueue) {
       setIsApprovalConfirmOpen(true)
     }
+  }
+
+  function handleRejectSelected() {
+    setNotice('')
+    setActionError('')
+    setRejectionError('')
+
+    if (hasMixedApprovalSelection) {
+      setActionError(MIXED_APPROVAL_SELECTION_MESSAGE)
+      return
+    }
+
+    if (!canRejectSelectedExecutionApprovals || selectedIds.length === 0 || !hasApprovalQueue) return
+
+    setRejectionReason('')
+    setIsRejectModalOpen(true)
   }
 
   async function resolveTeamByName(teamName: string) {
@@ -655,7 +720,7 @@ export function Approvals() {
     return teamId
   }
 
-  async function buildApprovalPayload(approval: ApprovalRecord): Promise<ApprovalUpdatePayload> {
+  async function buildPlanningApprovalPayload(approval: ApprovalRecord): Promise<ApprovalUpdatePayload> {
     const normalizedRole = normalizeRoleName(currentRole?.roleName ?? '')
 
     if (normalizedRole.includes('division director')) {
@@ -691,29 +756,81 @@ export function Approvals() {
     throw new Error('No approval transition is configured for the current role.')
   }
 
+  async function buildExecutionApprovalPayload(approval: ApprovalRecord): Promise<ApprovalUpdatePayload> {
+    const normalizedRole = normalizeRoleName(currentRole?.roleName ?? '')
+
+    if (normalizedRole.includes('division director')) {
+      return {
+        statuscode: 776140003,
+        'ownerid@odata.bind': toEntityBind('teams', await resolveTeamByName('AOP - Strategy Team')),
+      }
+    }
+
+    if (normalizedRole.includes('strategy team')) {
+      return {
+        statuscode: 776140002,
+        'ownerid@odata.bind': toEntityBind('teams', await resolvePlanningTeam(approval.planningInstanceId, '_dga_executive_director_team_value')),
+      }
+    }
+
+    if (normalizedRole.includes('executive director')) {
+      return {
+        ...(await persistApprovedExecutionRelatedChanges(approval.projectRelatedChanges)),
+        dga_is_rejected: false,
+        dga_project_related_changes: approveProjectRelatedChanges(approval.projectRelatedChanges),
+        dga_rejection_reason: '',
+        statuscode: 776140011,
+        'ownerid@odata.bind': toEntityBind('teams', await resolvePlanningTeam(approval.planningInstanceId, '_dga_division_member_team_value')),
+      }
+    }
+
+    throw new Error('No execution approval transition is configured for the current role.')
+  }
+
+  async function buildExecutionRejectPayload(approval: ApprovalRecord): Promise<ApprovalUpdatePayload> {
+    return {
+      dga_is_rejected: true,
+      dga_project_related_changes: rejectProjectRelatedChanges(approval.projectRelatedChanges),
+      dga_rejection_reason: rejectionReason.trim(),
+      statuscode: 776140011,
+      'ownerid@odata.bind': toEntityBind('teams', await resolvePlanningTeam(approval.planningInstanceId, '_dga_division_member_team_value')),
+    }
+  }
+
   async function handleConfirmBulkApproval() {
     if (isApproving) return
     if (!roleApprovalStatus || selectedApprovals.length === 0) return
+    if (!selectedApprovalMode) return
 
     setIsApproving(true)
     setNotice('')
     setActionError('')
 
     try {
+      if (hasMixedApprovalSelection) {
+        throw new Error(MIXED_APPROVAL_SELECTION_MESSAGE)
+      }
+
       for (const approval of selectedApprovals) {
         if (approval.statusCode !== roleApprovalStatus) {
           throw new Error(`${approval.activityName}: this activity is no longer in your current approval queue.`)
         }
 
-        const validation = await validatePersistedActivitySubmission(approval.id)
-        if (!validation.valid) {
-          throw new Error(`${approval.activityName}: ${VALIDATION_SECTION_LABELS[validation.section] ?? 'Validation'} - ${validation.message}`)
+        if (selectedApprovalMode === 'planning') {
+          const validation = await validatePersistedActivitySubmission(approval.id)
+          if (!validation.valid) {
+            throw new Error(`${approval.activityName}: ${VALIDATION_SECTION_LABELS[validation.section] ?? 'Validation'} - ${validation.message}`)
+          }
+        } else if (!isExecutionApprovalRecord(approval)) {
+          throw new Error(`${approval.activityName}: this is not an execution update approval.`)
         }
       }
 
       const payloads = await Promise.all(selectedApprovals.map(async (approval) => ({
         approval,
-        payload: await buildApprovalPayload(approval),
+        payload: selectedApprovalMode === 'execution'
+          ? await buildExecutionApprovalPayload(approval)
+          : await buildPlanningApprovalPayload(approval),
       })))
 
       for (const { approval, payload } of payloads) {
@@ -726,13 +843,75 @@ export function Approvals() {
       setSelectedIds([])
       setExpandedIds([])
       await loadApprovals()
-      setNotice(`${approvedCount} project(s) approved successfully.`)
+      setNotice(selectedApprovalMode === 'execution'
+        ? `${approvedCount} activity update request(s) approved successfully.`
+        : `${approvedCount} project(s) approved successfully.`)
     } catch (err) {
       console.error('Failed to approve selected activities:', err)
       setIsApprovalConfirmOpen(false)
       setActionError(err instanceof Error ? err.message : 'Unable to approve selected project(s).')
     } finally {
       setIsApproving(false)
+    }
+  }
+
+  async function handleConfirmBulkReject() {
+    if (isRejecting) return
+    if (!roleApprovalStatus || selectedApprovals.length === 0) return
+
+    const trimmedReason = rejectionReason.trim()
+    if (!trimmedReason) {
+      setRejectionError('Enter a rejection reason before confirming.')
+      return
+    }
+
+    setIsRejecting(true)
+    setNotice('')
+    setActionError('')
+    setRejectionError('')
+
+    try {
+      if (hasMixedApprovalSelection) {
+        throw new Error(MIXED_APPROVAL_SELECTION_MESSAGE)
+      }
+
+      if (!canRejectSelectedExecutionApprovals) {
+        throw new Error('Reject is available only for execution update approvals.')
+      }
+
+      for (const approval of selectedApprovals) {
+        if (approval.statusCode !== roleApprovalStatus) {
+          throw new Error(`${approval.activityName}: this activity is no longer in your current approval queue.`)
+        }
+
+        if (!isExecutionApprovalRecord(approval)) {
+          throw new Error(`${approval.activityName}: this is not an execution update approval.`)
+        }
+      }
+
+      const payloads = await Promise.all(selectedApprovals.map(async (approval) => ({
+        approval,
+        payload: await buildExecutionRejectPayload(approval),
+      })))
+
+      for (const { approval, payload } of payloads) {
+        const result = await Dga_aop_projectsesService.update(approval.id, payload)
+        assertOperationSuccess(result, `Unable to reject ${approval.activityName}.`)
+      }
+
+      const rejectedCount = selectedApprovals.length
+      setIsRejectModalOpen(false)
+      setRejectionReason('')
+      setSelectedIds([])
+      setExpandedIds([])
+      await loadApprovals()
+      setNotice(`${rejectedCount} activity update request(s) rejected successfully.`)
+    } catch (err) {
+      console.error('Failed to reject selected activities:', err)
+      setIsRejectModalOpen(false)
+      setActionError(err instanceof Error ? err.message : 'Unable to reject selected activity update request(s).')
+    } finally {
+      setIsRejecting(false)
     }
   }
 
@@ -753,6 +932,10 @@ export function Approvals() {
     ))
   }
 
+  const approvalConfirmDescription = selectedApprovalMode === 'execution'
+    ? `Are you sure you want to approve ${selectedIds.length} activity update request(s)?`
+    : `This action will approve ${selectedIds.length} project(s) and move them to the next workflow owner for ${currentRole?.roleName ?? 'the current role'}. Are you sure you want to proceed?`
+
   return (
     <div className="approvals-page">
       <header className="approvals-page__header">
@@ -767,13 +950,29 @@ export function Approvals() {
           {selectedIds.length > 0 ? (
             <span className="approvals-page__selected-count">{selectedIds.length} selected</span>
           ) : null}
-          <Button disabled={selectedIds.length === 0 || loading || isApproving || !hasApprovalQueue} icon={<FileCheck2 size={16} />} onClick={handleApproveSelected}>
+          {canRejectSelectedExecutionApprovals ? (
+            <Button
+              className="button--danger"
+              disabled={rejectActionDisabled}
+              icon={<AlertTriangle size={16} />}
+              onClick={handleRejectSelected}
+              variant="secondary"
+            >
+              {isRejecting ? 'Rejecting...' : 'Reject'}
+            </Button>
+          ) : null}
+          <Button disabled={approvalActionDisabled} icon={<FileCheck2 size={16} />} onClick={handleApproveSelected}>
             {isApproving ? 'Approving...' : 'Approve'}
           </Button>
         </div>
       </header>
 
-      {actionError ? (
+      {mixedSelectionNotice ? (
+        <div className="approvals-page__notice approvals-page__notice--error">
+          <AlertTriangle size={15} />
+          <span>{mixedSelectionNotice}</span>
+        </div>
+      ) : actionError ? (
         <div className="approvals-page__notice approvals-page__notice--error">
           <AlertTriangle size={15} />
           <span>{actionError}</span>
@@ -1074,14 +1273,60 @@ export function Approvals() {
 
       <ConfirmationDialog
         confirmLabel={isApproving ? 'Approving...' : 'Approve'}
-        description={`This action will approve ${selectedIds.length} project(s) and move them to the next workflow owner for ${currentRole?.roleName ?? 'the current role'}. Are you sure you want to proceed?`}
+        description={approvalConfirmDescription}
         isOpen={isApprovalConfirmOpen}
         onCancel={() => {
           if (!isApproving) setIsApprovalConfirmOpen(false)
         }}
         onConfirm={handleConfirmBulkApproval}
-        title="Approve Selected Projects"
+        title={selectedApprovalMode === 'execution' ? 'Approve Activity Updates' : 'Approve Selected Projects'}
       />
+
+      <Modal
+        actions={(
+          <>
+            <Button
+              disabled={isRejecting}
+              onClick={() => {
+                if (!isRejecting) setIsRejectModalOpen(false)
+              }}
+              variant="secondary"
+            >
+              Cancel
+            </Button>
+            <Button
+              className="button--danger"
+              disabled={isRejecting}
+              onClick={handleConfirmBulkReject}
+            >
+              {isRejecting ? 'Rejecting...' : 'Confirm Reject'}
+            </Button>
+          </>
+        )}
+        isOpen={isRejectModalOpen}
+        onClose={() => {
+          if (!isRejecting) setIsRejectModalOpen(false)
+        }}
+        title="Reject Activity Updates"
+      >
+        <div className="approvals-page__reject-body">
+          <p className="confirm-dialog__description">
+            Please provide a rejection reason. The selected execution updates will be discarded and returned to the Division Member.
+          </p>
+          <Textarea
+            disabled={isRejecting}
+            error={rejectionError}
+            label="Rejection Reason"
+            onChange={(event) => {
+              setRejectionReason(event.target.value)
+              if (rejectionError) setRejectionError('')
+            }}
+            required
+            rows={5}
+            value={rejectionReason}
+          />
+        </div>
+      </Modal>
     </div>
   )
 }
