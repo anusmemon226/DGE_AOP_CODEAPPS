@@ -2,8 +2,10 @@ import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import { Link2 } from 'lucide-react'
 import { Card, RadioGroup } from '../../components/ui'
 import type { Dga_aop_projectsesBase } from '../../generated/models/Dga_aop_projectsesModel'
+import type { Dga_objective_dga_objectiveset } from '../../generated/models/Dga_objective_dga_objectivesetModel'
 import type { Dga_objectives } from '../../generated/models/Dga_objectivesModel'
 import { Dga_aop_projectsesService } from '../../generated/services/Dga_aop_projectsesService'
+import { Dga_objective_dga_objectivesetService } from '../../generated/services/Dga_objective_dga_objectivesetService'
 import { Dga_objectivesService } from '../../generated/services/Dga_objectivesService'
 
 type ObjectiveValue = string
@@ -167,6 +169,7 @@ export function ObjectivesTab({
   const [form, setForm] = useState<ObjectiveForm>(EMPTY_FORM)
   const [savedForm, setSavedForm] = useState<ObjectiveForm>(EMPTY_FORM)
   const [objectives, setObjectives] = useState<Dga_objectives[]>([])
+  const [objectiveRelationships, setObjectiveRelationships] = useState<Dga_objective_dga_objectiveset[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
@@ -180,6 +183,7 @@ export function ObjectivesTab({
       setForm(EMPTY_FORM)
       setSavedForm(EMPTY_FORM)
       setObjectives([])
+      setObjectiveRelationships([])
       return
     }
 
@@ -189,7 +193,7 @@ export function ObjectivesTab({
     setNotice('')
 
     try {
-      const [objectivesResult, projectResult] = await Promise.all([
+      const [objectivesResult, relationshipsResult, projectResult] = await Promise.all([
         Dga_objectivesService.getAll({
           select: [
             'dga_objectiveid',
@@ -199,8 +203,15 @@ export function ObjectivesTab({
             'statecode',
             'statuscode',
           ],
-          filter: 'statecode eq 0 and (dga_objective_type eq 1 or dga_objective_type eq 2 or dga_objective_type eq 3 or dga_objective_type eq 4)',
+          filter: 'statecode eq 0 and (dga_objective_type eq 2 or dga_objective_type eq 3 or dga_objective_type eq 4 or dga_objective_type eq 5)',
           orderBy: ['dga_objective_type asc', 'dga_name asc'],
+        }),
+        Dga_objective_dga_objectivesetService.getAll({
+          select: [
+            'dga_objective_dga_objectiveid',
+            'dga_objectiveidone',
+            'dga_objectiveidtwo',
+          ],
         }),
         Dga_aop_projectsesService.get(projectId, {
           select: OBJECTIVE_SELECT_FIELDS,
@@ -208,9 +219,11 @@ export function ObjectivesTab({
       ])
 
       assertOperationSuccess(objectivesResult, 'Unable to load objectives.')
+      assertOperationSuccess(relationshipsResult, 'Unable to load objective relationships.')
       assertOperationSuccess(projectResult, 'Unable to load activity objective links.')
 
       setObjectives((objectivesResult.data ?? []) as Dga_objectives[])
+      setObjectiveRelationships((relationshipsResult.data ?? []) as Dga_objective_dga_objectiveset[])
       const loadedForm = {
         corporateStrategyPillarId: projectResult.data?._dga_dge_corporate_strategy_pillar_value ?? '',
         digitalPillarId: projectResult.data?._dga_govdigital_pillar_value ?? '',
@@ -226,6 +239,7 @@ export function ObjectivesTab({
       setForm(EMPTY_FORM)
       setSavedForm(EMPTY_FORM)
       setObjectives([])
+      setObjectiveRelationships([])
     } finally {
       setIsLoading(false)
     }
@@ -240,7 +254,7 @@ export function ObjectivesTab({
   }, [loadObjectivesContext])
 
   const corporatePillarOptions = useMemo(() => objectives
-    .filter((objective) => objective.dga_objective_type === 1)
+    .filter((objective) => objective.dga_objective_type === 5)
     .map(toObjectiveOption)
     .filter((option): option is ObjectiveOption => Boolean(option)), [objectives])
 
@@ -259,12 +273,50 @@ export function ObjectivesTab({
     .map(toObjectiveOption)
     .filter((option): option is ObjectiveOption => Boolean(option)), [objectives])
 
-  const selectedDigitalPillar = digitalPillarOptions.find((option) => normalizeId(option.value) === normalizeId(form.digitalPillarId))
-  const matchedDigitalObjectiveOptions = allDigitalObjectiveOptions.filter((option) => matchesDigitalPillar(option, selectedDigitalPillar))
-  const matchedKpiOptions = allKpiOptions.filter((option) => matchesDigitalPillar(option, selectedDigitalPillar))
-  const digitalObjectiveOptions = selectedDigitalPillar ? matchedDigitalObjectiveOptions : []
-  const kpiOptions = selectedDigitalPillar ? matchedKpiOptions : []
-  const activeCount = Object.values(form).filter(Boolean).length
+  const linkedObjectiveIdsByPillar = useMemo(() => {
+    const linkedIds = new Set<string>()
+    const selectedPillarId = normalizeId(form.digitalPillarId)
+
+    if (!selectedPillarId) return linkedIds
+
+    objectiveRelationships.forEach((relationship) => {
+      const firstId = normalizeId(relationship.dga_objectiveidone)
+      const secondId = normalizeId(relationship.dga_objectiveidtwo)
+
+      if (firstId === selectedPillarId && secondId) {
+        linkedIds.add(secondId)
+      } else if (secondId === selectedPillarId && firstId) {
+        linkedIds.add(firstId)
+      }
+    })
+
+    return linkedIds
+  }, [form.digitalPillarId, objectiveRelationships])
+  const digitalObjectiveOptions = useMemo(() => (
+    form.digitalPillarId
+      ? allDigitalObjectiveOptions.filter((option) => linkedObjectiveIdsByPillar.has(normalizeId(option.value)))
+      : []
+  ), [allDigitalObjectiveOptions, form.digitalPillarId, linkedObjectiveIdsByPillar])
+  const kpiOptions = useMemo(() => (
+    form.digitalPillarId
+      ? allKpiOptions.filter((option) => linkedObjectiveIdsByPillar.has(normalizeId(option.value)))
+      : []
+  ), [allKpiOptions, form.digitalPillarId, linkedObjectiveIdsByPillar])
+  const selectedDigitalObjectiveId = digitalObjectiveOptions.some((option) => normalizeId(option.value) === normalizeId(form.digitalObjectiveId))
+    ? form.digitalObjectiveId
+    : ''
+  const selectedStrategicKpiId = kpiOptions.some((option) => normalizeId(option.value) === normalizeId(form.strategicKpiId))
+    ? form.strategicKpiId
+    : ''
+  const legacyTextMatchingFallbackEnabled = false
+  void legacyTextMatchingFallbackEnabled
+  void matchesDigitalPillar
+  const activeCount = [
+    form.corporateStrategyPillarId,
+    form.digitalPillarId,
+    selectedDigitalObjectiveId,
+    selectedStrategicKpiId,
+  ].filter(Boolean).length
   const hasUnsavedChanges = !isSameForm(form, savedForm)
   const canSave = !isReadOnly && !isLoading && !isSaving && !error
   const saveLabel = statusCode === 1 ? 'Save Draft' : 'Save Changes'
@@ -318,6 +370,12 @@ export function ObjectivesTab({
     if (!canSave) return
 
     const nextErrors = validateObjectiveForm(form)
+    if (form.digitalPillarId && !selectedDigitalObjectiveId) {
+      nextErrors.digitalObjectiveId = 'Select a Digital Strategy objective mapped to the selected Digital Strategy Pillar.'
+    }
+    if (form.digitalPillarId && !selectedStrategicKpiId) {
+      nextErrors.strategicKpiId = 'Select a strategic KPI mapped to the selected Digital Strategy Pillar.'
+    }
     if (Object.keys(nextErrors).length > 0) {
       setFieldErrors(nextErrors)
       return
@@ -329,7 +387,7 @@ export function ObjectivesTab({
     }
 
     void saveObjectives(form)
-  }, [canSave, form, hasUnsavedChanges, saveObjectives])
+  }, [canSave, form, hasUnsavedChanges, saveObjectives, selectedDigitalObjectiveId, selectedStrategicKpiId])
 
   useEffect(() => {
     onHeaderActionChange?.(!isLoading ? {
@@ -461,7 +519,7 @@ export function ObjectivesTab({
                   }}
                   options={digitalObjectiveOptions}
                   required
-                  value={form.digitalObjectiveId}
+                  value={selectedDigitalObjectiveId}
                 />
               ) : form.digitalPillarId ? (
                 <div className="edit-activity__objective-empty" role="status">
@@ -485,7 +543,7 @@ export function ObjectivesTab({
                   }}
                   options={kpiOptions}
                   required
-                  value={form.strategicKpiId}
+                  value={selectedStrategicKpiId}
                 />
               ) : form.digitalPillarId ? (
                 <div className="edit-activity__objective-empty" role="status">

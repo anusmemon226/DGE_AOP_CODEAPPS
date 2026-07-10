@@ -19,6 +19,13 @@ export const dataSourcesInfo = {
     "dataSourceType": "Dataverse",
     "apis": {}
   },
+  "dga_aop_ai_summaries": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "dga_aop_ai_summaryid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
   "dga_aop_cost_centers": {
     "tableId": "",
     "version": "",
@@ -168,6 +175,13 @@ export const dataSourcesInfo = {
         }
       }
     }
+  },
+  "dga_objective_dga_objectiveset": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "dga_objective_dga_objectiveid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
   },
   "dga_divisional_hierarchies": {
     "tableId": "",

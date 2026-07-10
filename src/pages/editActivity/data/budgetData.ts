@@ -1,8 +1,15 @@
 // ── Budget form data types ──
 
+import {
+  Dga_aop_projectsesdga_budget_type,
+  type Dga_aop_projectsesdga_budget_type as BudgetTypeCode,
+} from '../../../generated/models/Dga_aop_projectsesModel'
+
+export type BudgetTypeValue = '' | `${BudgetTypeCode}`
+
 export type BudgetFormData = {
   budgetSource: '' | '1' | '2'
-  budgetType: '' | '1' | '2'
+  budgetType: BudgetTypeValue
   totalActivityBudget: string
   totalPlannedBudget: string
   allocatedBudget: string
@@ -21,9 +28,11 @@ export const BUDGET_SOURCE_OPTIONS = [
 ] as const
 
 export const BUDGET_TYPE_OPTIONS = [
-  { label: 'Opex', value: '1' },
-  { label: 'Capex', value: '2' },
-] as const
+  ...Object.entries(Dga_aop_projectsesdga_budget_type).map(([value, label]) => ({
+    label: label.replace(/^Chapter(\d+)_/, 'Chapter $1 - ').replace(/_/g, ' '),
+    value,
+  })),
+]
 
 // ── Month labels ──
 

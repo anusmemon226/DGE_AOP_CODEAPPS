@@ -8,6 +8,7 @@ import type { GetEntityMetadataOptions, EntityMetadata } from '@microsoft/power-
 import type { IGetOptions, IGetAllOptions } from '../models/CommonModels';
 import type { IOperationResult } from '@microsoft/power-apps/data';
 import { dataSourcesInfo } from '../../../.power/schemas/appschemas/dataSourcesInfo';
+import { deserializeMultiSelectPicklistFields, serializeMultiSelectPicklistFields } from '@microsoft/power-apps/data';
 import { getClient } from '@microsoft/power-apps/data';
 
 
@@ -15,21 +16,28 @@ export class Dga_aop_projectsesService {
   private static readonly dataSourceName = 'dga_aop_projectses';
 
   private static readonly client = getClient(dataSourcesInfo);
+  private static readonly multiSelectPicklistFields = ['dga_project_categorized_under'] as const;
 
   public static async create(record: Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>): Promise<IOperationResult<Dga_aop_projectses>> {
-    const result = await Dga_aop_projectsesService.client.createRecordAsync<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>, Dga_aop_projectses>(
+    const result = await Dga_aop_projectsesService.client.createRecordAsync<Record<string, unknown>, Dga_aop_projectses>(
       Dga_aop_projectsesService.dataSourceName,
-      record
+      serializeMultiSelectPicklistFields(record as unknown as Record<string, unknown>, Dga_aop_projectsesService.multiSelectPicklistFields)
     );
+    if (result.data) {
+      deserializeMultiSelectPicklistFields(result.data as unknown as Record<string, unknown>, Dga_aop_projectsesService.multiSelectPicklistFields);
+    }
     return result;
   }
 
   public static async update(id: string, changedFields: Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>>): Promise<IOperationResult<Dga_aop_projectses>> {
-    const result = await Dga_aop_projectsesService.client.updateRecordAsync<Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>>, Dga_aop_projectses>(
+    const result = await Dga_aop_projectsesService.client.updateRecordAsync<Record<string, unknown>, Dga_aop_projectses>(
       Dga_aop_projectsesService.dataSourceName,
       id,
-      changedFields
+      serializeMultiSelectPicklistFields(changedFields as unknown as Record<string, unknown>, Dga_aop_projectsesService.multiSelectPicklistFields)
     );
+    if (result.data) {
+      deserializeMultiSelectPicklistFields(result.data as unknown as Record<string, unknown>, Dga_aop_projectsesService.multiSelectPicklistFields);
+    }
     return result;
   }
 
@@ -45,6 +53,9 @@ export class Dga_aop_projectsesService {
       id,
       options
     );
+    if (result.data) {
+      deserializeMultiSelectPicklistFields(result.data as unknown as Record<string, unknown>, Dga_aop_projectsesService.multiSelectPicklistFields);
+    }
     return result;
   }
 
@@ -53,6 +64,7 @@ export class Dga_aop_projectsesService {
       Dga_aop_projectsesService.dataSourceName,
       options
     );
+    result.data?.forEach(record => deserializeMultiSelectPicklistFields(record as unknown as Record<string, unknown>, Dga_aop_projectsesService.multiSelectPicklistFields));
     return result;
   }
 

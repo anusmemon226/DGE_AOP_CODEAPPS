@@ -142,6 +142,16 @@
         "accountcodes": {
           "entitySetName": "dga_account_codes",
           "logicalName": "dga_account_code"
+        },
+        "aopaisummaries": {
+          "entitySetName": "dga_aop_ai_summaries",
+          "logicalName": "dga_aop_ai_summary",
+          "isHidden": false
+        },
+        "dga_objective_dga_objective": {
+          "entitySetName": "dga_objective_dga_objectiveset",
+          "logicalName": "dga_objective_dga_objective",
+          "isHidden": false
         }
       },
       "environmentVariableName": ""

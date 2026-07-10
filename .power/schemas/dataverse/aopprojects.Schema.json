@@ -337,14 +337,17 @@
           "x-ms-dataverse-type": "PicklistType",
           "x-ms-schema-name": "dga_budget_type",
           "enum": [
-            "Opex",
-            "Capex"
+            " Chapter 1 - HR",
+            "Chapter 2 - Opex",
+            " Chapter 3 - Capex"
           ],
           "x-ms-enum-values": [
             1,
-            2
+            2,
+            3
           ],
           "Color": [
+            null,
             null,
             null
           ],

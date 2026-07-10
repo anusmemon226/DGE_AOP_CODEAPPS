@@ -1,0 +1,58 @@
+{
+  "name": "dga_objective_dga_objective",
+  "title": "dga_objective_dga_objective",
+  "schema": {
+    "type": "array",
+    "items": {
+      "type": "object",
+      "x-ms-dataverse-entity": true,
+      "x-ms-dataverse-entityset": "dga_objective_dga_objectiveset",
+      "x-ms-dataverse-primary-id": "dga_objective_dga_objectiveid",
+      "x-ms-dataverse-primary-name": null,
+      "properties": {
+        "dga_objective_dga_objectiveid": {
+          "type": "string",
+          "title": "dga_objective_dga_objectiveid",
+          "x-ms-dataverse-attribute": "dga_objective_dga_objectiveid",
+          "x-ms-dataverse-type": "UniqueidentifierType",
+          "x-ms-schema-name": "dga_objective_dga_objectiveId",
+          "x-ms-read-only": true,
+          "x-ms-dataverse-primary-id": true,
+          "required": true,
+          "x-ms-keyType": "primary"
+        },
+        "dga_objectiveidone": {
+          "type": "string",
+          "title": "dga_objectiveidone",
+          "x-ms-dataverse-attribute": "dga_objectiveidone",
+          "x-ms-dataverse-type": "UniqueidentifierType",
+          "x-ms-schema-name": "dga_objectiveidOne",
+          "x-ms-read-only": true,
+          "required": true
+        },
+        "dga_objectiveidtwo": {
+          "type": "string",
+          "title": "dga_objectiveidtwo",
+          "x-ms-dataverse-attribute": "dga_objectiveidtwo",
+          "x-ms-dataverse-type": "UniqueidentifierType",
+          "x-ms-schema-name": "dga_objectiveidTwo",
+          "x-ms-read-only": true,
+          "required": true
+        },
+        "versionnumber": {
+          "type": "string",
+          "title": "versionnumber",
+          "x-ms-dataverse-attribute": "versionnumber",
+          "x-ms-dataverse-type": "BigIntType",
+          "x-ms-schema-name": "VersionNumber",
+          "x-ms-read-only": true
+        }
+      },
+      "required": [
+        "dga_objective_dga_objectiveid",
+        "dga_objectiveidone",
+        "dga_objectiveidtwo"
+      ]
+    }
+  }
+}

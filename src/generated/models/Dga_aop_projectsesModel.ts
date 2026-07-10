@@ -21,8 +21,9 @@ export const Dga_aop_projectsesdga_budget_source = {
 } as const;
 export type Dga_aop_projectsesdga_budget_source = keyof typeof Dga_aop_projectsesdga_budget_source;
 export const Dga_aop_projectsesdga_budget_type = {
-  1: 'Opex',
-  2: 'Capex'
+  1: 'Chapter1_HR',
+  2: 'Chapter2_Opex',
+  3: 'Chapter3_Capex'
 } as const;
 export type Dga_aop_projectsesdga_budget_type = keyof typeof Dga_aop_projectsesdga_budget_type;
 export const Dga_aop_projectsesdga_does_this_project_require_procurement = {
@@ -141,7 +142,7 @@ export interface Dga_aop_projectsesBase {
   dga_planned_start_date: string;
   dga_procurement_plan?: string;
   dga_project_activity_status?: Dga_aop_projectsesdga_project_activity_status;
-  dga_project_categorized_under?: Dga_aop_projectsesdga_project_categorized_under;
+  dga_project_categorized_under?: Dga_aop_projectsesdga_project_categorized_under[];
   dga_project_description?: string;
   dga_project_kpi?: string;
   dga_project_long_term_impact?: string;

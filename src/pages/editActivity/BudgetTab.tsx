@@ -397,7 +397,7 @@ function buildForm(project: Dga_aop_projectses, months: BudgetMonthRecord[]): Bu
     allocatedBudget,
     budgetReviewComment: project.dga_budget_review_comments ?? '',
     budgetSource: toChoice(project.dga_budget_source, ['1', '2'] as const),
-    budgetType: toChoice(project.dga_budget_type, ['1', '2'] as const),
+    budgetType: toChoice(project.dga_budget_type, ['1', '2', '3'] as const),
     delta: calcDelta(allocatedBudget, totalPlannedBudget),
     monthlyBudgets,
     totalActivityBudget: numberToString(project.dga_total_project_budget),
