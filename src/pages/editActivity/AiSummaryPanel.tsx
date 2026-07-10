@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { Bot, ChevronDown, ChevronUp, Sparkles } from 'lucide-react'
+import { Bot, Sparkles } from 'lucide-react'
 import type { AiSummaryBlocks, AiSummaryMeta } from './types/aiSummaryTypes'
 
 type AiSummaryPanelProps = {
@@ -16,15 +15,13 @@ export function AiSummaryPanel({
   summaries,
   title,
 }: AiSummaryPanelProps) {
-  const [isExpanded, setIsExpanded] = useState(false)
-
   const sharedSummary = summaries?.summary?.trim()
   const hasSummary = Boolean(sharedSummary)
 
   return (
     <section
       aria-label={`${title} AI summary`}
-      className={`ai-summary-card ${isExpanded ? 'ai-summary-card--expanded' : 'ai-summary-card--collapsed'}`}
+      className="ai-summary-card"
     >
       <div className="ai-summary-card__header">
         <div className="ai-summary-card__brand">
@@ -37,19 +34,6 @@ export function AiSummaryPanel({
           </div>
         </div>
 
-        <div className="ai-summary-card__header-actions">
-          {hasSummary && !isLoading && !error ? (
-            <button
-              aria-expanded={isExpanded}
-              aria-label={isExpanded ? 'Collapse summary' : 'Expand full summary'}
-              className="ai-summary-card__toggle-btn"
-              onClick={() => setIsExpanded(!isExpanded)}
-              type="button"
-            >
-              {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-            </button>
-          ) : null}
-        </div>
       </div>
 
       <div className="ai-summary-card__body">
@@ -64,7 +48,7 @@ export function AiSummaryPanel({
             <span>{error}</span>
           </div>
         ) : (
-          <div className={`ai-summary-card__grid ${!isExpanded ? 'ai-summary-card__grid--clamped' : ''}`}>
+          <div className="ai-summary-card__grid">
             <article className={`ai-summary-block ai-summary-block--shared${hasSummary ? '' : ' ai-summary-block--empty'}`}>
               <header className="ai-summary-block__header">
                 <span className="ai-summary-badge ai-summary-badge--shared">AI Summary</span>

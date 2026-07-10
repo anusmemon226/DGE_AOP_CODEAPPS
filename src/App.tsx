@@ -1,17 +1,18 @@
-import type { ReactNode } from 'react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AppLayout } from './components/layout/AppLayout'
 import { NAVIGATION_ITEMS } from './constants/app'
 import { DEFAULT_APP_ROUTE, APP_ROUTE_PATHS, UI_SHOWCASE_ROUTE } from './routes/appRoutes'
-import { ActivitiesList } from './pages/ActivitiesList'
-import { Approvals } from './pages/Approvals'
-import { CreateActivity } from './pages/CreateActivity'
-import { EditActivity } from './pages/EditActivity'
-import { UiShowcase } from './pages/UiShowcase'
 import { useAppSelector } from './store/hooks'
 import { canViewNavigationItem } from './utils/permissions'
 import './App.css'
 import './styles/typography.css'
+
+const ActivitiesList = lazy(() => import('./pages/ActivitiesList').then((module) => ({ default: module.ActivitiesList })))
+const Approvals = lazy(() => import('./pages/Approvals').then((module) => ({ default: module.Approvals })))
+const CreateActivity = lazy(() => import('./pages/CreateActivity').then((module) => ({ default: module.CreateActivity })))
+const EditActivity = lazy(() => import('./pages/EditActivity').then((module) => ({ default: module.EditActivity })))
+const UiShowcase = lazy(() => import('./pages/UiShowcase').then((module) => ({ default: module.UiShowcase })))
 
 type RouteGuardProps = {
   children: ReactNode
@@ -41,20 +42,22 @@ function App() {
   return (
     <AppLayout>
       <RouteGuard>
-        <Routes>
-          <Route element={<EmptyScreen />} path={APP_ROUTE_PATHS.dashboard} />
-          <Route element={<CreateActivity />} path={APP_ROUTE_PATHS.createActivity} />
-          <Route element={<EditActivity />} path={APP_ROUTE_PATHS.editActivity} />
-          <Route element={<EmptyScreen />} path={APP_ROUTE_PATHS.overview} />
-          <Route element={<EmptyScreen />} path={APP_ROUTE_PATHS.activityLeads} />
-          <Route element={<ActivitiesList />} path={APP_ROUTE_PATHS.activitiesList} />
-          <Route element={<Approvals />} path={APP_ROUTE_PATHS.approvals} />
-          <Route element={<EmptyScreen />} path={APP_ROUTE_PATHS.procurementPlan} />
-          <Route element={<EmptyScreen />} path={APP_ROUTE_PATHS.engagementPlan} />
-          <Route element={<EmptyScreen />} path={APP_ROUTE_PATHS.financialSpending} />
-          <Route element={<UiShowcase />} path={UI_SHOWCASE_ROUTE} />
-          <Route element={<Navigate replace to={DEFAULT_APP_ROUTE} />} path="*" />
-        </Routes>
+        <Suspense fallback={<EmptyScreen />}>
+          <Routes>
+            <Route element={<EmptyScreen />} path={APP_ROUTE_PATHS.dashboard} />
+            <Route element={<CreateActivity />} path={APP_ROUTE_PATHS.createActivity} />
+            <Route element={<EditActivity />} path={APP_ROUTE_PATHS.editActivity} />
+            <Route element={<EmptyScreen />} path={APP_ROUTE_PATHS.overview} />
+            <Route element={<EmptyScreen />} path={APP_ROUTE_PATHS.activityLeads} />
+            <Route element={<ActivitiesList />} path={APP_ROUTE_PATHS.activitiesList} />
+            <Route element={<Approvals />} path={APP_ROUTE_PATHS.approvals} />
+            <Route element={<EmptyScreen />} path={APP_ROUTE_PATHS.procurementPlan} />
+            <Route element={<EmptyScreen />} path={APP_ROUTE_PATHS.engagementPlan} />
+            <Route element={<EmptyScreen />} path={APP_ROUTE_PATHS.financialSpending} />
+            <Route element={<UiShowcase />} path={UI_SHOWCASE_ROUTE} />
+            <Route element={<Navigate replace to={DEFAULT_APP_ROUTE} />} path="*" />
+          </Routes>
+        </Suspense>
       </RouteGuard>
     </AppLayout>
   )

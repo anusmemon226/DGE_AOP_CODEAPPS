@@ -1202,6 +1202,11 @@
   min-width: 0;
 }
 
+.create-activity__manual-ai-summary {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
 .create-activity__guidance {
   display: grid;
   gap: 0;

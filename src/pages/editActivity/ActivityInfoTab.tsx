@@ -706,7 +706,7 @@ export function ActivityInfoTab({
 
   return (
     <div className="create-activity__manual-layout">
-      <div className="create-activity__manual-form">
+      <div className="create-activity__manual-ai-summary">
         <AiSummaryPanel
           error={aiSummaryError}
           isLoading={isAiSummaryLoading}
@@ -714,6 +714,8 @@ export function ActivityInfoTab({
           summaries={aiSummaryBlocks}
           title="Activity Information"
         />
+      </div>
+      <div className="create-activity__manual-form">
         {formCards}
       </div>
       {guidancePanel}
