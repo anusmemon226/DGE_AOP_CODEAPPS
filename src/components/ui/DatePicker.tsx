@@ -4,6 +4,8 @@ import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
 import { formatDateDisplay } from '../../utils/formatting'
 import './ui.css'
 
+type DatePickerView = 'day' | 'month' | 'year'
+
 type DatePickerProps = {
   className?: string
   disabled?: boolean
@@ -18,6 +20,21 @@ type DatePickerProps = {
   required?: boolean
   value?: string
 }
+
+const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+] as const
 
 function normalizeDateValue(value?: string) {
   if (!value) {
@@ -55,6 +72,28 @@ function isDateDisabled(date: Date, min?: string, max?: string) {
   return Boolean((normalizedMin && isoDate < normalizedMin) || (normalizedMax && isoDate > normalizedMax))
 }
 
+function doesMonthHaveSelectableDate(year: number, month: number, min?: string, max?: string) {
+  const firstDay = toIsoDate(new Date(year, month, 1))
+  const lastDay = toIsoDate(new Date(year, month + 1, 0))
+  const normalizedMin = normalizeDateValue(min)
+  const normalizedMax = normalizeDateValue(max)
+
+  return !((normalizedMin && lastDay < normalizedMin) || (normalizedMax && firstDay > normalizedMax))
+}
+
+function doesYearHaveSelectableDate(year: number, min?: string, max?: string) {
+  const firstDay = `${year}-01-01`
+  const lastDay = `${year}-12-31`
+  const normalizedMin = normalizeDateValue(min)
+  const normalizedMax = normalizeDateValue(max)
+
+  return !((normalizedMin && lastDay < normalizedMin) || (normalizedMax && firstDay > normalizedMax))
+}
+
+function getYearRangeStart(year: number) {
+  return Math.floor(year / 12) * 12
+}
+
 export function DatePicker({
   className = '',
   disabled = false,
@@ -73,6 +112,7 @@ export function DatePicker({
   const [selectedValue, setSelectedValue] = useState(value ?? '')
   const [lastPropValue, setLastPropValue] = useState(value ?? '')
   const [viewDate, setViewDate] = useState(() => toDate(value))
+  const [pickerView, setPickerView] = useState<DatePickerView>('day')
   const rootRef = useRef<HTMLDivElement>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
   const [popoverRect, setPopoverRect] = useState<{ top: number; left: number } | null>(null)
@@ -166,6 +206,8 @@ export function DatePicker({
       setViewDate(toDate(activeValue))
     }
 
+    setPickerView('day')
+
     // Calculate fixed position from trigger
     const trigger = rootRef.current?.querySelector('.date-picker__trigger') as HTMLElement | null
     if (trigger) {
@@ -190,6 +232,55 @@ export function DatePicker({
     setPopoverRect(null)
     setIsOpen(false)
   }
+
+  function handlePreviousView() {
+    if (pickerView === 'day') {
+      setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1))
+      return
+    }
+
+    if (pickerView === 'month') {
+      setViewDate(new Date(viewDate.getFullYear() - 1, viewDate.getMonth(), 1))
+      return
+    }
+
+    setViewDate(new Date(viewDate.getFullYear() - 12, viewDate.getMonth(), 1))
+  }
+
+  function handleNextView() {
+    if (pickerView === 'day') {
+      setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1))
+      return
+    }
+
+    if (pickerView === 'month') {
+      setViewDate(new Date(viewDate.getFullYear() + 1, viewDate.getMonth(), 1))
+      return
+    }
+
+    setViewDate(new Date(viewDate.getFullYear() + 12, viewDate.getMonth(), 1))
+  }
+
+  function handleSelectToday() {
+    const today = new Date()
+
+    if (isDateDisabled(today, min, max)) return
+
+    const isoDate = toIsoDate(today)
+    setSelectedValue(isoDate)
+    setViewDate(today)
+    onChange(isoDate)
+    handleClose()
+  }
+
+  function handleClear() {
+    setSelectedValue('')
+    onChange('')
+    handleClose()
+  }
+
+  const yearRangeStart = getYearRangeStart(viewDate.getFullYear())
+  const yearRange = Array.from({ length: 12 }, (_, index) => yearRangeStart + index)
 
   return (
     <div className={`field date-picker ${disabled ? 'field--disabled' : ''} ${className}`.trim()} ref={rootRef}>
@@ -225,6 +316,7 @@ export function DatePicker({
         ? createPortal(
             <div
               className="date-picker__popover"
+              onClick={(event) => event.stopPropagation()}
               ref={popoverRef}
               role="dialog"
               style={{
@@ -236,50 +328,137 @@ export function DatePicker({
             >
               <div className="date-picker__header">
                 <button
-                  aria-label="Previous month"
-                  onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1))}
+                  aria-label={pickerView === 'year' ? 'Previous years' : pickerView === 'month' ? 'Previous year' : 'Previous month'}
+                  onClick={handlePreviousView}
                   type="button"
                 >
                   <ChevronLeft size={16} />
                 </button>
-                <strong>{viewDate.toLocaleString('en-US', { month: 'long', year: 'numeric' })}</strong>
+                <div className="date-picker__header-title">
+                  {pickerView === 'day' ? (
+                    <>
+                      <button
+                        className="date-picker__header-select"
+                        onClick={() => setPickerView('month')}
+                        type="button"
+                      >
+                        {MONTH_NAMES[viewDate.getMonth()]}
+                      </button>
+                      <button
+                        className="date-picker__header-select"
+                        onClick={() => setPickerView('year')}
+                        type="button"
+                      >
+                        {viewDate.getFullYear()}
+                      </button>
+                    </>
+                  ) : pickerView === 'month' ? (
+                    <button
+                      className="date-picker__header-select"
+                      onClick={() => setPickerView('year')}
+                      type="button"
+                    >
+                      {viewDate.getFullYear()}
+                    </button>
+                  ) : (
+                    <strong>{yearRangeStart} - {yearRangeStart + 11}</strong>
+                  )}
+                </div>
                 <button
-                  aria-label="Next month"
-                  onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1))}
+                  aria-label={pickerView === 'year' ? 'Next years' : pickerView === 'month' ? 'Next year' : 'Next month'}
+                  onClick={handleNextView}
                   type="button"
                 >
                   <ChevronRight size={16} />
                 </button>
               </div>
-              <div className="date-picker__weekdays">
-                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
-                  <span key={`${day}-${index}`}>{day}</span>
-                ))}
-              </div>
-              <div className="date-picker__grid">
-                {calendarDays.map((day) => {
-                  const isoDate = toIsoDate(day)
-                  const isMuted = day.getMonth() !== viewDate.getMonth()
-                  const isSelected = isoDate === activeValue
-                  const isDisabled = isDateDisabled(day, min, max)
 
-                  return (
+              {pickerView === 'day' ? (
+                <>
+                  <div className="date-picker__weekdays">
+                    {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
+                      <span key={`${day}-${index}`}>{day}</span>
+                    ))}
+                  </div>
+                  <div className="date-picker__grid">
+                    {calendarDays.map((day) => {
+                      const isoDate = toIsoDate(day)
+                      const isMuted = day.getMonth() !== viewDate.getMonth()
+                      const isSelected = isoDate === activeValue
+                      const isDisabled = isDateDisabled(day, min, max)
+
+                      return (
+                        <button
+                          className={`${isMuted ? 'date-picker__day--muted' : ''} ${isSelected ? 'date-picker__day--selected' : ''}`}
+                          disabled={isDisabled}
+                          key={isoDate}
+                          onClick={() => {
+                            setSelectedValue(isoDate)
+                            setViewDate(day)
+                            onChange(isoDate)
+                            handleClose()
+                          }}
+                          type="button"
+                        >
+                          {day.getDate()}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
+              ) : pickerView === 'month' ? (
+                <div className="date-picker__month-grid">
+                  {MONTH_NAMES.map((monthName, monthIndex) => {
+                    const isSelected = viewDate.getMonth() === monthIndex
+                    const isDisabled = !doesMonthHaveSelectableDate(viewDate.getFullYear(), monthIndex, min, max)
+
+                    return (
+                      <button
+                        className={isSelected ? 'date-picker__period--selected' : ''}
+                        disabled={isDisabled}
+                        key={monthName}
+                        onClick={() => {
+                          setViewDate(new Date(viewDate.getFullYear(), monthIndex, 1))
+                          setPickerView('day')
+                        }}
+                        type="button"
+                      >
+                        {monthName.slice(0, 3)}
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="date-picker__year-grid">
+                  {yearRange.map((year) => {
+                    const isSelected = viewDate.getFullYear() === year
+                    const isDisabled = !doesYearHaveSelectableDate(year, min, max)
+
+                    return (
                     <button
-                      className={`${isMuted ? 'date-picker__day--muted' : ''} ${isSelected ? 'date-picker__day--selected' : ''}`}
+                      className={isSelected ? 'date-picker__period--selected' : ''}
                       disabled={isDisabled}
-                      key={isoDate}
+                      key={year}
                       onClick={() => {
-                        setSelectedValue(isoDate)
-                        setViewDate(day)
-                        onChange(isoDate)
-                        handleClose()
+                        setViewDate(new Date(year, viewDate.getMonth(), 1))
+                        setPickerView('month')
                       }}
                       type="button"
                     >
-                      {day.getDate()}
+                      {year}
                     </button>
-                  )
-                })}
+                    )
+                  })}
+                </div>
+              )}
+
+              <div className="date-picker__quick-actions">
+                <button disabled={isDateDisabled(new Date(), min, max)} onClick={handleSelectToday} type="button">
+                  Today
+                </button>
+                <button onClick={handleClear} type="button">
+                  Clear
+                </button>
               </div>
             </div>,
             document.body,

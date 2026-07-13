@@ -49,7 +49,7 @@ import {
 } from './data/budgetData'
 import {
   cleanRecordId,
-  getProjectRelatedChangeAt,
+  getProjectRelatedRecordChange,
   isEmptyRelatedValue,
   parseProjectRelatedChanges,
   relatedOldValue,
@@ -370,9 +370,11 @@ function getBudgetMonthRelatedValue(
   monthId: string,
   fieldName: string,
 ): unknown {
-  return resolveProjectRelatedValue(getProjectRelatedChangeAt(
+  return resolveProjectRelatedValue(getProjectRelatedRecordChange(
     parseProjectRelatedChanges(relatedChanges),
-    ['budget', 'by_month', cleanRecordId(monthId), fieldName],
+    'budget',
+    cleanRecordId(monthId),
+    fieldName,
   ))
 }
 
@@ -396,15 +398,12 @@ function buildBudgetMonthRelatedChanges(
   deliveredAmount: number,
 ): ProjectRelatedChanges {
   return {
-    budget: {
-      by_month: {
-        [cleanRecordId(month.id)]: {
-          month_name: month.monthName,
-          dga_actual_budget: relatedOldValue(actualBudget),
-          dga_delivered_amount: relatedOldValue(deliveredAmount),
-        },
-      },
-    },
+    budget: [{
+      id: cleanRecordId(month.id),
+      month_name: month.monthName,
+      dga_actual_budget: relatedOldValue(actualBudget),
+      dga_delivered_amount: relatedOldValue(deliveredAmount),
+    }],
   }
 }
 

@@ -32,7 +32,7 @@ import { formatDateDisplay } from '../../utils/formatting'
 import { getQuarter } from './helpers/sharedHelpers'
 import {
   cleanRecordId,
-  getProjectRelatedChangeAt,
+  getProjectRelatedRecordChange,
   isEmptyRelatedValue,
   parseProjectRelatedChanges,
   relatedOldValue,
@@ -344,9 +344,11 @@ function getMilestoneRelatedValue(
   milestoneId: string,
   fieldName: string,
 ): unknown {
-  return resolveProjectRelatedValue(getProjectRelatedChangeAt(
+  return resolveProjectRelatedValue(getProjectRelatedRecordChange(
     parseProjectRelatedChanges(relatedChanges),
-    ['milestones', 'by_record', cleanRecordId(milestoneId), fieldName],
+    'milestones',
+    cleanRecordId(milestoneId),
+    fieldName,
   ))
 }
 
@@ -382,20 +384,17 @@ function buildMilestoneRelatedChanges(
   uploadedFile: UploadedFile | null,
 ): ProjectRelatedChanges {
   return {
-    milestones: {
-      by_record: {
-        [cleanRecordId(milestone.id)]: {
-          name: milestone.name,
-          dga_actual_start_date: relatedOldValue(form.actualStartDate),
-          dga_actual_end_date: relatedOldValue(form.actualEndDate),
-          statuscode: relatedOldValue(form.executionStatus ? Number(form.executionStatus) : ''),
-          dga_actual_progress: relatedOldValue(form.actualProgress ? Number(form.actualProgress) : ''),
-          dga_cancellation_reason: relatedOldValue(form.cancellationReason),
-          dga_justification: relatedOldValue(form.executionJustification),
-          uploaded_file: relatedOldValue(uploadedFile?.name ?? ''),
-        },
-      },
-    },
+    milestones: [{
+      id: cleanRecordId(milestone.id),
+      name: milestone.name,
+      dga_actual_start_date: relatedOldValue(form.actualStartDate),
+      dga_actual_end_date: relatedOldValue(form.actualEndDate),
+      statuscode: relatedOldValue(form.executionStatus ? Number(form.executionStatus) : ''),
+      dga_actual_progress: relatedOldValue(form.actualProgress ? Number(form.actualProgress) : ''),
+      dga_cancellation_reason: relatedOldValue(form.cancellationReason),
+      dga_justification: relatedOldValue(form.executionJustification),
+      uploaded_file: relatedOldValue(uploadedFile?.name ?? ''),
+    }],
   }
 }
 

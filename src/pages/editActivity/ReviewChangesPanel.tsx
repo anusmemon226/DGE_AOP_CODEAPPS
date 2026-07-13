@@ -8,6 +8,7 @@ import {
 } from '../../generated/models/Dga_procurement_plansModel'
 import { formatCurrencyAmount, formatDateDisplay } from '../../utils/formatting'
 import {
+  getProjectRelatedRecords,
   isEmptyRelatedValue,
   isPlainObject,
   isRelatedChange,
@@ -184,6 +185,15 @@ function collectDirectChanges(source: unknown, prefix = '') {
 }
 
 function collectRecordChanges(source: unknown, fallbackPrefix: string) {
+  if (Array.isArray(source)) {
+    return source.flatMap((record, index) => {
+      if (!isPlainObject(record)) return []
+
+      const label = getRecordLabel(record as ProjectRelatedChanges, `${fallbackPrefix} ${index + 1}`)
+      return collectDirectChanges(record, label)
+    })
+  }
+
   if (!isPlainObject(source)) return []
 
   return Object.entries(source).flatMap(([recordId, record]) => {
@@ -194,21 +204,17 @@ function collectRecordChanges(source: unknown, fallbackPrefix: string) {
   })
 }
 
-function getObjectChild(source: unknown, key: string): unknown {
-  return isPlainObject(source) ? source[key] : undefined
-}
-
 function buildDynamicChangeGroups(relatedChanges?: string | null): ReviewChangeGroup[] {
   const parsed = parseProjectRelatedChanges(relatedChanges)
-  const milestonesByRecord = getObjectChild(getObjectChild(parsed, 'milestones'), 'by_record')
-  const procurementsByRecord = getObjectChild(getObjectChild(parsed, 'procurements'), 'by_record')
-  const budgetByMonth = getObjectChild(getObjectChild(parsed, 'budget'), 'by_month')
+  const milestoneRecords = getProjectRelatedRecords(parsed, 'milestones')
+  const procurementRecords = getProjectRelatedRecords(parsed, 'procurements')
+  const budgetRecords = getProjectRelatedRecords(parsed, 'budget')
 
   const groups: Array<[ReviewChangeGroupKey, ReviewChange[]]> = [
     ['activity-info', collectDirectChanges(parsed.activity_information)],
-    ['milestones', collectRecordChanges(milestonesByRecord, 'Milestone')],
-    ['procurements', collectRecordChanges(procurementsByRecord, 'Procurement')],
-    ['budget', collectRecordChanges(budgetByMonth, 'Budget Month')],
+    ['milestones', collectRecordChanges(milestoneRecords, 'Milestone')],
+    ['procurements', collectRecordChanges(procurementRecords, 'Procurement')],
+    ['budget', collectRecordChanges(budgetRecords, 'Budget Month')],
   ]
 
   return groups

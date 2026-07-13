@@ -8,7 +8,9 @@ import { Dga_procurement_plansService } from '../../../generated/services/Dga_pr
 import { assertOperationSuccess } from './activityInfoHelpers'
 import {
   isEmptyRelatedValue,
+  getProjectRelatedRecords,
   isPlainObject,
+  normalizeProjectRelatedChangesShape,
   parseProjectRelatedChanges,
   type ProjectRelatedChange,
   type ProjectRelatedChanges,
@@ -18,6 +20,10 @@ function transformProjectRelatedChangesValues(
   node: ProjectRelatedChange | ProjectRelatedChanges | unknown,
   mode: 'approve' | 'reject',
 ): ProjectRelatedChange | ProjectRelatedChanges | unknown {
+  if (Array.isArray(node)) {
+    return node.map((record) => transformProjectRelatedChangesValues(record, mode))
+  }
+
   if (!isPlainObject(node)) {
     return node
   }
@@ -38,18 +44,17 @@ function transformProjectRelatedChangesValues(
 }
 
 export function approveProjectRelatedChanges(relatedChanges?: string | null) {
-  return JSON.stringify(transformProjectRelatedChangesValues(parseProjectRelatedChanges(relatedChanges), 'approve'))
+  return JSON.stringify(transformProjectRelatedChangesValues(
+    normalizeProjectRelatedChangesShape(parseProjectRelatedChanges(relatedChanges)),
+    'approve',
+  ))
 }
 
 export function rejectProjectRelatedChanges(relatedChanges?: string | null) {
-  return JSON.stringify(transformProjectRelatedChangesValues(parseProjectRelatedChanges(relatedChanges), 'reject'))
-}
-
-function getRecordEntries(source: unknown): Array<[string, ProjectRelatedChanges]> {
-  if (!isPlainObject(source)) return []
-
-  return Object.entries(source)
-    .filter((entry): entry is [string, ProjectRelatedChanges] => isPlainObject(entry[1]))
+  return JSON.stringify(transformProjectRelatedChangesValues(
+    normalizeProjectRelatedChangesShape(parseProjectRelatedChanges(relatedChanges)),
+    'reject',
+  ))
 }
 
 function getSection(source: ProjectRelatedChanges, path: string[]): unknown {
@@ -115,7 +120,7 @@ function addBooleanField<TPayload extends Record<string, unknown>>(payload: TPay
 export async function persistApprovedExecutionRelatedChanges(
   relatedChanges?: string | null,
 ): Promise<Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>>> {
-  const parsed = parseProjectRelatedChanges(relatedChanges)
+  const parsed = normalizeProjectRelatedChangesShape(parseProjectRelatedChanges(relatedChanges))
   const activityPayload: Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>> = {}
   const activityInformation = getSection(parsed, ['activity_information'])
 
@@ -134,7 +139,9 @@ export async function persistApprovedExecutionRelatedChanges(
     }
   }
 
-  const milestoneUpdates = getRecordEntries(getSection(parsed, ['milestones', 'by_record'])).map(async ([milestoneId, record]) => {
+  const milestoneUpdates = getProjectRelatedRecords(parsed, 'milestones').map(async (record) => {
+    const milestoneId = String(record.id ?? '')
+    if (!milestoneId) return
     const payload: Partial<Omit<Dga_aop_project_milestone_detailsesBase, 'dga_aop_project_milestone_detailsid'>> = {}
 
     addStringField(payload, 'dga_actual_start_date', pendingRelatedValue(record, 'dga_actual_start_date'))
@@ -150,7 +157,9 @@ export async function persistApprovedExecutionRelatedChanges(
     assertOperationSuccess(result, `Failed to apply approved execution changes to milestone ${record.name ?? milestoneId}.`)
   })
 
-  const procurementUpdates = getRecordEntries(getSection(parsed, ['procurements', 'by_record'])).map(async ([procurementId, record]) => {
+  const procurementUpdates = getProjectRelatedRecords(parsed, 'procurements').map(async (record) => {
+    const procurementId = String(record.id ?? '')
+    if (!procurementId) return
     const payload: Partial<Omit<Dga_procurement_plansBase, 'dga_procurement_planid'>> = {}
 
     addBooleanField(payload, 'dga_does_this_project_require_tender', pendingRelatedValue(record, 'dga_does_this_project_require_tender'))
@@ -170,7 +179,9 @@ export async function persistApprovedExecutionRelatedChanges(
     assertOperationSuccess(result, `Failed to apply approved execution changes to procurement ${record.name ?? procurementId}.`)
   })
 
-  const budgetUpdates = getRecordEntries(getSection(parsed, ['budget', 'by_month'])).map(async ([monthId, record]) => {
+  const budgetUpdates = getProjectRelatedRecords(parsed, 'budget').map(async (record) => {
+    const monthId = String(record.id ?? '')
+    if (!monthId) return
     const payload: Partial<Omit<Dga_aop_project_budgetsBase, 'dga_aop_project_budgetid'>> = {}
 
     addNumberField(payload, 'dga_actual_budget', pendingRelatedValue(record, 'dga_actual_budget'))

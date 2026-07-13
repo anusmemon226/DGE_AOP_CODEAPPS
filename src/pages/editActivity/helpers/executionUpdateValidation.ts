@@ -12,10 +12,11 @@ import {
   type FieldErrors,
 } from './activityInfoHelpers'
 import {
-  getProjectRelatedChangeAt,
+  getProjectRelatedRecordChange,
   isEmptyRelatedValue,
   isPlainObject,
   isRelatedChange,
+  normalizeProjectRelatedChangesShape,
   parseProjectRelatedChanges,
   resolveProjectRelatedValue,
   type ProjectRelatedChange,
@@ -143,20 +144,15 @@ function hasAnyMeaningfulExecutionChange(
     return hasMeaningfulRelatedChange(path[path.length - 1] ?? '', node, path)
   }
 
+  if (Array.isArray(node)) {
+    return node.some((value) => hasAnyMeaningfulExecutionChange(value, path))
+  }
+
   if (!isPlainObject(node)) return false
 
   return Object.entries(node).some(([key, value]) => (
     hasAnyMeaningfulExecutionChange(value, [...path, key])
   ))
-}
-
-function relatedValue(
-  changes: ProjectRelatedChanges,
-  path: string[],
-  fallback: unknown = '',
-) {
-  const value = resolveProjectRelatedValue(getProjectRelatedChangeAt(changes, path))
-  return isEmptyRelatedValue(value) ? fallback : value
 }
 
 function getQuarterNumber(value?: string | null) {
@@ -219,11 +215,13 @@ function getMilestoneExecutionValue(
   fieldName: string,
   fallback: unknown,
 ) {
-  return relatedValue(
+  const value = resolveProjectRelatedValue(getProjectRelatedRecordChange(
     changes,
-    ['milestones', 'by_record', milestoneId.replace(/[{}]/g, ''), fieldName],
-    fallback,
-  )
+    'milestones',
+    milestoneId.replace(/[{}]/g, ''),
+    fieldName,
+  ))
+  return isEmptyRelatedValue(value) ? fallback : value
 }
 
 function getProcurementExecutionValue(
@@ -232,11 +230,13 @@ function getProcurementExecutionValue(
   fieldName: string,
   fallback: unknown,
 ) {
-  return relatedValue(
+  const value = resolveProjectRelatedValue(getProjectRelatedRecordChange(
     changes,
-    ['procurements', 'by_record', procurementId.replace(/[{}]/g, ''), fieldName],
-    fallback,
-  )
+    'procurements',
+    procurementId.replace(/[{}]/g, ''),
+    fieldName,
+  ))
+  return isEmptyRelatedValue(value) ? fallback : value
 }
 
 function getBudgetExecutionValue(
@@ -245,11 +245,13 @@ function getBudgetExecutionValue(
   fieldName: string,
   fallback: unknown,
 ) {
-  return relatedValue(
+  const value = resolveProjectRelatedValue(getProjectRelatedRecordChange(
     changes,
-    ['budget', 'by_month', monthId.replace(/[{}]/g, ''), fieldName],
-    fallback,
-  )
+    'budget',
+    monthId.replace(/[{}]/g, ''),
+    fieldName,
+  ))
+  return isEmptyRelatedValue(value) ? fallback : value
 }
 
 function formatRecordLabel(value?: string | null, fallback = 'record') {
@@ -422,7 +424,7 @@ export async function validateExecutionUpdateSubmission(options: {
   relatedChanges?: string | null
 }): Promise<ExecutionUpdateValidationResult> {
   const { form, projectId, relatedChanges } = options
-  const changes = parseProjectRelatedChanges(relatedChanges)
+  const changes = normalizeProjectRelatedChangesShape(parseProjectRelatedChanges(relatedChanges))
 
   if (!hasAnyMeaningfulExecutionChange(changes)) {
     return {

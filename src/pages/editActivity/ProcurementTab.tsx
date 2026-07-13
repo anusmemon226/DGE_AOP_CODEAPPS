@@ -484,7 +484,15 @@ type ProjectRelatedChange = {
 }
 
 type ProjectRelatedChanges = {
-  [key: string]: ProjectRelatedChange | ProjectRelatedChanges | string | number | boolean | null | undefined
+  [key: string]:
+    | ProjectRelatedChange
+    | ProjectRelatedChanges
+    | ProjectRelatedChanges[]
+    | string
+    | number
+    | boolean
+    | null
+    | undefined
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -509,11 +517,67 @@ function parseProjectRelatedChanges(value?: string | null): ProjectRelatedChange
   }
 }
 
-function mergeProjectRelatedChanges(base: ProjectRelatedChanges, override: ProjectRelatedChanges): ProjectRelatedChanges {
-  const merged: ProjectRelatedChanges = { ...base }
+function cleanProjectRelatedRecordId(id?: string | null) {
+  return id?.replace(/[{}]/g, '') || ''
+}
 
-  Object.entries(override).forEach(([key, value]) => {
+function legacyRecordMapToArray(source: unknown): ProjectRelatedChanges[] {
+  if (!isPlainObject(source)) return []
+
+  return Object.entries(source)
+    .filter((entry): entry is [string, ProjectRelatedChanges] => isPlainObject(entry[1]))
+    .map(([id, record]) => ({
+      id: cleanProjectRelatedRecordId(id),
+      ...record,
+    }))
+}
+
+function normalizeProjectRelatedChangesShape(changes: ProjectRelatedChanges): ProjectRelatedChanges {
+  const normalized: ProjectRelatedChanges = { ...changes }
+  const procurements = normalized.procurements
+
+  if (isPlainObject(procurements) && Array.isArray((procurements as Record<string, unknown>).records)) {
+    normalized.procurements = (procurements as Record<string, unknown>).records as ProjectRelatedChanges[]
+  } else if (isPlainObject(procurements) && isPlainObject((procurements as Record<string, unknown>).by_record)) {
+    normalized.procurements = legacyRecordMapToArray((procurements as Record<string, unknown>).by_record)
+  }
+
+  return normalized
+}
+
+function mergeProjectRelatedRecords(
+  base: ProjectRelatedChanges[],
+  override: ProjectRelatedChanges[],
+): ProjectRelatedChanges[] {
+  const merged = base.map((record) => ({ ...record }))
+
+  override.forEach((record) => {
+    const recordId = cleanProjectRelatedRecordId(String(record.id ?? ''))
+    const existingIndex = recordId
+      ? merged.findIndex((existing) => cleanProjectRelatedRecordId(String(existing.id ?? '')) === recordId)
+      : -1
+
+    if (existingIndex >= 0) {
+      merged[existingIndex] = mergeProjectRelatedChanges(merged[existingIndex], record)
+      return
+    }
+
+    merged.push(record)
+  })
+
+  return merged
+}
+
+function mergeProjectRelatedChanges(base: ProjectRelatedChanges, override: ProjectRelatedChanges): ProjectRelatedChanges {
+  const merged: ProjectRelatedChanges = { ...normalizeProjectRelatedChangesShape(base) }
+
+  Object.entries(normalizeProjectRelatedChangesShape(override)).forEach(([key, value]) => {
     const existingValue = merged[key]
+
+    if (Array.isArray(existingValue) && Array.isArray(value)) {
+      merged[key] = mergeProjectRelatedRecords(existingValue, value)
+      return
+    }
 
     if (isPlainObject(existingValue) && isPlainObject(value) && !('old_value' in value) && !('new_value' in value)) {
       merged[key] = mergeProjectRelatedChanges(existingValue as ProjectRelatedChanges, value as ProjectRelatedChanges)
@@ -545,22 +609,22 @@ function mergeProjectRelatedChanges(base: ProjectRelatedChanges, override: Proje
   return merged
 }
 
-function getProjectRelatedChangeAt(changes: ProjectRelatedChanges, path: string[]): ProjectRelatedChange | undefined {
-  let current: unknown = changes
-
-  for (const segment of path) {
-    if (!isPlainObject(current)) {
-      return undefined
-    }
-
-    current = (current as ProjectRelatedChanges)[segment]
-  }
-
-  if (isPlainObject(current) && ('old_value' in current || 'new_value' in current)) {
-    return current as ProjectRelatedChange
-  }
-
-  return undefined
+function getProjectRelatedRecordChange(
+  changes: ProjectRelatedChanges,
+  sectionName: 'procurements',
+  recordId: string,
+  fieldName: string,
+): ProjectRelatedChange | undefined {
+  const normalized = normalizeProjectRelatedChangesShape(changes)
+  const section = normalized[sectionName]
+  const record = Array.isArray(section)
+    ? section.find((candidate) => (
+      isPlainObject(candidate)
+      && cleanProjectRelatedRecordId(String(candidate.id ?? '')) === cleanProjectRelatedRecordId(recordId)
+    ))
+    : undefined
+  const value = isPlainObject(record) ? record[fieldName] : undefined
+  return isPlainObject(value) && ('old_value' in value || 'new_value' in value) ? value as ProjectRelatedChange : undefined
 }
 
 function isEmptyRelatedValue(value: unknown) {
@@ -595,9 +659,11 @@ function getExecutionProcurementRelatedField(
 ): unknown {
   const recordKey = procurementId ? procurementId.replace(/[{}]/g, '') : 'new'
 
-  return resolveProjectRelatedValue(getProjectRelatedChangeAt(
+  return resolveProjectRelatedValue(getProjectRelatedRecordChange(
     parseProjectRelatedChanges(relatedChanges),
-    ['procurements', 'by_record', recordKey, fieldName],
+    'procurements',
+    recordKey,
+    fieldName,
   ))
 }
 
@@ -637,35 +703,32 @@ function buildExecutionProcurementRelatedChanges(
   const recordKey = procurement?.id ? procurement.id.replace(/[{}]/g, '') : 'new'
 
   return {
-    procurements: {
-      by_record: {
-        [recordKey]: {
-          name: procurement?.procurementName ?? '',
-          dga_does_this_project_require_tender: relatedOldValue(
-            yesNoToBoolean(executionForm.tenderRequired),
-            yesNoToBoolean(procurement?.tenderRequired ?? ''),
-          ),
-          dga_tender_type: relatedOldValue(
-            executionForm.tenderType ? Number(executionForm.tenderType) : '',
-            procurement?.tenderType ? Number(procurement.tenderType) : '',
-          ),
-          dga_current_procurement_status: relatedOldValue(
-            executionForm.procurementStatus ? Number(executionForm.procurementStatus) : '',
-            procurement?.procurementStatus ? Number(procurement.procurementStatus) : '',
-          ),
-          dga_pr_ticket_number: relatedOldValue(executionForm.prTicketNumber),
-          dga_actual_contract_value: relatedOldValue(currencyToNumber(executionForm.actualContractValue) ?? ''),
-          dga_actual_contract_duration_in_months: relatedOldValue(
-            executionForm.actualContractDuration.replace(/\s*Month(s?)$/i, '').replace(/\D/g, ''),
-          ),
-          dga_stage_update_date: relatedOldValue(executionForm.stageUpdateDate),
-          dga_progress_update: relatedOldValue(executionForm.progressUpdate),
-          attach_contract_file: relatedOldValue(executionForm.attachContractFile?.name ?? ''),
-          dga_justification_date: relatedOldValue(executionForm.justificationDate),
-          dga_justification_of_the_change: relatedOldValue(executionForm.justification),
-        } as ProjectRelatedChanges,
-      },
-    },
+    procurements: [{
+      id: recordKey,
+      name: procurement?.procurementName ?? '',
+      dga_does_this_project_require_tender: relatedOldValue(
+        yesNoToBoolean(executionForm.tenderRequired),
+        yesNoToBoolean(procurement?.tenderRequired ?? ''),
+      ),
+      dga_tender_type: relatedOldValue(
+        executionForm.tenderType ? Number(executionForm.tenderType) : '',
+        procurement?.tenderType ? Number(procurement.tenderType) : '',
+      ),
+      dga_current_procurement_status: relatedOldValue(
+        executionForm.procurementStatus ? Number(executionForm.procurementStatus) : '',
+        procurement?.procurementStatus ? Number(procurement.procurementStatus) : '',
+      ),
+      dga_pr_ticket_number: relatedOldValue(executionForm.prTicketNumber),
+      dga_actual_contract_value: relatedOldValue(currencyToNumber(executionForm.actualContractValue) ?? ''),
+      dga_actual_contract_duration_in_months: relatedOldValue(
+        executionForm.actualContractDuration.replace(/\s*Month(s?)$/i, '').replace(/\D/g, ''),
+      ),
+      dga_stage_update_date: relatedOldValue(executionForm.stageUpdateDate),
+      dga_progress_update: relatedOldValue(executionForm.progressUpdate),
+      attach_contract_file: relatedOldValue(executionForm.attachContractFile?.name ?? ''),
+      dga_justification_date: relatedOldValue(executionForm.justificationDate),
+      dga_justification_of_the_change: relatedOldValue(executionForm.justification),
+    } as ProjectRelatedChanges],
   }
 }
 
