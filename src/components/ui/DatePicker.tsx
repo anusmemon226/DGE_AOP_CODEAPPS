@@ -90,7 +90,7 @@ export function DatePicker({
       return
     }
 
-    function handlePointerDown(event: PointerEvent) {
+    function handleDocumentClick(event: MouseEvent) {
       if (!rootRef.current?.contains(event.target as Node) && !popoverRef.current?.contains(event.target as Node)) {
         setPopoverRect(null)
         setIsOpen(false)
@@ -128,14 +128,14 @@ export function DatePicker({
     // Refine position after actual layout is known
     const rafId = requestAnimationFrame(reposition)
 
-    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('click', handleDocumentClick)
     document.addEventListener('keydown', handleKeyDown)
     // Scroll events don't bubble but can be captured at document level
     document.addEventListener('scroll', reposition, { capture: true })
 
     return () => {
       cancelAnimationFrame(rafId)
-      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('click', handleDocumentClick)
       document.removeEventListener('keydown', handleKeyDown)
       document.removeEventListener('scroll', reposition, { capture: true })
     }

@@ -260,6 +260,53 @@ function getStatusLabel(value: string): string {
   return all.find((s) => s.value === value)?.label ?? value
 }
 
+type ProcurementReadOnlyKind = 'identity' | 'date' | 'classification' | 'requirement' | 'narrative'
+
+function renderReadOnlyValue(value?: string | number | null) {
+  const text = String(value ?? '').trim()
+  return text || '—'
+}
+
+function getOptionLabel<T extends string>(
+  options: readonly SelectOption<T>[] | readonly { label: string; value: T }[],
+  value: T | '',
+) {
+  return options.find((option) => option.value === value)?.label ?? value
+}
+
+function renderProcurementReadOnlyDetails(items: Array<{
+  label: string
+  value?: string | number | null
+  type?: 'date' | 'long'
+  kind?: ProcurementReadOnlyKind
+  columns?: 3 | 4 | 6 | 9 | 12
+}>) {
+  return (
+    <dl className="create-activity__readonly-grid create-activity__readonly-grid--3">
+      {items.map((item) => {
+        const kind = item.kind ?? (item.type === 'date' ? 'date' : item.type === 'long' ? 'narrative' : 'identity')
+        const displayValue = item.type === 'date'
+          ? renderReadOnlyValue(formatDate(String(item.value ?? '')))
+          : renderReadOnlyValue(item.value)
+        const spanClass = item.type === 'long' ? 'create-activity__readonly-item--wide' : ''
+        const columnClass = item.columns ? `create-activity__readonly-item--span-${item.columns}` : ''
+
+        return (
+          <div
+            className={`create-activity__readonly-item create-activity__readonly-item--${kind} ${spanClass} ${columnClass}`.trim()}
+            key={item.label}
+          >
+            <div className="create-activity__readonly-item-content">
+              <dt>{item.label}</dt>
+              <dd>{displayValue}</dd>
+            </div>
+          </div>
+        )
+      })}
+    </dl>
+  )
+}
+
 function formatFileSize(size: number) {
   if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`
   return `${Math.max(1, Math.round(size / 1024))} KB`
@@ -1449,6 +1496,7 @@ export function ProcurementTab({
   function renderDrawerForm() {
     const title = editingProcurement ? 'Edit Procurement' : 'Create Procurement'
     const isDrawerReadOnly = isReadOnly || isFutureQuarterLocked
+    const showPlanningReadOnlyView = isExecutionPhase
     const canSaveProcurement = isExecutionPhase ? canEditExecutionSection : !isReadOnly
 
     return (
@@ -1482,7 +1530,7 @@ export function ProcurementTab({
 
           {/* ── Tender Information ── */}
           {!isExecutionPhase ? (
-            <div className="edit-activity__procurement-section">
+          <div className="edit-activity__procurement-section">
               <div className="create-activity__section-header">
                 <div className="create-activity__section-header-inner">
                   <span className="create-activity__section-header-icon" aria-hidden="true">
@@ -1753,6 +1801,25 @@ export function ProcurementTab({
               </div>
             </div>
 
+            {showPlanningReadOnlyView ? (
+              <div className="create-activity__readonly-panel">
+                {renderProcurementReadOnlyDetails([
+                  { label: 'Procurement Name', value: form.procurementName, kind: 'identity', columns: 6 },
+                  { label: 'Request Type', value: getOptionLabel(REQUEST_TYPE_OPTIONS, form.requestType), kind: 'classification', columns: 6 },
+                  { label: 'Contract Number (if applicable)', value: form.contractNumber, kind: 'identity', columns: 6 },
+                  { label: 'Recommended Suppliers', value: form.recommendedSuppliers, kind: 'identity', columns: 6 },
+                  { label: 'Tendering Method', value: getOptionLabel(TENDERING_METHOD_OPTIONS, form.tenderingMethod), kind: 'classification', columns: 6 },
+                  { label: 'Solicitation Channel', value: getOptionLabel(SOLICITATION_CHANNEL_OPTIONS, form.solicitationChannel), kind: 'classification', columns: 6 },
+                  { label: 'Cost Center', value: costCenterOptions.find((option) => option.value === form.costCenter)?.label ?? form.costCenter, kind: 'classification', columns: 6 },
+                  { label: 'Cost Center Code', value: form.costCenterCode, kind: 'classification', columns: 6 },
+                  { label: 'Opex/Capex', value: getOptionLabel(OPEX_CAPEX_OPTIONS, form.opexCapex), kind: 'requirement', columns: 4 },
+                  { label: 'Aligned with Strategic Plan', value: getOptionLabel(STRATEGIC_PLAN_OPTIONS, form.alignedStrategicPlan), kind: 'requirement', columns: 4 },
+                  { label: 'Outcome', value: getOptionLabel(OUTCOME_OPTIONS, form.outcome), kind: 'classification', columns: 4 },
+                  { label: 'Category Description', value: categoryOptions.find((option) => option.value === form.categoryDescription)?.label ?? form.categoryDescription, kind: 'classification', columns: 6 },
+                  { label: 'Category Code', value: form.categoryCode, kind: 'classification', columns: 6 },
+                ])}
+              </div>
+            ) : (
             <div className="edit-activity__procurement-drawer-section">
             <Input
               disabled={isDrawerReadOnly}
@@ -1884,7 +1951,8 @@ export function ProcurementTab({
                 value={form.categoryCode}
               />
             </div>
-          </div>
+            </div>
+            )}
           </div>
 
           {/* ── Financial Details ── */}
@@ -1905,6 +1973,21 @@ export function ProcurementTab({
               </div>
             </div>
 
+            {showPlanningReadOnlyView ? (
+              <div className="create-activity__readonly-panel">
+                {renderProcurementReadOnlyDetails([
+                  { label: 'End User Comments', value: form.endUserComments, type: 'long', kind: 'narrative', columns: 6 },
+                  { label: 'Item/Service Description', value: form.itemServiceDescription, type: 'long', kind: 'narrative', columns: 6 },
+                  { label: 'Total Activity Estimated Value', value: formatCurrencyAmount(form.totalEstimatedValue), kind: 'requirement', columns: 6 },
+                  { label: 'PR Expected Value in 2026', value: formatCurrencyAmount(form.prExpectedValue2026), kind: 'requirement', columns: 6 },
+                  { label: 'Expected Contract Duration', value: form.expectedContractDuration, kind: 'classification', columns: 4 },
+                  { label: 'Planned PR Creation Date', value: form.plannedPrCreationDate, type: 'date', kind: 'date', columns: 4 },
+                  { label: 'PR Raising Quarter', value: form.purchaseRequestRaisingQuarter, kind: 'classification', columns: 4 },
+                  { label: 'Expected Awarding Date', value: form.expectedAwardingDate, type: 'date', kind: 'date', columns: 6 },
+                  { label: 'Expected Awarding Quarter', value: form.expectedAwardingQuarter, kind: 'classification', columns: 6 },
+                ])}
+              </div>
+            ) : (
             <div className="edit-activity__procurement-drawer-section">
               <Textarea
                 disabled={isDrawerReadOnly}
@@ -2013,6 +2096,7 @@ export function ProcurementTab({
                 />
               </div>
             </div>
+            )}
           </div>
         </div>
       </SideDrawer>

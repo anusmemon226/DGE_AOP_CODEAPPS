@@ -264,3 +264,63 @@ table td {
 .edit-activity__execution-budget-value strong {
   font-weight: var(--font-weight-semibold) !important;
 }
+
+/* Final disabled radio guard.
+   This intentionally lives in the last-loaded typography layer so tab-specific
+   colored radio hovers cannot make disabled choices look interactive. */
+.radio-group--disabled .choice,
+.checkbox-group--disabled .choice,
+.radio-group .choice:has(input:disabled),
+.checkbox-group .choice:has(input:disabled) {
+  background: var(--color-surface-muted) !important;
+  border-color: var(--color-border) !important;
+  box-shadow: var(--control-shadow) !important;
+  color: var(--color-text-secondary) !important;
+  cursor: not-allowed !important;
+  opacity: 0.82;
+  transform: none !important;
+}
+
+.radio-group--disabled .choice:hover,
+.checkbox-group--disabled .choice:hover,
+.radio-group .choice:has(input:disabled):hover,
+.checkbox-group .choice:has(input:disabled):hover {
+  background: var(--color-surface-muted) !important;
+  border-color: var(--color-border) !important;
+  box-shadow: var(--control-shadow) !important;
+  color: var(--color-text-secondary) !important;
+  transform: none !important;
+}
+
+.radio-group--disabled .choice:has(input:checked),
+.checkbox-group--disabled .choice:has(input:checked),
+.radio-group .choice:has(input:disabled:checked),
+.checkbox-group .choice:has(input:disabled:checked) {
+  background: color-mix(in srgb, var(--choice-accent, var(--color-primary)) 8%, var(--color-surface-muted)) !important;
+  border-color: color-mix(in srgb, var(--choice-accent, var(--color-primary)) 48%, var(--color-border)) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--choice-accent, var(--color-primary)) 16%, transparent) !important;
+  opacity: 0.9;
+}
+
+.radio-group--disabled .choice:has(input:checked):hover,
+.checkbox-group--disabled .choice:has(input:checked):hover,
+.radio-group .choice:has(input:disabled:checked):hover,
+.checkbox-group .choice:has(input:disabled:checked):hover {
+  background: color-mix(in srgb, var(--choice-accent, var(--color-primary)) 8%, var(--color-surface-muted)) !important;
+  border-color: color-mix(in srgb, var(--choice-accent, var(--color-primary)) 48%, var(--color-border)) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--choice-accent, var(--color-primary)) 16%, transparent) !important;
+}
+
+.radio-group--disabled .choice:has(input:checked) .choice__box,
+.radio-group .choice:has(input:disabled:checked) .choice__box {
+  background: var(--color-text-tertiary) !important;
+  border-color: var(--color-text-tertiary) !important;
+  color: var(--color-on-primary) !important;
+}
+
+.radio-group .choice:has(input:disabled:not(:checked)) .choice__box,
+.checkbox-group .choice:has(input:disabled:not(:checked)) .choice__box {
+  background: var(--control-bg) !important;
+  border-color: var(--color-border) !important;
+  color: transparent !important;
+}

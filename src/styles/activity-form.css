@@ -409,6 +409,7 @@
 .create-activity__section {
   display: grid;
   gap: 0;
+  overflow: hidden;
   padding: 0;
 }
 
@@ -499,6 +500,209 @@
 .create-activity__form-stack .field__control--textarea {
   font-size: 0.84rem;
   min-height: 5.25rem;
+}
+
+.create-activity__readonly-panel {
+  background:
+    radial-gradient(circle at 100% 0, color-mix(in srgb, var(--color-primary) 7%, transparent), transparent 22rem),
+    linear-gradient(180deg, color-mix(in srgb, var(--color-primary-soft) 18%, var(--color-surface)) 0%, var(--color-surface) 74%),
+    var(--color-surface);
+  border-top: 1px solid color-mix(in srgb, var(--color-primary-border) 76%, transparent);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  padding: 1rem 1.1rem 1.1rem;
+}
+
+.create-activity__readonly-grid {
+  display: grid;
+  gap: 0.72rem;
+  margin: 0;
+}
+
+.create-activity__readonly-grid--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.create-activity__readonly-grid--3 {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+.create-activity__readonly-item {
+  align-items: stretch;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-primary-soft) 54%, var(--color-surface)), color-mix(in srgb, var(--color-surface) 78%, var(--color-primary-soft)));
+  border: 1px solid color-mix(in srgb, var(--color-primary-border) 76%, transparent);
+  border-radius: 1rem;
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--color-primary) 4%, transparent);
+  display: grid;
+  min-height: 3.65rem;
+  min-width: 0;
+  padding: 0.78rem 0.95rem;
+  position: relative;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.create-activity__readonly-item:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 24%, var(--color-border));
+  box-shadow: 0 14px 30px color-mix(in srgb, var(--color-primary) 6%, transparent);
+  transform: translateY(-1px);
+}
+
+.create-activity__readonly-item--featured {
+  grid-column: span 2;
+}
+
+.create-activity__readonly-item--wide {
+  grid-column: 1 / -1;
+  min-height: 0;
+}
+
+.create-activity__readonly-item--span-3 {
+  grid-column: span 3;
+}
+
+.create-activity__readonly-item--span-4 {
+  grid-column: span 4;
+}
+
+.create-activity__readonly-item--span-6 {
+  grid-column: span 6;
+}
+
+.create-activity__readonly-item--span-9 {
+  grid-column: span 9;
+}
+
+.create-activity__readonly-item--span-12 {
+  grid-column: span 12;
+}
+
+.create-activity__readonly-item--narrative {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-info-soft) 62%, var(--color-surface)), color-mix(in srgb, var(--color-surface) 74%, var(--color-info-soft)));
+  padding-block: 0.82rem;
+}
+
+.create-activity__readonly-item--requirement {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-success-soft) 68%, var(--color-surface)), color-mix(in srgb, var(--color-surface) 72%, var(--color-success-soft)));
+}
+
+.create-activity__readonly-item--date {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-primary-soft) 70%, var(--color-surface)), color-mix(in srgb, var(--color-surface) 68%, var(--color-primary-soft)));
+}
+
+.create-activity__readonly-item--identity {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-primary-soft) 64%, var(--color-surface)), color-mix(in srgb, var(--color-surface) 72%, var(--color-primary-soft)));
+}
+
+.create-activity__readonly-item--organization {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-info-soft) 58%, var(--color-surface)), color-mix(in srgb, var(--color-surface) 74%, var(--color-info-soft)));
+}
+
+.create-activity__readonly-item--classification {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-warning-soft) 62%, var(--color-surface)), color-mix(in srgb, var(--color-surface) 74%, var(--color-warning-soft)));
+}
+
+.create-activity__readonly-item--person {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-primary-soft) 50%, var(--color-surface)), color-mix(in srgb, var(--color-surface) 72%, var(--color-warning-soft)));
+}
+
+.create-activity__readonly-item-content {
+  display: grid;
+  gap: 0.28rem;
+  min-width: 0;
+}
+
+.create-activity__readonly-item dt {
+  color: var(--color-text-secondary);
+  font-size: 0.7rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.01em;
+  line-height: 1.25;
+}
+
+.create-activity__readonly-item dd {
+  color: var(--color-text-primary);
+  font-size: 0.86rem;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.42;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.create-activity__readonly-item--narrative dd {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-medium);
+  white-space: pre-wrap;
+}
+
+.create-activity__readonly-value-pill {
+  align-items: center;
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.72rem;
+  font-weight: var(--font-weight-semibold);
+  justify-content: center;
+  line-height: 1;
+  min-width: 2.65rem;
+  padding: 0.28rem 0.58rem;
+}
+
+.create-activity__readonly-value-pill--yes {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.create-activity__readonly-value-pill--no {
+  background: var(--color-surface-muted);
+  color: var(--color-text-secondary);
+}
+
+:root[data-theme='dark'] .create-activity__readonly-panel {
+  background:
+    radial-gradient(circle at 100% 0, color-mix(in srgb, var(--color-primary) 10%, transparent), transparent 22rem),
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface-muted) 58%, var(--color-surface)) 0%, var(--color-surface) 78%),
+    var(--color-surface);
+}
+
+:root[data-theme='dark'] .create-activity__readonly-item {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-surface-muted) 72%, var(--color-surface)), color-mix(in srgb, var(--color-surface) 78%, var(--color-primary-soft)));
+  border-color: color-mix(in srgb, var(--color-border) 82%, transparent);
+  box-shadow: none;
+}
+
+:root[data-theme='dark'] .create-activity__readonly-item--identity,
+:root[data-theme='dark'] .create-activity__readonly-item--date {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-primary-soft) 38%, var(--color-surface)), color-mix(in srgb, var(--color-surface) 72%, var(--color-primary-soft)));
+}
+
+:root[data-theme='dark'] .create-activity__readonly-item--organization,
+:root[data-theme='dark'] .create-activity__readonly-item--narrative {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-info-soft) 32%, var(--color-surface)), color-mix(in srgb, var(--color-surface) 74%, var(--color-info-soft)));
+}
+
+:root[data-theme='dark'] .create-activity__readonly-item--classification,
+:root[data-theme='dark'] .create-activity__readonly-item--person {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-warning-soft) 28%, var(--color-surface)), color-mix(in srgb, var(--color-surface) 76%, var(--color-warning-soft)));
+}
+
+:root[data-theme='dark'] .create-activity__readonly-item--requirement {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-success-soft) 30%, var(--color-surface)), color-mix(in srgb, var(--color-surface) 76%, var(--color-success-soft)));
+}
+
+:root[data-theme='dark'] .create-activity__readonly-item:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 38%, var(--color-border));
+  box-shadow: none;
 }
 
 .create-activity__form-stack .select-field__value {
@@ -1170,6 +1374,28 @@
   background: var(--control-bg-hover);
   border-color: var(--control-border-hover);
   box-shadow: var(--control-shadow-hover);
+}
+
+.create-activity__date-range .date-picker__trigger:disabled,
+.create-activity__date-range .field--disabled .date-picker__trigger {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+  box-shadow: var(--control-shadow);
+  color: var(--color-text-secondary);
+  cursor: not-allowed;
+  opacity: 0.82;
+}
+
+.create-activity__date-range .date-picker__trigger:disabled:hover,
+.create-activity__date-range .field--disabled .date-picker__trigger:hover {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+  box-shadow: var(--control-shadow);
+}
+
+.create-activity__date-range .date-picker__trigger:disabled svg,
+.create-activity__date-range .field--disabled .date-picker__trigger svg {
+  color: var(--color-text-secondary);
 }
 
 .create-activity__date-range .date-picker__trigger:focus-visible {
@@ -2591,6 +2817,8 @@
   .create-activity__form-row--three,
   .create-activity__form-row--four,
   .create-activity__date-range,
+  .create-activity__readonly-grid--2,
+  .create-activity__readonly-grid--3,
   .create-activity__radio--classification .radio-group__options,
   .copilot-import__child-grid,
   .copilot-import__field-grid,
@@ -2598,6 +2826,15 @@
   .copilot-import__steps,
   .copilot-summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .create-activity__readonly-item--featured,
+  .create-activity__readonly-item--span-3,
+  .create-activity__readonly-item--span-4,
+  .create-activity__readonly-item--span-6,
+  .create-activity__readonly-item--span-9,
+  .create-activity__readonly-item--span-12 {
+    grid-column: auto;
   }
 
   .create-activity__manual-layout {

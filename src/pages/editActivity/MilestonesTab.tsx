@@ -244,6 +244,46 @@ function getQuarterBadgeClass(quarter: string) {
   return `edit-activity__milestone-quarter-badge edit-activity__milestone-quarter-badge--${quarterKey}`
 }
 
+type MilestoneReadOnlyKind = 'identity' | 'date' | 'classification' | 'requirement' | 'narrative'
+
+function renderReadOnlyValue(value?: string | number | null) {
+  const text = String(value ?? '').trim()
+  return text || '—'
+}
+
+function renderMilestoneReadOnlyDetails(items: Array<{
+  label: string
+  value?: string | number | null
+  type?: 'date' | 'long'
+  kind?: MilestoneReadOnlyKind
+  columns?: 3 | 4 | 6 | 9 | 12
+}>) {
+  return (
+    <dl className="create-activity__readonly-grid create-activity__readonly-grid--3">
+      {items.map((item) => {
+        const kind = item.kind ?? (item.type === 'date' ? 'date' : item.type === 'long' ? 'narrative' : 'identity')
+        const displayValue = item.type === 'date'
+          ? renderReadOnlyValue(formatDateDisplay(String(item.value ?? '')))
+          : renderReadOnlyValue(item.value)
+        const spanClass = item.type === 'long' ? 'create-activity__readonly-item--wide' : ''
+        const columnClass = item.columns ? `create-activity__readonly-item--span-${item.columns}` : ''
+
+        return (
+          <div
+            className={`create-activity__readonly-item create-activity__readonly-item--${kind} ${spanClass} ${columnClass}`.trim()}
+            key={item.label}
+          >
+            <div className="create-activity__readonly-item-content">
+              <dt>{item.label}</dt>
+              <dd>{displayValue}</dd>
+            </div>
+          </div>
+        )
+      })}
+    </dl>
+  )
+}
+
 function getQuarterNumber(quarter?: string | null) {
   const match = String(quarter ?? '').match(/[1-4]/)
   return match ? Number(match[0]) : 0
@@ -967,6 +1007,7 @@ export function MilestonesTab({
   function renderDrawerForm() {
     const title = editingMilestone ? 'Edit Milestone' : 'Create Milestone'
     const showExecutionFields = isExecutionPhase && Boolean(editingMilestone)
+    const showPlanningReadOnlyView = showExecutionFields
     const isFutureQuarterLocked = showExecutionFields && isFutureQuarter(form.quarter)
     const canEditExecutionSection = (!isReadOnly || (canEditExecutionFieldsOnly && showExecutionFields)) && !isFutureQuarterLocked
     const isBaseSectionReadOnly = isReadOnly || canEditExecutionFieldsOnly || isFutureQuarterLocked
@@ -994,131 +1035,6 @@ export function MilestonesTab({
           {isFutureQuarterLocked ? (
             <div className="create-activity__notice create-activity__notice--warning">
               This milestone is scheduled for a future quarter. You can review the details now, but execution updates will be enabled when that quarter starts.
-            </div>
-          ) : null}
-
-          <div className="edit-activity__procurement-section">
-            <div className="create-activity__section-header">
-              <div className="create-activity__section-header-inner">
-                <span className="create-activity__section-header-icon" aria-hidden="true">
-                  <Flag size={16} />
-                </span>
-                <div>
-                  <span>Milestone Information</span>
-                  <h2>Name, Timeline & Details</h2>
-                </div>
-              </div>
-            </div>
-
-            <div className="edit-activity__procurement-drawer-section">
-              <Input
-                disabled={isBaseSectionReadOnly}
-                error={formErrors.name}
-                label="Name of Milestone"
-                onChange={(e) => handleFieldChange({ name: e.target.value })}
-                required
-                value={form.name}
-              />
-
-              <div className="create-activity__date-range">
-                <DatePicker
-                  disabled={isBaseSectionReadOnly}
-                  error={formErrors.plannedStartDate}
-                  id="ms-planned-start-date"
-                  label="Planned Start Date"
-                  max={activityPlannedEndDate}
-                  min={activityPlannedStartDate}
-                  onChange={(value) => handleFieldChange({ plannedStartDate: value })}
-                  required
-                  value={form.plannedStartDate}
-                />
-                <span className="create-activity__date-connector" aria-hidden="true">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M5 12h14M13 5l7 7-7 7"/>
-                  </svg>
-                </span>
-                <DatePicker
-                  disabled={isBaseSectionReadOnly}
-                  error={formErrors.plannedEndDate}
-                  id="ms-planned-end-date"
-                  label="Planned End Date"
-                  max={activityPlannedEndDate}
-                  min={form.plannedStartDate || activityPlannedStartDate}
-                  onChange={(value) => handleFieldChange({ plannedEndDate: value })}
-                  required
-                  value={form.plannedEndDate}
-                />
-              </div>
-
-              <Input
-                disabled
-                label="Quarter"
-                value={form.quarter}
-              />
-
-              <Textarea
-                disabled={isBaseSectionReadOnly}
-                label="Description"
-                onChange={(e) => handleFieldChange({ description: e.target.value })}
-                rows={3}
-                value={form.description}
-              />
-            </div>
-          </div>
-
-          {isAdeoVisible ? (
-            <div className="edit-activity__procurement-section">
-              <div className="create-activity__section-header">
-                <div className="create-activity__section-header-inner">
-                  <span className="create-activity__section-header-icon" aria-hidden="true">
-                    <Flag size={16} />
-                  </span>
-                  <div>
-                    <span>ADEO Dependent Fields</span>
-                    <h2>Weightage & Project Details</h2>
-                  </div>
-                </div>
-              </div>
-
-              <div className="edit-activity__procurement-drawer-section">
-                <Input
-                  disabled={isBaseSectionReadOnly}
-                  error={formErrors.weightage}
-                  label="Weightage (%)"
-                  max={maxAllowedWeightage}
-                  min={0}
-                  onChange={(e) => handleFieldChange({ weightage: Number(e.target.value) || 0 })}
-                  required
-                  type="number"
-                  value={form.weightage > 0 ? String(form.weightage) : '0'}
-                />
-                <div className="edit-activity__milestones-weightage-remaining">
-                  <span className="edit-activity__milestones-weightage-remaining-label">
-                    Remaining weightage:
-                  </span>
-                  <span className="edit-activity__milestones-weightage-remaining-value">
-                    {remainingWeightage}%
-                  </span>
-                </div>
-
-                <Input
-                  disabled={isBaseSectionReadOnly}
-                  error={formErrors.makhrajAlMarhala}
-                  label="مخرجات المرحلة"
-                  onChange={(e) => handleFieldChange({ makhrajAlMarhala: e.target.value })}
-                  required
-                  value={form.makhrajAlMarhala}
-                />
-
-                <Input
-                  disabled={isBaseSectionReadOnly}
-                  error={formErrors.marhalaAlMashroua}
-                  label="مرحلة المشروع"
-                  onChange={(e) => handleFieldChange({ marhalaAlMashroua: e.target.value })}
-                  required
-                  value={form.marhalaAlMashroua}
-                />
-              </div>
             </div>
           ) : null}
 
@@ -1267,6 +1183,156 @@ export function MilestonesTab({
               </div>
             </div>
           ) : null}
+
+          <div className="edit-activity__procurement-section">
+            <div className="create-activity__section-header">
+              <div className="create-activity__section-header-inner">
+                <span className="create-activity__section-header-icon" aria-hidden="true">
+                  <Flag size={16} />
+                </span>
+                <div>
+                  <span>Milestone Information</span>
+                  <h2>Name, Timeline & Details</h2>
+                </div>
+              </div>
+            </div>
+
+            {showPlanningReadOnlyView ? (
+              <div className="create-activity__readonly-panel">
+                {renderMilestoneReadOnlyDetails([
+                  { label: 'Name of Milestone', value: form.name, kind: 'identity', columns: 6 },
+                  { label: 'Quarter', value: form.quarter, kind: 'classification', columns: 6 },
+                  { label: 'Planned Start Date', value: form.plannedStartDate, type: 'date', kind: 'date', columns: 6 },
+                  { label: 'Planned End Date', value: form.plannedEndDate, type: 'date', kind: 'date', columns: 6 },
+                  { label: 'Description', value: form.description, type: 'long', kind: 'narrative', columns: 12 },
+                ])}
+              </div>
+            ) : (
+              <div className="edit-activity__procurement-drawer-section">
+                <Input
+                  disabled={isBaseSectionReadOnly}
+                  error={formErrors.name}
+                  label="Name of Milestone"
+                  onChange={(e) => handleFieldChange({ name: e.target.value })}
+                  required
+                  value={form.name}
+                />
+
+                <div className="create-activity__date-range">
+                  <DatePicker
+                    disabled={isBaseSectionReadOnly}
+                    error={formErrors.plannedStartDate}
+                    id="ms-planned-start-date"
+                    label="Planned Start Date"
+                    max={activityPlannedEndDate}
+                    min={activityPlannedStartDate}
+                    onChange={(value) => handleFieldChange({ plannedStartDate: value })}
+                    required
+                    value={form.plannedStartDate}
+                  />
+                  <span className="create-activity__date-connector" aria-hidden="true">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M5 12h14M13 5l7 7-7 7"/>
+                    </svg>
+                  </span>
+                  <DatePicker
+                    disabled={isBaseSectionReadOnly}
+                    error={formErrors.plannedEndDate}
+                    id="ms-planned-end-date"
+                    label="Planned End Date"
+                    max={activityPlannedEndDate}
+                    min={form.plannedStartDate || activityPlannedStartDate}
+                    onChange={(value) => handleFieldChange({ plannedEndDate: value })}
+                    required
+                    value={form.plannedEndDate}
+                  />
+                </div>
+
+                <Input
+                  disabled
+                  label="Quarter"
+                  value={form.quarter}
+                />
+
+                <Textarea
+                  disabled={isBaseSectionReadOnly}
+                  label="Description"
+                  onChange={(e) => handleFieldChange({ description: e.target.value })}
+                  rows={3}
+                  value={form.description}
+                />
+              </div>
+            )}
+          </div>
+
+          {isAdeoVisible ? (
+            <div className="edit-activity__procurement-section">
+              <div className="create-activity__section-header">
+                <div className="create-activity__section-header-inner">
+                  <span className="create-activity__section-header-icon" aria-hidden="true">
+                    <Flag size={16} />
+                  </span>
+                  <div>
+                    <span>ADEO Dependent Fields</span>
+                    <h2>Weightage & Project Details</h2>
+                  </div>
+                </div>
+              </div>
+
+              {showPlanningReadOnlyView ? (
+                <div className="create-activity__readonly-panel">
+                  {renderMilestoneReadOnlyDetails([
+                    { label: 'Weightage (%)', value: `${form.weightage || 0}%`, kind: 'requirement', columns: 6 },
+                    { label: 'Remaining Weightage', value: `${remainingWeightage}%`, kind: 'requirement', columns: 6 },
+                    { label: 'مخرجات المرحلة', value: form.makhrajAlMarhala, kind: 'narrative', columns: 6 },
+                    { label: 'مرحلة المشروع', value: form.marhalaAlMashroua, kind: 'classification', columns: 6 },
+                  ])}
+                </div>
+              ) : (
+
+              <div className="edit-activity__procurement-drawer-section">
+                <Input
+                  disabled={isBaseSectionReadOnly}
+                  error={formErrors.weightage}
+                  label="Weightage (%)"
+                  max={maxAllowedWeightage}
+                  min={0}
+                  onChange={(e) => handleFieldChange({ weightage: Number(e.target.value) || 0 })}
+                  required
+                  type="number"
+                  value={form.weightage > 0 ? String(form.weightage) : '0'}
+                />
+                <div className="edit-activity__milestones-weightage-remaining">
+                  <span className="edit-activity__milestones-weightage-remaining-label">
+                    Remaining weightage:
+                  </span>
+                  <span className="edit-activity__milestones-weightage-remaining-value">
+                    {remainingWeightage}%
+                  </span>
+                </div>
+
+                <Input
+                  disabled={isBaseSectionReadOnly}
+                  error={formErrors.makhrajAlMarhala}
+                  label="مخرجات المرحلة"
+                  onChange={(e) => handleFieldChange({ makhrajAlMarhala: e.target.value })}
+                  required
+                  value={form.makhrajAlMarhala}
+                />
+
+                <Input
+                  disabled={isBaseSectionReadOnly}
+                  error={formErrors.marhalaAlMashroua}
+                  label="مرحلة المشروع"
+                  onChange={(e) => handleFieldChange({ marhalaAlMashroua: e.target.value })}
+                  required
+                  value={form.marhalaAlMashroua}
+                />
+              </div>
+              )}
+            </div>
+          ) : null}
+
         </div>
       </SideDrawer>
     )

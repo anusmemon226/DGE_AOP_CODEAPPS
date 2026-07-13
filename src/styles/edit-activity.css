@@ -131,11 +131,11 @@
   background: conic-gradient(
     from 0deg,
     transparent 0deg,
-    transparent 65deg,
-    color-mix(in srgb, var(--color-primary) 88%, #8b5cf6) 105deg,
-    color-mix(in srgb, #a855f7 82%, var(--color-primary)) 145deg,
-    color-mix(in srgb, var(--color-success) 68%, var(--color-primary)) 185deg,
-    transparent 235deg,
+    transparent 72deg,
+    color-mix(in srgb, var(--color-primary) 34%, transparent) 112deg,
+    color-mix(in srgb, #a855f7 28%, transparent) 152deg,
+    color-mix(in srgb, var(--color-success) 22%, transparent) 192deg,
+    transparent 245deg,
     transparent 360deg
   );
   content: '';
@@ -150,8 +150,8 @@
 
 .edit-activity__review-changes::after {
   background:
-    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--color-primary) 14%, transparent), transparent 32%),
-    radial-gradient(circle at 88% 0%, color-mix(in srgb, #a855f7 12%, transparent), transparent 34%),
+    radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--color-primary) 7%, transparent), transparent 32%),
+    radial-gradient(circle at 88% 0%, color-mix(in srgb, #a855f7 6%, transparent), transparent 34%),
     linear-gradient(180deg, color-mix(in srgb, var(--color-primary) 4%, var(--color-surface)), var(--color-surface));
   border-radius: calc(1.15rem - 2px);
   content: '';
@@ -7009,37 +7009,41 @@
   border: 1px solid color-mix(in srgb, var(--ai-accent-a) 54%, var(--color-border));
   border-radius: 1.15rem;
   box-shadow: 0 10px 10px color-mix(in srgb, var(--ai-accent-a) 5%, transparent);
+  overflow: hidden;
   padding: 1px;
   position: relative;
 }
 
 .ai-summary-card::before {
-  animation: ai-summary-border-flow 5.8s linear infinite;
+  animation: ai-summary-border-flow 5s linear infinite;
   background: conic-gradient(
     from 0deg,
     transparent 0deg,
-    var(--ai-accent-a) 46deg,
-    var(--ai-accent-b) 112deg,
-    var(--ai-accent-c) 168deg,
-    transparent 224deg,
-    var(--ai-accent-a) 304deg,
+    transparent 72deg,
+    color-mix(in srgb, var(--ai-accent-a) 42%, transparent) 112deg,
+    color-mix(in srgb, var(--ai-accent-b) 36%, transparent) 152deg,
+    color-mix(in srgb, var(--ai-accent-c) 30%, transparent) 192deg,
+    transparent 245deg,
     transparent 360deg
   );
   content: '';
-  inset: -48%;
-  opacity: 0.48;
+  height: 180%;
+  left: -40%;
+  opacity: 1;
   pointer-events: none;
   position: absolute;
+  top: -40%;
+  width: 180%;
   z-index: 0;
 }
 
 .ai-summary-card::after {
   background:
-    radial-gradient(circle at 3% 0%, color-mix(in srgb, var(--ai-accent-a) 12%, transparent), transparent 34%),
+    radial-gradient(circle at 3% 0%, color-mix(in srgb, var(--ai-accent-a) 7%, transparent), transparent 34%),
     linear-gradient(135deg, color-mix(in srgb, var(--color-surface) 94%, var(--ai-accent-a) 6%), var(--color-surface));
-  border-radius: calc(1.15rem - 1px);
+  border-radius: calc(1.15rem - 2px);
   content: '';
-  inset: 1px;
+  inset: 2px;
   pointer-events: none;
   position: absolute;
   z-index: 0;
@@ -7178,7 +7182,6 @@
 .ai-summary-block__text {
   color: var(--color-text-primary);
   font-size: 0.86rem;
-  font-weight: 560;
   line-height: 1.62;
 }
 

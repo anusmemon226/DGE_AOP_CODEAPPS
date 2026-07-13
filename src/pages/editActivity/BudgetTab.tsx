@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import {
   CalendarRange,
   ChartNoAxesColumnIncreasing,
@@ -202,6 +202,43 @@ function addCommas(value: string): string {
   const parts = value.split('.')
   parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',')
   return parts.join('.')
+}
+
+function getOptionLabel(options: readonly { label: string; value: string }[], value: string): string {
+  return options.find((option) => option.value === value)?.label ?? value
+}
+
+function renderBudgetReadOnlyValue(value?: string | number | null): string {
+  const text = String(value ?? '').trim()
+  return text || '—'
+}
+
+function renderBudgetReadOnlyDetails(items: Array<{
+  label: string
+  value: ReactNode
+  kind?: 'classification' | 'requirement' | 'date' | 'identity'
+  columns?: 3 | 4 | 6 | 9 | 12
+}>) {
+  return (
+    <dl className="create-activity__readonly-grid create-activity__readonly-grid--3">
+      {items.map((item) => {
+        const columnClass = item.columns ? `create-activity__readonly-item--span-${item.columns}` : ''
+        const kind = item.kind ?? 'identity'
+
+        return (
+          <div
+            className={`create-activity__readonly-item create-activity__readonly-item--${kind} ${columnClass}`.trim()}
+            key={item.label}
+          >
+            <div className="create-activity__readonly-item-content">
+              <dt>{item.label}</dt>
+              <dd>{item.value}</dd>
+            </div>
+          </div>
+        )
+      })}
+    </dl>
+  )
 }
 
 function parseNum(value: string): number {
@@ -1388,7 +1425,7 @@ export function BudgetTab({
                     </div>
 
                     <div className="edit-activity__execution-budget-value edit-activity__execution-budget-value--detail-count">
-                      <span>Entries</span>
+                      <span>Account Codes</span>
                       <strong>{monthRecord?.details.length ?? 0}</strong>
                     </div>
                     <div className="edit-activity__execution-budget-value edit-activity__execution-budget-value--delivered">
@@ -1415,7 +1452,7 @@ export function BudgetTab({
                       onClick={() => openDrawer(monthId)}
                       variant="secondary"
                     >
-                      Manage Entries
+                      Manage Account Codes
                     </Button>
                     {canEditCurrentMonth ? (
                       <Button
@@ -1676,7 +1713,7 @@ export function BudgetTab({
 
           <div className="edit-activity__budget-details-header">
             <div>
-              <span>Budget Entries</span>
+              <span>Account Codes</span>
               <h3>Monthly detail breakdown</h3>
             </div>
             <Button disabled={addDisabled} icon={<Plus size={16} />} onClick={openAddDetailForm} variant="secondary">
@@ -1854,81 +1891,120 @@ export function BudgetTab({
           </div>
         </div>
 
-        <div className="create-activity__form-stack">
-          <div className="create-activity__form-row">
-            <RadioGroup
-              className="edit-activity__budget-source"
-              disabled={isReadOnly}
-              error={errors.budgetSource}
-              label="Budget Source"
-              name="budget-source"
-              onChange={(value) => handleFieldChange({ budgetSource: value as BudgetFormData['budgetSource'] })}
-              options={BUDGET_SOURCE_OPTIONS}
-              required
-              value={form.budgetSource}
-            />
+        {isExecutionPhase ? (
+          <div className="create-activity__readonly-panel">
+            {renderBudgetReadOnlyDetails([
+              {
+                label: 'Budget Source',
+                value: renderBudgetReadOnlyValue(getOptionLabel(BUDGET_SOURCE_OPTIONS, form.budgetSource)),
+                kind: 'classification',
+                columns: 6,
+              },
+              {
+                label: 'Budget Type',
+                value: renderBudgetReadOnlyValue(getOptionLabel(BUDGET_TYPE_OPTIONS, form.budgetType)),
+                kind: 'classification',
+                columns: 6,
+              },
+              ...(showTotalActivityBudget
+                ? [{
+                    label: 'Total Activity Budget (Across Multiple Years)',
+                    value: <CurrencyDisplay value={parseNum(form.totalActivityBudget)} />,
+                    kind: 'requirement' as const,
+                    columns: 4 as const,
+                  }]
+                : []),
+              {
+                label: 'Total Planned Budget',
+                value: <CurrencyDisplay value={parseNum(form.totalPlannedBudget)} />,
+                kind: 'requirement',
+                columns: showTotalActivityBudget ? 4 : 6,
+              },
+              {
+                label: 'Allocated Budget',
+                value: <CurrencyDisplay value={parseNum(form.allocatedBudget)} />,
+                kind: 'requirement',
+                columns: showTotalActivityBudget ? 4 : 6,
+              },
+            ])}
           </div>
+        ) : (
+          <div className="create-activity__form-stack">
+            <div className="create-activity__form-row">
+              <RadioGroup
+                className="edit-activity__budget-source"
+                disabled={isReadOnly}
+                error={errors.budgetSource}
+                label="Budget Source"
+                name="budget-source"
+                onChange={(value) => handleFieldChange({ budgetSource: value as BudgetFormData['budgetSource'] })}
+                options={BUDGET_SOURCE_OPTIONS}
+                required
+                value={form.budgetSource}
+              />
+            </div>
 
-          <div className="create-activity__form-row">
-            <RadioGroup
-              className="edit-activity__budget-type"
-              disabled={isReadOnly}
-              error={errors.budgetType}
-              label="Budget Type"
-              name="budget-type"
-              onChange={(value) => handleFieldChange({ budgetType: value as BudgetFormData['budgetType'] })}
-              options={BUDGET_TYPE_OPTIONS}
-              required
-              value={form.budgetType}
-            />
-          </div>
+            <div className="create-activity__form-row">
+              <RadioGroup
+                className="edit-activity__budget-type"
+                disabled={isReadOnly}
+                error={errors.budgetType}
+                label="Budget Type"
+                name="budget-type"
+                onChange={(value) => handleFieldChange({ budgetType: value as BudgetFormData['budgetType'] })}
+                options={BUDGET_TYPE_OPTIONS}
+                required
+                value={form.budgetType}
+              />
+            </div>
 
-          <div className="create-activity__form-row create-activity__form-row--three">
-            {showTotalActivityBudget ? (
+            <div className="create-activity__form-row create-activity__form-row--three">
+              {showTotalActivityBudget ? (
+                <CurrencyInput
+                  disabled={isReadOnly}
+                  error={errors.totalActivityBudget}
+                  label="Total Activity Budget (Across Multiple Years)"
+                  onChange={(event) => handleFieldChange({ totalActivityBudget: stripCommas(event.target.value) })}
+                  placeholder="0"
+                  required
+                  value={addCommas(form.totalActivityBudget)}
+                />
+              ) : null}
+
+              <label className="field field--disabled edit-activity__budget-disabled-currency">
+                <span className="field__label">
+                  Total Planned Budget
+                  <span aria-hidden="true" className="field__required"> *</span>
+                </span>
+                <span className="currency-input__control field__input-wrap" style={{ paddingRight: '2.4rem' }}>
+                  <DirhamIcon />
+                  <input
+                    aria-invalid={false}
+                    className="field__control"
+                    disabled
+                    readOnly
+                    required
+                    value={addCommas(form.totalPlannedBudget) || '0'}
+                  />
+                  <span className="field__right-icon">
+                    <LockKeyhole size={15} />
+                  </span>
+                </span>
+                <span className="field__hint">Auto-calculated from monthly budgets</span>
+              </label>
+
               <CurrencyInput
                 disabled={isReadOnly}
-                error={errors.totalActivityBudget}
-                label="Total Activity Budget (Across Multiple Years)"
-                onChange={(event) => handleFieldChange({ totalActivityBudget: stripCommas(event.target.value) })}
+                error={errors.allocatedBudget}
+                label="Allocated Budget"
+                onChange={(event) => handleFieldChange({ allocatedBudget: stripCommas(event.target.value) })}
                 placeholder="0"
                 required
-                value={addCommas(form.totalActivityBudget)}
+                value={addCommas(form.allocatedBudget)}
               />
-            ) : null}
-
-            <label className="field field--disabled edit-activity__budget-disabled-currency">
-              <span className="field__label">
-                Total Planned Budget
-                <span aria-hidden="true" className="field__required"> *</span>
-              </span>
-              <span className="currency-input__control field__input-wrap" style={{ paddingRight: '2.4rem' }}>
-                <DirhamIcon />
-                <input
-                  aria-invalid={false}
-                  className="field__control"
-                  disabled
-                  readOnly
-                  required
-                  value={addCommas(form.totalPlannedBudget) || '0'}
-                />
-                <span className="field__right-icon">
-                  <LockKeyhole size={15} />
-                </span>
-              </span>
-              <span className="field__hint">Auto-calculated from monthly budgets</span>
-            </label>
-
-            <CurrencyInput
-              disabled={isReadOnly}
-              error={errors.allocatedBudget}
-              label="Allocated Budget"
-              onChange={(event) => handleFieldChange({ allocatedBudget: stripCommas(event.target.value) })}
-              placeholder="0"
-              required
-              value={addCommas(form.allocatedBudget)}
-            />
+            </div>
           </div>
-        </div>
+        )}
       </Card>
 
       <Card className="create-activity__section">
@@ -1942,26 +2018,28 @@ export function BudgetTab({
               <h2>{isExecutionPhase ? 'Execution tracking grid' : '12-month allocation grid'}</h2>
             </div>
           </div>
-          <div className="edit-activity__budget-view-switch" aria-label="Budget view mode">
-            <button
-              aria-pressed={budgetViewMode === 'cards'}
-              className={budgetViewMode === 'cards' ? 'edit-activity__budget-view-switch-btn edit-activity__budget-view-switch-btn--active' : 'edit-activity__budget-view-switch-btn'}
-              onClick={() => setBudgetViewMode('cards')}
-              type="button"
-            >
-              <LayoutGrid size={15} />
-              <span>Card View</span>
-            </button>
-            <button
-              aria-pressed={budgetViewMode === 'graph'}
-              className={budgetViewMode === 'graph' ? 'edit-activity__budget-view-switch-btn edit-activity__budget-view-switch-btn--active' : 'edit-activity__budget-view-switch-btn'}
-              onClick={() => setBudgetViewMode('graph')}
-              type="button"
-            >
-              <ChartNoAxesColumnIncreasing size={15} />
-              <span>Graphical View</span>
-            </button>
-          </div>
+          {isExecutionPhase ? (
+            <div className="edit-activity__budget-view-switch" aria-label="Budget view mode">
+              <button
+                aria-pressed={budgetViewMode === 'cards'}
+                className={budgetViewMode === 'cards' ? 'edit-activity__budget-view-switch-btn edit-activity__budget-view-switch-btn--active' : 'edit-activity__budget-view-switch-btn'}
+                onClick={() => setBudgetViewMode('cards')}
+                type="button"
+              >
+                <LayoutGrid size={15} />
+                <span>Card View</span>
+              </button>
+              <button
+                aria-pressed={budgetViewMode === 'graph'}
+                className={budgetViewMode === 'graph' ? 'edit-activity__budget-view-switch-btn edit-activity__budget-view-switch-btn--active' : 'edit-activity__budget-view-switch-btn'}
+                onClick={() => setBudgetViewMode('graph')}
+                type="button"
+              >
+                <ChartNoAxesColumnIncreasing size={15} />
+                <span>Graphical View</span>
+              </button>
+            </div>
+          ) : null}
         </div>
 
         <div className="create-activity__form-stack edit-activity__monthly-body">

@@ -2234,6 +2234,7 @@ export function EditActivity() {
             form={form}
             hasFullEdit={editPermissions.activityInfoHasFullEdit}
             isAiSummaryLoading={isAiSummaryLoading}
+            isExecutionPhase={isExecutionPhase}
             showExecutionTracking={shouldShowExecutionFields}
             isReadOnly={editPermissions.activityInfoReadOnly}
             isAdeoVisible={isAdeoVisible}

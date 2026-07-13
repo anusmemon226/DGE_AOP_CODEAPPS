@@ -37,6 +37,7 @@ import { MembersTab } from './MembersTab'
 import { DependenciesTab } from './DependenciesTab'
 import { AiSummaryPanel } from './AiSummaryPanel'
 import type { AiSummaryBlocks, AiSummaryMeta } from './types/aiSummaryTypes'
+import { formatDateDisplay } from '../../utils/formatting'
 
 // ── Props ──
 
@@ -50,6 +51,7 @@ interface ActivityInfoTabProps {
   form: ActivityForm
   hasFullEdit?: boolean
   isAiSummaryLoading?: boolean
+  isExecutionPhase?: boolean
   showExecutionTracking?: boolean
   isReadOnly?: boolean
   isAdeoVisible: boolean
@@ -76,6 +78,58 @@ function toggleStrategy(
 
 // ── Component ──
 
+function renderReadOnlyValue(value?: string | null) {
+  const text = String(value ?? '').trim()
+  return text || '—'
+}
+
+type ReadOnlyDetailKind = 'default' | 'identity' | 'organization' | 'classification' | 'requirement' | 'date' | 'person' | 'narrative'
+
+function renderReadOnlyDetails(items: Array<{
+  label: string
+  value?: string | null
+  type?: 'date' | 'long'
+  kind?: ReadOnlyDetailKind
+  span?: 'wide' | 'featured'
+  columns?: 3 | 4 | 6 | 9 | 12
+}>, columns: 2 | 3 = 3) {
+  return (
+    <dl className={`create-activity__readonly-grid create-activity__readonly-grid--${columns}`}>
+      {items.map((item) => {
+        const kind = item.kind ?? (item.type === 'date' ? 'date' : item.type === 'long' ? 'narrative' : 'default')
+        const displayValue = item.type === 'date'
+          ? renderReadOnlyValue(formatDateDisplay(item.value ?? ''))
+          : renderReadOnlyValue(item.value)
+        const isBooleanValue = kind === 'requirement' && (displayValue === 'Yes' || displayValue === 'No')
+        const spanClass = item.type === 'long' || item.span === 'wide'
+          ? 'create-activity__readonly-item--wide'
+          : item.span === 'featured'
+            ? 'create-activity__readonly-item--featured'
+            : ''
+        const columnClass = item.columns ? `create-activity__readonly-item--span-${item.columns}` : ''
+
+        return (
+          <div
+            className={`create-activity__readonly-item create-activity__readonly-item--${kind} ${spanClass} ${columnClass}`.trim()}
+            key={item.label}
+          >
+            <div className="create-activity__readonly-item-content">
+              <dt>{item.label}</dt>
+              <dd>
+                {isBooleanValue ? (
+                  <span className={`create-activity__readonly-value-pill create-activity__readonly-value-pill--${displayValue.toLowerCase()}`}>
+                    {displayValue}
+                  </span>
+                ) : displayValue}
+              </dd>
+            </div>
+          </div>
+        )
+      })}
+    </dl>
+  )
+}
+
 export function ActivityInfoTab({
   activityLeadOptions,
   aiSummaryBlocks,
@@ -86,6 +140,7 @@ export function ActivityInfoTab({
   form,
   hasFullEdit = false,
   isAiSummaryLoading = false,
+  isExecutionPhase = false,
   showExecutionTracking = false,
   isReadOnly = false,
   isAdeoVisible,
@@ -110,12 +165,14 @@ export function ActivityInfoTab({
   const requiresActivityStatusJustification = Boolean(
     form.activityStatus && EXECUTION_ACTIVITY_STATUS_REQUIRES_JUSTIFICATION.has(form.activityStatus),
   )
+  const showPlanningReadOnlyView = isExecutionPhase
   const executionActivityStatusOptions = useMemo(() => (
     EXECUTION_ACTIVITY_STATUS_OPTIONS.map((option) => ({
       ...option,
       disabled: showExecutionTracking && option.value === '776140007',
     }))
   ), [showExecutionTracking])
+
 
   // ── Guidance Panel ──
   const guidancePanel = useMemo(() => {
@@ -388,6 +445,29 @@ export function ActivityInfoTab({
             </div>
           </div>
 
+          {showPlanningReadOnlyView ? (
+            <div className="create-activity__readonly-panel">
+              {renderReadOnlyDetails([
+                { label: 'Activity Type', value: getOptionLabel(ACTIVITY_TYPE_OPTIONS, form.activityType), kind: 'identity', columns: 3 },
+                { label: 'Activity / Initiative Name', value: form.activityName, kind: 'identity', columns: 9 },
+                { label: 'Sector', value: form.sectorName, kind: 'organization', columns: 6 },
+                { label: 'Division', value: form.divisionName, kind: 'organization', columns: 6 },
+                { label: 'Activity Scope', value: getOptionLabel(ACTIVITY_SCOPE_OPTIONS, form.activityScope), kind: 'classification', columns: 4 },
+                ...(isStrategic
+                  ? [{ label: 'Categorized Strategy', value: form.strategies.map((strategy) => getOptionLabel(STRATEGY_OPTIONS, strategy)).filter(Boolean).join(', '), kind: 'classification' as const, columns: 4 as const }]
+                  : []),
+                { label: 'Activity Classification', value: getOptionLabel(CLASSIFICATION_OPTIONS, form.activityClassification), kind: 'classification', columns: 4 },
+                { label: 'Budget Required', value: isPaymentOnly ? 'Yes' : getOptionLabel(YES_NO_OPTIONS, form.budgetRequired), kind: 'requirement', columns: 4 },
+                { label: 'Procurement Required', value: isBudgetNo ? 'No' : getOptionLabel(YES_NO_OPTIONS, form.procurementRequired), kind: 'requirement', columns: 4 },
+                { label: 'Execution plan project reported in ADEO', value: getOptionLabel(YES_NO_OPTIONS, form.adeoReported), kind: 'requirement', columns: 4 },
+                { label: 'Activity Lead / PM Name', value: activityLeadOptions.find((option) => option.value === form.activityLeadId)?.label ?? form.activityLeadId, kind: 'person', columns: 4 },
+                { label: 'Planned Start Date', value: form.plannedStartDate, type: 'date', kind: 'date', columns: 4 },
+                { label: 'Planned End Date', value: form.plannedEndDate, type: 'date', kind: 'date', columns: 4 },
+                { label: 'Activity Scope Description', value: form.scopeDescription, type: 'long', kind: 'narrative', columns: 6 },
+                { label: 'Summary', value: form.summary, type: 'long', kind: 'narrative', columns: 6 },
+              ], 3)}
+            </div>
+          ) : (
           <div className="create-activity__form-stack">
             <div className="create-activity__form-row create-activity__form-row--two">
               <Select
@@ -571,6 +651,7 @@ export function ActivityInfoTab({
               />
             </div>
           </div>
+          )}
         </Card>
 
         {/* ADEO Card */}
@@ -587,6 +668,20 @@ export function ActivityInfoTab({
                 </div>
               </div>
             </div>
+            {showPlanningReadOnlyView ? (
+              <div className="create-activity__readonly-panel create-activity__readonly-panel--adeo">
+                {renderReadOnlyDetails([
+                  { label: 'Project Name', value: form.adeoProjectName, kind: 'identity' },
+                  { label: 'Project Description', value: form.adeoProjectDescription, kind: 'narrative' },
+                  { label: 'Long Term Impact', value: form.longTermImpact, type: 'long', kind: 'narrative' },
+                  { label: 'Overall Long Term Impact', value: form.overallLongTermImpact, type: 'long', kind: 'narrative' },
+                  { label: 'Stakeholder', value: form.stakeholder, kind: 'person' },
+                  { label: 'Activity KPI', value: form.activityKpi, kind: 'classification' },
+                  { label: 'Activity Plan (If any)', value: form.activityPlan, kind: 'narrative' },
+                  { label: 'Risks', value: form.risks, kind: 'narrative' },
+                ], 2)}
+              </div>
+            ) : (
             <div className="create-activity__form-stack">
               <div className="create-activity__form-row create-activity__form-row--two">
                 <Input
@@ -670,6 +765,7 @@ export function ActivityInfoTab({
                 />
               </div>
             </div>
+            )}
           </Card>
         ) : null}
 
@@ -702,6 +798,7 @@ export function ActivityInfoTab({
     canEditField,
     executionActivityStatusOptions,
     handleDependencyCountChange,
+    showPlanningReadOnlyView,
   ])
 
   return (

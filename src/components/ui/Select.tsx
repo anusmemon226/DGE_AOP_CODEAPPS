@@ -71,7 +71,7 @@ export function Select<TValue extends string>({
       return
     }
 
-    function handlePointerDown(event: PointerEvent) {
+    function handleDocumentClick(event: MouseEvent) {
       if (!rootRef.current?.contains(event.target as Node) && !menuRef.current?.contains(event.target as Node)) {
         setIsOpen(false)
       }
@@ -102,13 +102,13 @@ export function Select<TValue extends string>({
 
     const rafId = requestAnimationFrame(reposition)
 
-    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('click', handleDocumentClick)
     document.addEventListener('keydown', handleKeyDown)
     document.addEventListener('scroll', reposition, { capture: true })
 
     return () => {
       cancelAnimationFrame(rafId)
-      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('click', handleDocumentClick)
       document.removeEventListener('keydown', handleKeyDown)
       document.removeEventListener('scroll', reposition, { capture: true })
     }
