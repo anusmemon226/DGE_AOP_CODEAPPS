@@ -6,14 +6,8 @@ export const Dga_aop_project_logsesdga_type = {
   776140000: 'Milestone',
   776140001: 'Budget',
   776140002: 'Project',
-  776140003: 'ProcurementStatus',
-  776140004: 'Procurement_ActualStartDate',
-  776140005: 'Procurement_ActualEndDate',
-  776140006: 'Procurement_ActualAwardingDate',
-  776140007: 'ActualContractDurationinMonths',
-  776140008: 'ProjectUpdates',
-  776140009: 'ProjectSubmissionUpdates',
-  576610001: 'ActivityClassification'
+  776140003: 'Procurement',
+  776140004: 'ProjectUpdates'
 } as const;
 export type Dga_aop_project_logsesdga_type = keyof typeof Dga_aop_project_logsesdga_type;
 export const Dga_aop_project_logsesstatecode = {
@@ -28,11 +22,15 @@ export const Dga_aop_project_logsesstatuscode = {
 export type Dga_aop_project_logsesstatuscode = keyof typeof Dga_aop_project_logsesstatuscode;
 
 export interface Dga_aop_project_logsesBase {
-  "dga_aop_project@odata.bind": string;
+  "dga_aop_project@odata.bind"?: string;
   dga_aop_project_logsid: string;
+  "dga_milestone@odata.bind"?: string;
   dga_name: string;
   dga_new_value?: string;
   dga_previous_value?: string;
+  "dga_procurement@odata.bind"?: string;
+  "dga_RegardingId@odata.bind"?: string;
+  dga_regardingidtype?: string;
   dga_type?: Dga_aop_project_logsesdga_type;
   importsequencenumber?: number;
   overriddencreatedon?: string;
@@ -51,6 +49,10 @@ export interface Dga_aop_project_logses extends Dga_aop_project_logsesBase {
   createdonbehalfbyname?: string;
   createdonbehalfbyyominame: string;
   dga_aop_projectname?: string;
+  dga_milestonename?: string;
+  dga_procurementname?: string;
+  dga_regardingidname?: string;
+  dga_regardingidyominame?: string;
   dga_typename?: string;
   modifiedbyname?: string;
   modifiedbyyominame: string;
@@ -69,6 +71,12 @@ export interface Dga_aop_project_logses extends Dga_aop_project_logsesBase {
   _createdonbehalfby_value?: string;
   dga_aop_project?: object;
   _dga_aop_project_value?: string;
+  dga_milestone?: object;
+  _dga_milestone_value?: string;
+  dga_procurement?: object;
+  _dga_procurement_value?: string;
+  dga_regardingid?: object;
+  _dga_regardingid_value?: string;
   modifiedby?: object;
   _modifiedby_value?: string;
   modifiedonbehalfby?: object;

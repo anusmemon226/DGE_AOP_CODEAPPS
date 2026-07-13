@@ -40,6 +40,13 @@ import {
   stringifyMergedProjectRelatedChanges,
   type ProjectRelatedChanges,
 } from './helpers/projectRelatedChanges'
+import { createExecutionFieldLogs, EXECUTION_LOG_TYPES } from './helpers/approvalWorkflowLogs'
+import { RecordLogsGrid } from './RecordLogsGrid'
+import {
+  calculateMilestonePlannedProgress,
+  calculateProjectMilestoneProgress,
+  type ProjectMilestoneProgress,
+} from './helpers/milestoneProgress'
 
 // ── Types ──
 
@@ -58,6 +65,7 @@ type Milestone = {
   name: string
   plannedStartDate: string
   plannedEndDate: string
+  plannedProgress: number
   actualStartDate: string
   actualEndDate: string
   actualProgress: string
@@ -109,6 +117,15 @@ const EXECUTION_STATUS_OPTIONS: SelectOption<ExecutionMilestoneStatusValue | ''>
   })),
 ]
 
+function formatMilestoneStatusLogValue(value: unknown) {
+  const numericValue = Number(value)
+  const generatedLabel = Number.isFinite(numericValue)
+    ? (Dga_aop_project_milestone_detailsesstatuscode as Record<number, string>)[numericValue]
+    : ''
+
+  return generatedLabel ? formatGeneratedStatusLabel(generatedLabel) : value
+}
+
 function getStatusIcon(status: MilestoneStatus): string {
   switch (status) {
     case 'completed': return '●'
@@ -122,6 +139,7 @@ const EMPTY_FORM: MilestoneFormData = {
   name: '',
   plannedStartDate: '',
   plannedEndDate: '',
+  plannedProgress: 0,
   actualStartDate: '',
   actualEndDate: '',
   actualProgress: '',
@@ -147,6 +165,7 @@ interface MilestonesTabProps {
   canEditExecutionFieldsOnly?: boolean
   isAdeoVisible: boolean
   onActivityDataChanged?: () => void
+  onProgressChange?: (progress: ProjectMilestoneProgress) => void
   onProjectRelatedChangesChange?: (relatedChanges: string) => void
   projectId: string
   projectRelatedChanges?: string | null
@@ -211,6 +230,7 @@ function milestoneToUi(record: Dga_aop_project_milestone_detailses): Milestone |
     name: record.dga_name ?? '',
     plannedStartDate: toDateOnly(record.dga_planned_start_date),
     plannedEndDate,
+    plannedProgress: record.dga_planned_progress ?? 0,
     actualStartDate: toDateOnly(record.dga_actual_start_date),
     actualEndDate: toDateOnly(record.dga_actual_end_date),
     actualProgress: record.dga_actual_progress != null ? String(record.dga_actual_progress) : '',
@@ -362,6 +382,7 @@ function buildMilestoneFormFromRelatedChanges(
     name: milestone.name,
     plannedStartDate: milestone.plannedStartDate,
     plannedEndDate: milestone.plannedEndDate,
+    plannedProgress: milestone.plannedProgress,
     actualStartDate: isEmptyRelatedValue(value('dga_actual_start_date')) ? milestone.actualStartDate : String(value('dga_actual_start_date')),
     actualEndDate: isEmptyRelatedValue(value('dga_actual_end_date')) ? milestone.actualEndDate : String(value('dga_actual_end_date')),
     actualProgress: isEmptyRelatedValue(value('dga_actual_progress')) ? milestone.actualProgress : String(value('dga_actual_progress')),
@@ -406,6 +427,7 @@ export function MilestonesTab({
   canEditExecutionFieldsOnly = false,
   isAdeoVisible,
   onActivityDataChanged,
+  onProgressChange,
   onProjectRelatedChangesChange,
   projectId,
   projectRelatedChanges,
@@ -422,6 +444,7 @@ export function MilestonesTab({
 
   // ── CRUD state ──
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+  const [drawerActiveTab, setDrawerActiveTab] = useState<'form' | 'logs'>('form')
   const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null)
   const [form, setForm] = useState<MilestoneFormData>(EMPTY_FORM)
   const [formErrors, setFormErrors] = useState<Partial<Record<MilestoneFormErrorKey, string>>>({})
@@ -449,6 +472,7 @@ export function MilestonesTab({
           'dga_name',
           'dga_planned_start_date',
           'dga_planned_end_date',
+          'dga_planned_progress',
           'dga_actual_start_date',
           'dga_actual_end_date',
           'dga_actual_progress',
@@ -473,6 +497,29 @@ export function MilestonesTab({
         .sort(sortMilestonesByEndDate)
 
       setMilestones(mapped)
+      const progressUpdates = mapped
+        .map((milestone) => ({
+          id: milestone.id,
+          nextPlannedProgress: calculateMilestonePlannedProgress(milestone.plannedStartDate, milestone.plannedEndDate),
+          previousPlannedProgress: Number(milestone.plannedProgress || 0),
+        }))
+        .filter((update) => Math.round(update.nextPlannedProgress * 100) !== Math.round(update.previousPlannedProgress * 100))
+
+      if (progressUpdates.length > 0) {
+        await Promise.all(progressUpdates.map(async (update) => {
+          const updateResult = await Dga_aop_project_milestone_detailsesService.update(update.id, {
+            dga_planned_progress: update.nextPlannedProgress,
+          })
+          assertOperationSuccess(updateResult, 'Unable to update milestone planned progress.')
+        }))
+
+        setMilestones((current) => current.map((milestone) => {
+          const progressUpdate = progressUpdates.find((update) => update.id === milestone.id)
+          return progressUpdate
+            ? { ...milestone, plannedProgress: progressUpdate.nextPlannedProgress }
+            : milestone
+        }))
+      }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Unable to load milestones.')
       setMilestones([])
@@ -490,8 +537,22 @@ export function MilestonesTab({
   }, [loadMilestones])
 
   // ── Derived ──
-  const completedCount = milestones.filter((m) => m.status === 'completed').length
-  const progressPercent = milestones.length > 0 ? Math.round((completedCount / milestones.length) * 100) : 0
+  const milestoneProgress = useMemo(
+    () => calculateProjectMilestoneProgress(milestones.map((milestone) => ({
+      actualProgress: milestone.actualProgress,
+      id: milestone.id,
+      plannedEndDate: milestone.plannedEndDate,
+      plannedProgress: milestone.plannedProgress,
+      plannedStartDate: milestone.plannedStartDate,
+      statuscode: milestone.executionStatus || undefined,
+    })), effectiveProjectRelatedChanges),
+    [effectiveProjectRelatedChanges, milestones],
+  )
+
+  useEffect(() => {
+    onProgressChange?.(milestoneProgress)
+  }, [milestoneProgress, onProgressChange])
+
   const milestonesByQuarter = useMemo(() => {
     return QUARTERS.reduce<Record<(typeof QUARTERS)[number], Milestone[]>>((map, quarter) => {
       map[quarter] = milestones
@@ -557,6 +618,7 @@ export function MilestonesTab({
 
   function handleOpenCreate() {
     if (isReadOnly || canEditExecutionFieldsOnly) return
+    setDrawerActiveTab('form')
     setEditingMilestone(null)
     setForm(EMPTY_FORM)
     setUploadedFile(null)
@@ -567,6 +629,7 @@ export function MilestonesTab({
   }
 
   function handleOpenEdit(milestone: Milestone) {
+    setDrawerActiveTab('form')
     setEditingMilestone(milestone)
     setForm(buildMilestoneFormFromRelatedChanges(effectiveProjectRelatedChanges, milestone))
     setUploadedFile(null)
@@ -578,6 +641,7 @@ export function MilestonesTab({
 
   function handleCloseDrawer() {
     setIsDrawerOpen(false)
+    setDrawerActiveTab('form')
     setEditingMilestone(null)
     setForm(EMPTY_FORM)
     setUploadedFile(null)
@@ -729,6 +793,56 @@ export function MilestonesTab({
         } as Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>>)
         assertOperationSuccess(result, 'Unable to update milestone execution changes.')
 
+        const currentRelatedChanges = projectResult.data?.dga_project_related_changes
+        const previousExecutionValue = (fieldName: string, fallback: unknown = '') => {
+          const value = getMilestoneRelatedValue(currentRelatedChanges, editingMilestone.id, fieldName)
+          return isEmptyRelatedValue(value) ? fallback : value
+        }
+        void createExecutionFieldLogs(projectId, [
+          {
+            logType: EXECUTION_LOG_TYPES.milestone,
+            name: `${editingMilestone.name} - Actual Start Date`,
+            oldValue: previousExecutionValue('dga_actual_start_date', editingMilestone.actualStartDate),
+            newValue: form.actualStartDate,
+          },
+          {
+            logType: EXECUTION_LOG_TYPES.milestone,
+            name: `${editingMilestone.name} - Actual End Date`,
+            oldValue: previousExecutionValue('dga_actual_end_date', editingMilestone.actualEndDate),
+            newValue: form.actualEndDate,
+          },
+          {
+            logType: EXECUTION_LOG_TYPES.milestone,
+            name: `${editingMilestone.name} - Milestone Status`,
+            oldValue: formatMilestoneStatusLogValue(previousExecutionValue('statuscode', editingMilestone.executionStatus)),
+            newValue: formatMilestoneStatusLogValue(form.executionStatus),
+          },
+          {
+            logType: EXECUTION_LOG_TYPES.milestone,
+            name: `${editingMilestone.name} - Actual Progress`,
+            oldValue: previousExecutionValue('dga_actual_progress', editingMilestone.actualProgress),
+            newValue: form.actualProgress,
+          },
+          {
+            logType: EXECUTION_LOG_TYPES.milestone,
+            name: `${editingMilestone.name} - Cancellation Reason`,
+            oldValue: previousExecutionValue('dga_cancellation_reason', editingMilestone.cancellationReason),
+            newValue: form.cancellationReason,
+          },
+          {
+            logType: EXECUTION_LOG_TYPES.milestone,
+            name: `${editingMilestone.name} - Justification`,
+            oldValue: previousExecutionValue('dga_justification', editingMilestone.executionJustification),
+            newValue: form.executionJustification,
+          },
+          {
+            logType: EXECUTION_LOG_TYPES.milestone,
+            name: `${editingMilestone.name} - Upload File`,
+            oldValue: previousExecutionValue('uploaded_file'),
+            newValue: uploadedFile?.name ?? '',
+          },
+        ], { milestoneId: editingMilestone.id })
+
         setLocalProjectRelatedChanges({ projectId, value: nextRelatedChanges })
         onProjectRelatedChangesChange?.(nextRelatedChanges)
         setMilestones((current) =>
@@ -798,19 +912,47 @@ export function MilestonesTab({
   // ── Render helpers ──
 
   function renderProgressBar() {
+    const displayedProgress = isExecutionPhase ? milestoneProgress.actual : milestoneProgress.planned
+    const progressLabel = isExecutionPhase ? 'Actual Progress' : 'Planned Progress'
+
     return (
       <div className="edit-activity__milestones-progress">
         <div className="edit-activity__milestones-progress-header">
           <span className="edit-activity__milestones-progress-label">
-            {completedCount} of {milestones.length} milestones completed
+            {progressLabel} across {milestoneProgress.eligibleCount} eligible milestone{milestoneProgress.eligibleCount === 1 ? '' : 's'}
           </span>
-          <span className="edit-activity__milestones-progress-pct">{progressPercent}%</span>
+          <span className="edit-activity__milestones-progress-pct">{Math.round(displayedProgress)}%</span>
         </div>
         <div className="edit-activity__milestones-progress-track">
           <div
             className="edit-activity__milestones-progress-fill"
-            style={{ width: `${progressPercent}%` }}
+            style={{ width: `${displayedProgress}%` }}
           />
+        </div>
+      </div>
+    )
+  }
+
+  function renderMilestoneProgress(milestone: Milestone, compact = false) {
+    const result = milestoneProgress.resultsById[milestone.id]
+    const value = isExecutionPhase ? result?.actualProgress ?? 0 : result?.plannedProgress ?? 0
+    const progressLabel = isExecutionPhase ? 'Actual' : 'Planned'
+
+    return (
+      <div className={`edit-activity__milestone-progress${compact ? ' edit-activity__milestone-progress--compact' : ''}`}>
+        <div className="edit-activity__milestone-progress-meta">
+          <span>{progressLabel}</span>
+          <strong>{Math.round(value)}%</strong>
+        </div>
+        <div
+          aria-label={`${progressLabel} progress ${Math.round(value)}%`}
+          aria-valuemax={100}
+          aria-valuemin={0}
+          aria-valuenow={Math.round(value)}
+          className="edit-activity__milestone-progress-track"
+          role="progressbar"
+        >
+          <span style={{ width: `${value}%` }} />
         </div>
       </div>
     )
@@ -852,6 +994,7 @@ export function MilestonesTab({
               Weightage: {milestone.weightage}%
             </div>
           )}
+          {renderMilestoneProgress(milestone, true)}
           <div className="edit-activity__milestone-card-bottom">
             <p className="edit-activity__milestone-card-desc">{milestone.description}</p>
             <div className="edit-activity__milestone-card-actions">
@@ -936,6 +1079,7 @@ export function MilestonesTab({
               <th>Start Date</th>
               <th>End Date</th>
               {isAdeoVisible ? <th>Weightage</th> : null}
+              <th>{isExecutionPhase ? 'Actual Progress' : 'Planned Progress'}</th>
               <th>Milestone Status</th>
               <th>Action</th>
             </tr>
@@ -963,6 +1107,7 @@ export function MilestonesTab({
                   <td>{formatDateDisplay(milestone.plannedStartDate)}</td>
                   <td>{formatDateDisplay(milestone.plannedEndDate)}</td>
                   {isAdeoVisible ? <td>{milestone.weightage}%</td> : null}
+                  <td>{renderMilestoneProgress(milestone)}</td>
                   <td>
                     <Badge tone={statusCfg.tone}>{statusCfg.label}</Badge>
                   </td>
@@ -1010,6 +1155,8 @@ export function MilestonesTab({
     const isFutureQuarterLocked = showExecutionFields && isFutureQuarter(form.quarter)
     const canEditExecutionSection = (!isReadOnly || (canEditExecutionFieldsOnly && showExecutionFields)) && !isFutureQuarterLocked
     const isBaseSectionReadOnly = isReadOnly || canEditExecutionFieldsOnly || isFutureQuarterLocked
+    const showDrawerTabs = showExecutionFields && Boolean(editingMilestone)
+    const isDrawerLogsTab = showDrawerTabs && drawerActiveTab === 'logs'
     const requiresCancellationReason = form.executionStatus === EXECUTION_STATUS_REQUIRES_CANCELLATION_REASON
     const requiresExecutionJustification = Boolean(
       form.executionStatus && EXECUTION_STATUS_REQUIRES_JUSTIFICATION.has(form.executionStatus),
@@ -1021,9 +1168,11 @@ export function MilestonesTab({
             <Button onClick={handleCloseDrawer} variant="secondary">
               Cancel
             </Button>
-            <Button disabled={!canEditExecutionSection || isSaving} onClick={handleSave}>
-              {isSaving ? 'Saving...' : editingMilestone ? 'Update Milestone' : 'Create Milestone'}
-            </Button>
+            {!isDrawerLogsTab ? (
+              <Button disabled={!canEditExecutionSection || isSaving} onClick={handleSave}>
+                {isSaving ? 'Saving...' : editingMilestone ? 'Update Milestone' : 'Create Milestone'}
+              </Button>
+            ) : null}
           </div>
         }
         isOpen={isDrawerOpen}
@@ -1037,6 +1186,39 @@ export function MilestonesTab({
             </div>
           ) : null}
 
+          {showDrawerTabs ? (
+            <div className="edit-activity__drawer-tabs" role="tablist" aria-label="Milestone drawer sections">
+              <button
+                aria-selected={drawerActiveTab === 'form'}
+                className={`edit-activity__drawer-tab${drawerActiveTab === 'form' ? ' edit-activity__drawer-tab--active' : ''}`}
+                onClick={() => setDrawerActiveTab('form')}
+                role="tab"
+                type="button"
+              >
+                Form
+              </button>
+              <button
+                aria-selected={drawerActiveTab === 'logs'}
+                className={`edit-activity__drawer-tab${drawerActiveTab === 'logs' ? ' edit-activity__drawer-tab--active' : ''}`}
+                onClick={() => setDrawerActiveTab('logs')}
+                role="tab"
+                type="button"
+              >
+                Logs
+              </button>
+            </div>
+          ) : null}
+
+          {isDrawerLogsTab && editingMilestone ? (
+            <RecordLogsGrid
+              emptyMessage="No milestone logs found for this record yet."
+              logType={EXECUTION_LOG_TYPES.milestone}
+              projectId={projectId}
+              recordId={editingMilestone.id}
+              recordName={editingMilestone.name}
+            />
+          ) : (
+            <>
           {showExecutionFields ? (
             <div className="edit-activity__procurement-section">
               <div className="create-activity__section-header">
@@ -1331,6 +1513,9 @@ export function MilestonesTab({
               )}
             </div>
           ) : null}
+
+            </>
+          )}
 
         </div>
       </SideDrawer>

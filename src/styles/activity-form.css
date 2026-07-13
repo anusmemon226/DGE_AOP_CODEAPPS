@@ -35,8 +35,103 @@
 
 /* Edit Activity — back button row at top left */
 .edit-activity__back-row {
+  align-items: center;
   display: flex;
+  gap: 0.75rem;
   justify-content: flex-start;
+}
+
+.edit-activity__header-progress {
+  align-items: center;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 9%, var(--color-surface)), var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 22%, var(--color-border));
+  border-radius: 0.85rem;
+  box-shadow: none;
+  display: inline-flex;
+  gap: 0.65rem;
+  margin-left: auto;
+  min-height: 2.25rem;
+  padding: 0.38rem 0.55rem 0.38rem 0.75rem;
+}
+
+.edit-activity__header-progress-group {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.edit-activity__header-progress-copy {
+  display: grid;
+  gap: 0.05rem;
+  min-width: 6.6rem;
+}
+
+.edit-activity__header-progress-copy span {
+  color: var(--color-text-secondary);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+.edit-activity__header-progress-copy strong {
+  color: var(--color-primary);
+  font-size: 0.92rem;
+  font-weight: 750;
+  line-height: 1.1;
+}
+
+.edit-activity__header-progress-ring {
+  --progress: 0%;
+  align-items: center;
+  background:
+    conic-gradient(var(--color-primary) var(--progress), color-mix(in srgb, var(--color-primary) 12%, var(--color-border)) 0);
+  border-radius: 999px;
+  display: inline-flex;
+  height: 2.2rem;
+  justify-content: center;
+  padding: 0.2rem;
+  width: 2.2rem;
+}
+
+.edit-activity__header-progress-ring span {
+  align-items: center;
+  background: var(--color-surface);
+  border-radius: inherit;
+  color: var(--color-primary);
+  display: inline-flex;
+  font-size: 0.58rem;
+  font-weight: 800;
+  height: 100%;
+  justify-content: center;
+  width: 100%;
+}
+
+.edit-activity__header-progress-ring--actual {
+  background:
+    conic-gradient(var(--color-success) var(--progress), color-mix(in srgb, var(--color-success) 12%, var(--color-border)) 0);
+}
+
+.edit-activity__header-progress:has(.edit-activity__header-progress-ring--actual) {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-success) 9%, var(--color-surface)), var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-success) 22%, var(--color-border));
+}
+
+.edit-activity__header-progress:has(.edit-activity__header-progress-ring--actual) .edit-activity__header-progress-copy strong,
+.edit-activity__header-progress-ring--actual span {
+  color: var(--color-success);
+}
+
+:root[data-theme='dark'] .edit-activity__header-progress {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 16%, var(--color-surface)), var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-primary) 28%, var(--color-border));
+  box-shadow: none;
 }
 
 .edit-activity__back-row .button {

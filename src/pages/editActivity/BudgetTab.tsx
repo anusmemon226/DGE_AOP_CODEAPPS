@@ -57,6 +57,7 @@ import {
   stringifyMergedProjectRelatedChanges,
   type ProjectRelatedChanges,
 } from './helpers/projectRelatedChanges'
+import { createExecutionFieldLogs, EXECUTION_LOG_TYPES } from './helpers/approvalWorkflowLogs'
 import { AiSummaryPanel } from './AiSummaryPanel'
 import type { AiSummaryBlocks, AiSummaryMeta } from './types/aiSummaryTypes'
 
@@ -946,6 +947,20 @@ export function BudgetTab({
       dga_project_related_changes: nextRelatedChanges,
     } as Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>>)
     assertOperationSuccess(result, `Failed to update ${monthRecord.monthName} budget changes.`)
+    void createExecutionFieldLogs(projectId, [
+      {
+        logType: EXECUTION_LOG_TYPES.budget,
+        name: `${monthRecord.monthName} - Actual Budget`,
+        oldValue: monthRecord.actualBudget,
+        newValue: actualBudget,
+      },
+      {
+        logType: EXECUTION_LOG_TYPES.budget,
+        name: `${monthRecord.monthName} - Delivered Amount`,
+        oldValue: monthRecord.deliveredAmount,
+        newValue: deliveredAmount,
+      },
+    ])
     onProjectRelatedChangesChange?.(nextRelatedChanges)
     return nextRelatedChanges
   }

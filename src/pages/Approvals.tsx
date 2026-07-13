@@ -35,6 +35,7 @@ import {
   persistApprovedExecutionRelatedChanges,
   rejectProjectRelatedChanges,
 } from './editActivity/helpers/executionApprovalHelpers'
+import { createApprovalWorkflowLog } from './editActivity/helpers/approvalWorkflowLogs'
 import '../styles/approvals.css'
 
 type ApprovalPhase = 'Planning' | 'Execution'
@@ -72,6 +73,12 @@ type ApprovalRecord = {
 
 type ApprovalUpdatePayload = Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>> & {
   'ownerid@odata.bind'?: string
+}
+
+type ApprovalActionPayload = {
+  actionName: string
+  newStatusCode: Dga_aop_projectsesBase['statuscode'] | number
+  payload: ApprovalUpdatePayload
 }
 
 const PAGE_SIZE = 8
@@ -695,7 +702,10 @@ export function Approvals() {
       throw new Error(`${teamName} team could not be found.`)
     }
 
-    return teamId
+    return {
+      id: teamId,
+      name: team.name || teamName,
+    }
   }
 
   async function resolvePlanningTeam(planningInstanceId: string, teamField: '_dga_executive_director_team_value' | '_dga_division_member_team_value') {
@@ -717,83 +727,137 @@ export function Approvals() {
       throw new Error('Required owner team could not be resolved from the planning instance.')
     }
 
-    return teamId
+    let teamName = 'Team'
+    try {
+      const teamResult = await TeamsService.get(teamId, {
+        select: ['teamid', 'name'],
+      })
+      assertOperationSuccess(teamResult, 'Unable to load owner team name.')
+      teamName = getResultValue<Teams>(teamResult)?.name || teamName
+    } catch {
+      // Owner id is enough for the workflow update; log display can fall back.
+    }
+
+    return {
+      id: teamId,
+      name: teamName,
+    }
   }
 
-  async function buildPlanningApprovalPayload(approval: ApprovalRecord): Promise<ApprovalUpdatePayload> {
+  async function buildPlanningApprovalPayload(approval: ApprovalRecord): Promise<ApprovalActionPayload> {
     const normalizedRole = normalizeRoleName(currentRole?.roleName ?? '')
 
     if (normalizedRole.includes('division director')) {
+      const strategyTeam = await resolveTeamByName('AOP - Strategy Team')
       return {
-        statuscode: 776140003,
-        'ownerid@odata.bind': toEntityBind('teams', await resolveTeamByName('AOP - Strategy Team')),
+        actionName: 'Approve Activity',
+        newStatusCode: 776140003,
+        payload: {
+          statuscode: 776140003,
+          'ownerid@odata.bind': toEntityBind('teams', strategyTeam.id),
+        },
       }
     }
 
     if (normalizedRole.includes('strategy team')) {
+      const executiveDirectorTeam = await resolvePlanningTeam(approval.planningInstanceId, '_dga_executive_director_team_value')
       return {
-        statuscode: 776140002,
-        'ownerid@odata.bind': toEntityBind('teams', await resolvePlanningTeam(approval.planningInstanceId, '_dga_executive_director_team_value')),
+        actionName: 'Approve Activity',
+        newStatusCode: 776140002,
+        payload: {
+          statuscode: 776140002,
+          'ownerid@odata.bind': toEntityBind('teams', executiveDirectorTeam.id),
+        },
       }
     }
 
     if (normalizedRole.includes('executive director')) {
+      const directorGeneralTeam = await resolveTeamByName('AOP - Director General')
       return {
-        statuscode: 776140014,
-        'ownerid@odata.bind': toEntityBind('teams', await resolveTeamByName('AOP - Director General')),
+        actionName: 'Approve Activity',
+        newStatusCode: 776140014,
+        payload: {
+          statuscode: 776140014,
+          'ownerid@odata.bind': toEntityBind('teams', directorGeneralTeam.id),
+        },
       }
     }
 
     if (normalizedRole.includes('director general')) {
+      const divisionMemberTeam = await resolvePlanningTeam(approval.planningInstanceId, '_dga_division_member_team_value')
       return {
-        dga_project_activity_status: 776140007,
-        statuscode: 776140011,
-        dga_project_phase: 776140001,
-        'ownerid@odata.bind': toEntityBind('teams', await resolvePlanningTeam(approval.planningInstanceId, '_dga_division_member_team_value')),
+        actionName: 'Approve Activity',
+        newStatusCode: 776140011,
+        payload: {
+          dga_project_activity_status: 776140007,
+          statuscode: 776140011,
+          dga_project_phase: 776140001,
+          'ownerid@odata.bind': toEntityBind('teams', divisionMemberTeam.id),
+        },
       }
     }
 
     throw new Error('No approval transition is configured for the current role.')
   }
 
-  async function buildExecutionApprovalPayload(approval: ApprovalRecord): Promise<ApprovalUpdatePayload> {
+  async function buildExecutionApprovalPayload(approval: ApprovalRecord): Promise<ApprovalActionPayload> {
     const normalizedRole = normalizeRoleName(currentRole?.roleName ?? '')
 
     if (normalizedRole.includes('division director')) {
+      const strategyTeam = await resolveTeamByName('AOP - Strategy Team')
       return {
-        statuscode: 776140003,
-        'ownerid@odata.bind': toEntityBind('teams', await resolveTeamByName('AOP - Strategy Team')),
+        actionName: 'Approve Activity Updates',
+        newStatusCode: 776140003,
+        payload: {
+          statuscode: 776140003,
+          'ownerid@odata.bind': toEntityBind('teams', strategyTeam.id),
+        },
       }
     }
 
     if (normalizedRole.includes('strategy team')) {
+      const executiveDirectorTeam = await resolvePlanningTeam(approval.planningInstanceId, '_dga_executive_director_team_value')
       return {
-        statuscode: 776140002,
-        'ownerid@odata.bind': toEntityBind('teams', await resolvePlanningTeam(approval.planningInstanceId, '_dga_executive_director_team_value')),
+        actionName: 'Approve Activity Updates',
+        newStatusCode: 776140002,
+        payload: {
+          statuscode: 776140002,
+          'ownerid@odata.bind': toEntityBind('teams', executiveDirectorTeam.id),
+        },
       }
     }
 
     if (normalizedRole.includes('executive director')) {
+      const divisionMemberTeam = await resolvePlanningTeam(approval.planningInstanceId, '_dga_division_member_team_value')
       return {
-        ...(await persistApprovedExecutionRelatedChanges(approval.projectRelatedChanges)),
-        dga_is_rejected: false,
-        dga_project_related_changes: approveProjectRelatedChanges(approval.projectRelatedChanges),
-        dga_rejection_reason: '',
-        statuscode: 776140011,
-        'ownerid@odata.bind': toEntityBind('teams', await resolvePlanningTeam(approval.planningInstanceId, '_dga_division_member_team_value')),
+        actionName: 'Approve Activity Updates',
+        newStatusCode: 776140011,
+        payload: {
+          ...(await persistApprovedExecutionRelatedChanges(approval.projectRelatedChanges)),
+          dga_is_rejected: false,
+          dga_project_related_changes: approveProjectRelatedChanges(approval.projectRelatedChanges),
+          dga_rejection_reason: '',
+          statuscode: 776140011,
+          'ownerid@odata.bind': toEntityBind('teams', divisionMemberTeam.id),
+        },
       }
     }
 
     throw new Error('No execution approval transition is configured for the current role.')
   }
 
-  async function buildExecutionRejectPayload(approval: ApprovalRecord): Promise<ApprovalUpdatePayload> {
+  async function buildExecutionRejectPayload(approval: ApprovalRecord): Promise<ApprovalActionPayload> {
+    const divisionMemberTeam = await resolvePlanningTeam(approval.planningInstanceId, '_dga_division_member_team_value')
     return {
-      dga_is_rejected: true,
-      dga_project_related_changes: rejectProjectRelatedChanges(approval.projectRelatedChanges),
-      dga_rejection_reason: rejectionReason.trim(),
-      statuscode: 776140011,
-      'ownerid@odata.bind': toEntityBind('teams', await resolvePlanningTeam(approval.planningInstanceId, '_dga_division_member_team_value')),
+      actionName: 'Reject Activity Updates',
+      newStatusCode: 776140011,
+      payload: {
+        dga_is_rejected: true,
+        dga_project_related_changes: rejectProjectRelatedChanges(approval.projectRelatedChanges),
+        dga_rejection_reason: rejectionReason.trim(),
+        statuscode: 776140011,
+        'ownerid@odata.bind': toEntityBind('teams', divisionMemberTeam.id),
+      },
     }
   }
 
@@ -828,14 +892,20 @@ export function Approvals() {
 
       const payloads = await Promise.all(selectedApprovals.map(async (approval) => ({
         approval,
-        payload: selectedApprovalMode === 'execution'
+        action: selectedApprovalMode === 'execution'
           ? await buildExecutionApprovalPayload(approval)
           : await buildPlanningApprovalPayload(approval),
       })))
 
-      for (const { approval, payload } of payloads) {
-        const result = await Dga_aop_projectsesService.update(approval.id, payload)
+      for (const { approval, action } of payloads) {
+        const result = await Dga_aop_projectsesService.update(approval.id, action.payload)
         assertOperationSuccess(result, `Unable to approve ${approval.activityName}.`)
+        void createApprovalWorkflowLog({
+          actionName: action.actionName,
+          newStatusCode: action.newStatusCode,
+          oldStatusCode: approval.statusCode,
+          projectId: approval.id,
+        })
       }
 
       const approvedCount = selectedApprovals.length
@@ -891,12 +961,18 @@ export function Approvals() {
 
       const payloads = await Promise.all(selectedApprovals.map(async (approval) => ({
         approval,
-        payload: await buildExecutionRejectPayload(approval),
+        action: await buildExecutionRejectPayload(approval),
       })))
 
-      for (const { approval, payload } of payloads) {
-        const result = await Dga_aop_projectsesService.update(approval.id, payload)
+      for (const { approval, action } of payloads) {
+        const result = await Dga_aop_projectsesService.update(approval.id, action.payload)
         assertOperationSuccess(result, `Unable to reject ${approval.activityName}.`)
+        void createApprovalWorkflowLog({
+          actionName: action.actionName,
+          newStatusCode: action.newStatusCode,
+          oldStatusCode: approval.statusCode,
+          projectId: approval.id,
+        })
       }
 
       const rejectedCount = selectedApprovals.length

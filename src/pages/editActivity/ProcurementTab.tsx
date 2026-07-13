@@ -23,6 +23,8 @@ import { Dga_categoriesService } from '../../generated/services/Dga_categoriesSe
 import { Dga_procurement_plansService } from '../../generated/services/Dga_procurement_plansService'
 import { formatCurrencyAmount } from '../../utils/formatting'
 import { formatDate, getQuarter } from './helpers/sharedHelpers'
+import { createExecutionFieldLogs, EXECUTION_LOG_TYPES } from './helpers/approvalWorkflowLogs'
+import { RecordLogsGrid } from './RecordLogsGrid'
 
 // ── Types ──
 
@@ -258,6 +260,20 @@ const STATUS_TONES: Record<string, 'neutral' | 'info' | 'success' | 'warning'> =
 function getStatusLabel(value: string): string {
   const all = [...PROCUREMENT_STATUS_YES_RAISED, ...PROCUREMENT_STATUS_NO, ...PROCUREMENT_STATUS_YES_NOT_RAISED]
   return all.find((s) => s.value === value)?.label ?? value
+}
+
+function formatTenderRequiredLogValue(value: unknown) {
+  if (value === true || value === '1') return 'Yes'
+  if (value === false || value === '0') return 'No'
+  return value
+}
+
+function formatTenderTypeLogValue(value: unknown) {
+  return getOptionLabel(TENDER_TYPE_OPTIONS, String(value ?? '') as TenderTypeValue)
+}
+
+function formatProcurementStatusLogValue(value: unknown) {
+  return getStatusLabel(String(value ?? ''))
 }
 
 type ProcurementReadOnlyKind = 'identity' | 'date' | 'classification' | 'requirement' | 'narrative'
@@ -838,6 +854,7 @@ export function ProcurementTab({
 
   // ── CRUD state ──
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+  const [drawerActiveTab, setDrawerActiveTab] = useState<'form' | 'logs'>('form')
   const [editingProcurement, setEditingProcurement] = useState<Procurement | null>(null)
   const [form, setForm] = useState<ProcurementFormData>(EMPTY_FORM)
   const [formErrors, setFormErrors] = useState<FormErrors>({})
@@ -1336,6 +1353,7 @@ export function ProcurementTab({
 
   function handleOpenCreate() {
     if (isReadOnly) return
+    setDrawerActiveTab('form')
     setEditingProcurement(null)
     setForm(EMPTY_FORM)
     setFormErrors({})
@@ -1350,6 +1368,7 @@ export function ProcurementTab({
   }
 
   function handleOpenEdit(procurement: Procurement) {
+    setDrawerActiveTab('form')
     setEditingProcurement(procurement)
     setForm({
       tenderRequired: procurement.tenderRequired,
@@ -1391,6 +1410,7 @@ export function ProcurementTab({
 
   function handleCloseDrawer() {
     setIsDrawerOpen(false)
+    setDrawerActiveTab('form')
     setEditingProcurement(null)
     setForm(EMPTY_FORM)
     setFormErrors({})
@@ -1500,6 +1520,81 @@ export function ProcurementTab({
         } as Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>>)
         assertOperationSuccess(result, 'Unable to update procurement execution tracking.')
 
+        const existingRelatedChangesText = projectResult.data?.dga_project_related_changes
+        const previousExecutionValue = (fieldName: string, fallback: unknown = '') => {
+          const value = getExecutionProcurementRelatedField(existingRelatedChangesText, editingProcurement?.id, fieldName)
+          return isEmptyRelatedValue(value) ? fallback : value
+        }
+        const nextActualDuration = executionForm.actualContractDuration.replace(/\s*Month(s?)$/i, '').replace(/\D/g, '')
+        void createExecutionFieldLogs(projectId, [
+          {
+            logType: EXECUTION_LOG_TYPES.procurement,
+            name: `${editingProcurement?.procurementName ?? 'Procurement'} - Tender Required`,
+            oldValue: formatTenderRequiredLogValue(previousExecutionValue('dga_does_this_project_require_tender', yesNoToBoolean(editingProcurement?.tenderRequired ?? ''))),
+            newValue: formatTenderRequiredLogValue(yesNoToBoolean(executionForm.tenderRequired)),
+          },
+          {
+            logType: EXECUTION_LOG_TYPES.procurement,
+            name: `${editingProcurement?.procurementName ?? 'Procurement'} - Tender Type`,
+            oldValue: formatTenderTypeLogValue(previousExecutionValue('dga_tender_type', editingProcurement?.tenderType ?? '')),
+            newValue: formatTenderTypeLogValue(executionForm.tenderType),
+          },
+          {
+            logType: EXECUTION_LOG_TYPES.procurement,
+            name: `${editingProcurement?.procurementName ?? 'Procurement'} - Procurement Status`,
+            oldValue: formatProcurementStatusLogValue(previousExecutionValue('dga_current_procurement_status', editingProcurement?.procurementStatus ?? '')),
+            newValue: formatProcurementStatusLogValue(executionForm.procurementStatus),
+          },
+          {
+            logType: EXECUTION_LOG_TYPES.procurement,
+            name: `${editingProcurement?.procurementName ?? 'Procurement'} - PR / Ticket Number`,
+            oldValue: previousExecutionValue('dga_pr_ticket_number'),
+            newValue: executionForm.prTicketNumber,
+          },
+          {
+            logType: EXECUTION_LOG_TYPES.procurement,
+            name: `${editingProcurement?.procurementName ?? 'Procurement'} - Actual Contract Value`,
+            oldValue: previousExecutionValue('dga_actual_contract_value'),
+            newValue: currencyToNumber(executionForm.actualContractValue) ?? '',
+          },
+          {
+            logType: EXECUTION_LOG_TYPES.procurement,
+            name: `${editingProcurement?.procurementName ?? 'Procurement'} - Actual Contract Duration`,
+            oldValue: previousExecutionValue('dga_actual_contract_duration_in_months'),
+            newValue: nextActualDuration,
+          },
+          {
+            logType: EXECUTION_LOG_TYPES.procurement,
+            name: `${editingProcurement?.procurementName ?? 'Procurement'} - Stage Update Date`,
+            oldValue: previousExecutionValue('dga_stage_update_date'),
+            newValue: executionForm.stageUpdateDate,
+          },
+          {
+            logType: EXECUTION_LOG_TYPES.procurement,
+            name: `${editingProcurement?.procurementName ?? 'Procurement'} - Progress Update`,
+            oldValue: previousExecutionValue('dga_progress_update'),
+            newValue: executionForm.progressUpdate,
+          },
+          {
+            logType: EXECUTION_LOG_TYPES.procurement,
+            name: `${editingProcurement?.procurementName ?? 'Procurement'} - Attach Contract File`,
+            oldValue: previousExecutionValue('attach_contract_file'),
+            newValue: executionForm.attachContractFile?.name ?? '',
+          },
+          {
+            logType: EXECUTION_LOG_TYPES.procurement,
+            name: `${editingProcurement?.procurementName ?? 'Procurement'} - Justification Date`,
+            oldValue: previousExecutionValue('dga_justification_date'),
+            newValue: executionForm.justificationDate,
+          },
+          {
+            logType: EXECUTION_LOG_TYPES.procurement,
+            name: `${editingProcurement?.procurementName ?? 'Procurement'} - Justification`,
+            oldValue: previousExecutionValue('dga_justification_of_the_change'),
+            newValue: executionForm.justification,
+          },
+        ], { procurementId: editingProcurement?.id })
+
         setProcurementNotice('Procurement execution tracking updated successfully.')
         setLocalProjectRelatedChanges({ projectId, value: nextRelatedChanges })
         onProjectRelatedChangesChange?.(nextRelatedChanges)
@@ -1561,6 +1656,8 @@ export function ProcurementTab({
     const isDrawerReadOnly = isReadOnly || isFutureQuarterLocked
     const showPlanningReadOnlyView = isExecutionPhase
     const canSaveProcurement = isExecutionPhase ? canEditExecutionSection : !isReadOnly
+    const showDrawerTabs = isExecutionPhase && Boolean(editingProcurement)
+    const isDrawerLogsTab = showDrawerTabs && drawerActiveTab === 'logs'
 
     return (
       <SideDrawer
@@ -1569,9 +1666,11 @@ export function ProcurementTab({
             <Button onClick={handleCloseDrawer} variant="secondary">
               Cancel
             </Button>
-            <Button disabled={!canSaveProcurement || isSavingProcurement} onClick={handleSave}>
-              {isSavingProcurement ? 'Saving...' : editingProcurement ? 'Update Procurement' : 'Create Procurement'}
-            </Button>
+            {!isDrawerLogsTab ? (
+              <Button disabled={!canSaveProcurement || isSavingProcurement} onClick={handleSave}>
+                {isSavingProcurement ? 'Saving...' : editingProcurement ? 'Update Procurement' : 'Create Procurement'}
+              </Button>
+            ) : null}
           </div>
         }
         isOpen={isDrawerOpen}
@@ -1592,6 +1691,39 @@ export function ProcurementTab({
           ) : null}
 
           {/* ── Tender Information ── */}
+          {showDrawerTabs ? (
+            <div className="edit-activity__drawer-tabs" role="tablist" aria-label="Procurement drawer sections">
+              <button
+                aria-selected={drawerActiveTab === 'form'}
+                className={`edit-activity__drawer-tab${drawerActiveTab === 'form' ? ' edit-activity__drawer-tab--active' : ''}`}
+                onClick={() => setDrawerActiveTab('form')}
+                role="tab"
+                type="button"
+              >
+                Form
+              </button>
+              <button
+                aria-selected={drawerActiveTab === 'logs'}
+                className={`edit-activity__drawer-tab${drawerActiveTab === 'logs' ? ' edit-activity__drawer-tab--active' : ''}`}
+                onClick={() => setDrawerActiveTab('logs')}
+                role="tab"
+                type="button"
+              >
+                Logs
+              </button>
+            </div>
+          ) : null}
+
+          {isDrawerLogsTab && editingProcurement ? (
+            <RecordLogsGrid
+              emptyMessage="No procurement logs found for this record yet."
+              logType={EXECUTION_LOG_TYPES.procurement}
+              projectId={projectId}
+              recordId={editingProcurement.id}
+              recordName={editingProcurement.procurementName}
+            />
+          ) : (
+            <>
           {!isExecutionPhase ? (
           <div className="edit-activity__procurement-section">
               <div className="create-activity__section-header">
@@ -2161,6 +2293,8 @@ export function ProcurementTab({
             </div>
             )}
           </div>
+            </>
+          )}
         </div>
       </SideDrawer>
     )

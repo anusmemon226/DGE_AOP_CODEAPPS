@@ -16,17 +16,21 @@ import {
   UserRound,
   Wallet,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Badge, Button, ConfirmationDialog, Modal, Textarea, type SelectOption } from '../components/ui'
 import {
+  Dga_aop_projectsesdga_project_activity_status,
   Dga_aop_projectsesstatuscode,
   type Dga_aop_projectses,
   type Dga_aop_projectsesBase,
 } from '../generated/models/Dga_aop_projectsesModel'
 import type { Dga_aop_project_budgetsBase } from '../generated/models/Dga_aop_project_budgetsModel'
 import type { Dga_aop_ai_summaries } from '../generated/models/Dga_aop_ai_summariesModel'
-import type { Dga_aop_project_milestone_detailsesBase } from '../generated/models/Dga_aop_project_milestone_detailsesModel'
+import type {
+  Dga_aop_project_milestone_detailses,
+  Dga_aop_project_milestone_detailsesBase,
+} from '../generated/models/Dga_aop_project_milestone_detailsesModel'
 import type { Dga_procurement_plansBase } from '../generated/models/Dga_procurement_plansModel'
 import type { Dga_project_planning_instances } from '../generated/models/Dga_project_planning_instancesModel'
 import { Dga_aop_project_budgetsService } from '../generated/services/Dga_aop_project_budgetsService'
@@ -67,6 +71,15 @@ import {
 import { validateActivitySubmissionRequirements as validateSubmissionRequirements } from './editActivity/helpers/submissionValidation'
 import { triggerActivityAiSummaryRefresh } from './editActivity/helpers/aiSummaryFlow'
 import { validateExecutionUpdateSubmission } from './editActivity/helpers/executionUpdateValidation'
+import {
+  createApprovalWorkflowLog,
+  createExecutionFieldLogs,
+  EXECUTION_LOG_TYPES,
+} from './editActivity/helpers/approvalWorkflowLogs'
+import {
+  calculateProjectMilestoneProgress,
+  type ProjectMilestoneProgress,
+} from './editActivity/helpers/milestoneProgress'
 
 // ── Types ──
 
@@ -141,6 +154,24 @@ const ACTIVITY_INFO_SELECT_FIELDS = [
 ]
 
 // ── Status helpers ──
+
+function formatGeneratedChoiceLabel(label?: string) {
+  return (label || '')
+    .replace(/_/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function formatActivityStatusLogValue(value: unknown) {
+  const numericValue = Number(value)
+  const generatedLabel = Number.isFinite(numericValue)
+    ? (Dga_aop_projectsesdga_project_activity_status as Record<number, string>)[numericValue]
+    : ''
+
+  return generatedLabel ? formatGeneratedChoiceLabel(generatedLabel) : value
+}
 
 function getStatusTone(statusCode: number): 'neutral' | 'info' | 'warning' | 'success' {
   switch (statusCode) {
@@ -773,6 +804,12 @@ export function EditActivity() {
   const [aiSummaryMeta, setAiSummaryMeta] = useState<AiSummaryMeta | undefined>()
   const [isAiSummaryLoading, setIsAiSummaryLoading] = useState(false)
   const [aiSummaryError, setAiSummaryError] = useState('')
+  const [milestoneProjectProgress, setMilestoneProjectProgress] = useState<ProjectMilestoneProgress>({
+    actual: 0,
+    eligibleCount: 0,
+    planned: 0,
+    resultsById: {},
+  })
 
   const loadActivityAiSummary = useCallback(async () => {
     if (!projectId) {
@@ -845,6 +882,66 @@ export function EditActivity() {
   }, [loadActivityAiSummary, projectId])
 
   // ── Loaded activity data ──
+  const loadMilestoneProjectProgress = useCallback(async (relatedChanges?: string | null) => {
+    if (!projectId) {
+      setMilestoneProjectProgress({
+        actual: 0,
+        eligibleCount: 0,
+        planned: 0,
+        resultsById: {},
+      })
+      return
+    }
+
+    try {
+      const result = await Dga_aop_project_milestone_detailsesService.getAll({
+        filter: `_dga_aop_project_value eq '${normalizeId(projectId)}'`,
+        select: [
+          'dga_aop_project_milestone_detailsid',
+          'dga_planned_start_date',
+          'dga_planned_end_date',
+          'dga_planned_progress',
+          'dga_actual_progress',
+          'statuscode',
+        ],
+      })
+      assertOperationSuccess(result, 'Unable to load milestone progress.')
+
+      const milestones = ((result.data ?? []) as Dga_aop_project_milestone_detailses[])
+        .filter((milestone) => milestone.dga_aop_project_milestone_detailsid)
+        .map((milestone) => ({
+          actualProgress: milestone.dga_actual_progress,
+          id: milestone.dga_aop_project_milestone_detailsid,
+          plannedEndDate: milestone.dga_planned_end_date,
+          plannedProgress: milestone.dga_planned_progress,
+          plannedStartDate: milestone.dga_planned_start_date,
+          statuscode: milestone.statuscode,
+        }))
+
+      setMilestoneProjectProgress(calculateProjectMilestoneProgress(milestones, relatedChanges))
+    } catch (error) {
+      console.warn('Unable to calculate milestone project progress', error)
+      setMilestoneProjectProgress({
+        actual: 0,
+        eligibleCount: 0,
+        planned: 0,
+        resultsById: {},
+      })
+    }
+  }, [projectId])
+
+  const logApprovalWorkflowTransition = useCallback((
+    actionName: string,
+    nextStatusCode: Dga_aop_projectsesBase['statuscode'] | number,
+  ) => {
+    void createApprovalWorkflowLog({
+      actionName,
+      newStatusCode: nextStatusCode,
+      oldStatusCode: activity?.statuscode,
+      projectId,
+    })
+  }, [activity?.statuscode, projectId])
+
   const activityName = activity?.dga_name || form.activityName || 'Edit Activity'
   const aiSummary = activity?.dga_description_summary || form.summary || 'No summary is available for this activity yet.'
   const statusCode = activity?.statuscode ?? 1 // Draft
@@ -856,6 +953,9 @@ export function EditActivity() {
   const isPaymentOnly = form.activityClassification === '576610002'
   const isBudgetNo = form.budgetRequired === '0'
   const isAdeoVisible = form.adeoReported === '1'
+  const displayedMilestoneProgress = isExecutionPhase ? milestoneProjectProgress.actual : milestoneProjectProgress.planned
+  const displayedMilestoneProgressLabel = isExecutionPhase ? 'Actual Progress' : 'Planned Progress'
+  const headerProgressAriaLabel = `${displayedMilestoneProgressLabel} ${Math.round(displayedMilestoneProgress)}%`
 
   // ── Tab lock conditions ──
   const tabLocked: Partial<Record<TabId, boolean>> = {
@@ -1114,6 +1214,10 @@ export function EditActivity() {
     void loadActivityAiSummary()
   }, [loadActivityAiSummary])
 
+  useEffect(() => {
+    void loadMilestoneProjectProgress(activity?.dga_project_related_changes)
+  }, [activity?.dga_project_related_changes, loadMilestoneProjectProgress])
+
   function updateForm(nextFields: Partial<ActivityForm>) {
     const changedFields = Object.keys(nextFields) as Array<keyof ActivityForm>
     const normalizedForm = normalizeControlledRules({ ...form, ...nextFields })
@@ -1220,6 +1324,39 @@ export function EditActivity() {
       )
 
       assertOperationSuccess(result, 'Failed to save activity information.')
+
+      if (editPermissions.canEditExecutionStatusOnly && activity) {
+        const existingRelatedChanges = parseProjectRelatedChanges(activity.dga_project_related_changes)
+        const previousStatus = resolveProjectRelatedValue(getProjectRelatedChangeAt(
+          existingRelatedChanges,
+          ['activity_information', 'dga_project_activity_status'],
+        ))
+        const previousJustification = resolveProjectRelatedValue(getProjectRelatedChangeAt(
+          existingRelatedChanges,
+          ['activity_information', 'dga_justification_for_activity_status'],
+        ))
+        const nextStatus = form.activityStatus ? Number(form.activityStatus) : ''
+        void createExecutionFieldLogs(projectId, [
+          {
+            logType: EXECUTION_LOG_TYPES.project,
+            name: 'Activity Status',
+            oldValue: formatActivityStatusLogValue(
+              isEmptyRelatedValue(previousStatus)
+                ? activity.dga_project_activity_status ?? ''
+                : previousStatus,
+            ),
+            newValue: formatActivityStatusLogValue(nextStatus),
+          },
+          {
+            logType: EXECUTION_LOG_TYPES.project,
+            name: 'Activity Status Justification',
+            oldValue: isEmptyRelatedValue(previousJustification)
+              ? activity.dga_justification_for_activity_status ?? ''
+              : previousJustification,
+            newValue: form.activityStatusJustification,
+          },
+        ])
+      }
 
       setActivity((currentActivity) => currentActivity ? {
         ...currentActivity,
@@ -1452,6 +1589,8 @@ export function EditActivity() {
         // Owner assignment succeeded; pending-with display can safely fall back.
       }
 
+      logApprovalWorkflowTransition('Submit to Division Director', 776140001)
+
       setActivity((currentActivity) => currentActivity ? {
         ...currentActivity,
         _owningteam_value: divisionDirectorTeamId,
@@ -1477,6 +1616,7 @@ export function EditActivity() {
   }, [
     activity?._dga_project_planning_instance_value,
     isSubmittingToDirector,
+    logApprovalWorkflowTransition,
     projectId,
     validateSubmitToDivisionDirector,
   ])
@@ -1577,6 +1717,7 @@ export function EditActivity() {
         payload as unknown as Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>>,
       )
       assertOperationSuccess(submitResult, 'Failed to submit activity to Strategy Team.')
+      logApprovalWorkflowTransition('Submit to Strategy Team', 776140003)
 
       setActivity((currentActivity) => currentActivity ? {
         ...currentActivity,
@@ -1600,6 +1741,7 @@ export function EditActivity() {
     }
   }, [
     isSubmittingToStrategyTeam,
+    logApprovalWorkflowTransition,
     projectId,
     resolveStrategyTeam,
     validateSubmitToStrategyTeam,
@@ -1675,6 +1817,8 @@ export function EditActivity() {
         // Owner assignment succeeded; pending-with display can safely fall back.
       }
 
+      logApprovalWorkflowTransition('Submit to Executive Director', 776140002)
+
       setActivity((currentActivity) => currentActivity ? {
         ...currentActivity,
         _owningteam_value: executiveDirectorTeamId,
@@ -1698,6 +1842,7 @@ export function EditActivity() {
   }, [
     activity?._dga_project_planning_instance_value,
     isSubmittingToExecutiveDirector,
+    logApprovalWorkflowTransition,
     projectId,
     validateSubmitToExecutiveDirector,
   ])
@@ -1757,6 +1902,7 @@ export function EditActivity() {
         payload as unknown as Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>>,
       )
       assertOperationSuccess(submitResult, 'Failed to submit activity to Director General.')
+      logApprovalWorkflowTransition('Submit to Director General', 776140014)
 
       setActivity((currentActivity) => currentActivity ? {
         ...currentActivity,
@@ -1780,6 +1926,7 @@ export function EditActivity() {
     }
   }, [
     isSubmittingToDirectorGeneral,
+    logApprovalWorkflowTransition,
     projectId,
     resolveDirectorGeneralTeam,
     validateSubmitToDirectorGeneral,
@@ -1857,6 +2004,8 @@ export function EditActivity() {
         // Approval succeeded; pending-with display can safely fall back.
       }
 
+      logApprovalWorkflowTransition('Approve Activity', 776140011)
+
       setActivity((currentActivity) => currentActivity ? {
         ...currentActivity,
         dga_project_activity_status: 776140007,
@@ -1887,6 +2036,7 @@ export function EditActivity() {
   }, [
     activity?._dga_project_planning_instance_value,
     isApprovingAsDirectorGeneral,
+    logApprovalWorkflowTransition,
     projectId,
     validateApproveAsDirectorGeneral,
   ])
@@ -2087,6 +2237,8 @@ export function EditActivity() {
         // Owner assignment succeeded; pending-with display can safely fall back.
       }
 
+      logApprovalWorkflowTransition('Submit Activity Updates', 776140001)
+
       setActivity((currentActivity) => currentActivity ? {
         ...currentActivity,
         _owningteam_value: divisionDirectorTeamId,
@@ -2113,6 +2265,7 @@ export function EditActivity() {
   }, [
     activity?._dga_project_planning_instance_value,
     isSubmittingActivityUpdates,
+    logApprovalWorkflowTransition,
     projectId,
     refreshActivityAiSummary,
     validateSubmitActivityUpdates,
@@ -2201,6 +2354,7 @@ export function EditActivity() {
         payload as unknown as Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>>,
       )
       assertOperationSuccess(approveResult, 'Failed to approve activity updates.')
+      logApprovalWorkflowTransition('Approve Activity Updates', next.statuscode)
 
       setActivity((currentActivity) => currentActivity ? {
         ...currentActivity,
@@ -2232,6 +2386,7 @@ export function EditActivity() {
     canApproveExecutionAsStrategyTeam,
     canReviewExecutionUpdates,
     isApprovingExecutionUpdates,
+    logApprovalWorkflowTransition,
     projectId,
     refreshActivityAiSummary,
     resolvePlanningInstanceTeam,
@@ -2274,6 +2429,7 @@ export function EditActivity() {
         payload as unknown as Partial<Omit<Dga_aop_projectsesBase, 'dga_aop_projectsid'>>,
       )
       assertOperationSuccess(rejectResult, 'Failed to reject activity updates.')
+      logApprovalWorkflowTransition('Reject Activity Updates', 776140011)
 
       setActivity((currentActivity) => currentActivity ? {
         ...currentActivity,
@@ -2303,6 +2459,7 @@ export function EditActivity() {
     canReviewExecutionUpdates,
     executionRejectionReason,
     isRejectingExecutionUpdates,
+    logApprovalWorkflowTransition,
     projectId,
     refreshActivityAiSummary,
     resolvePlanningInstanceTeam,
@@ -2315,7 +2472,8 @@ export function EditActivity() {
           dga_project_related_changes: relatedChanges,
         }
       : currentActivity)
-  }, [])
+    void loadMilestoneProjectProgress(relatedChanges)
+  }, [loadMilestoneProjectProgress])
 
   // ── Tab content ──
 
@@ -2364,7 +2522,11 @@ export function EditActivity() {
             isExecutionPhase={shouldShowExecutionFields}
             isReadOnly={editPermissions.milestonesReadOnly}
             isAdeoVisible={isAdeoVisible}
-            onActivityDataChanged={() => refreshActivityAiSummary('milestone-crud')}
+            onActivityDataChanged={() => {
+              refreshActivityAiSummary('milestone-crud')
+              void loadMilestoneProjectProgress(activity?.dga_project_related_changes)
+            }}
+            onProgressChange={setMilestoneProjectProgress}
             onProjectRelatedChangesChange={handleProjectRelatedChangesUpdate}
             projectId={projectId}
             projectRelatedChanges={activity?.dga_project_related_changes}
@@ -2427,7 +2589,7 @@ export function EditActivity() {
       case 'clarifications':
         return <ClarificationTab />
       case 'logs':
-        return <LogTab />
+        return <LogTab isExecutionPhase={isExecutionPhase} projectId={projectId} />
     }
   }
 
@@ -2685,6 +2847,50 @@ export function EditActivity() {
           >
             Back to Activities
           </Button>
+          {isExecutionPhase ? (
+            <div className="edit-activity__header-progress-group">
+              <div className="edit-activity__header-progress" aria-label={`Planned Progress ${Math.round(milestoneProjectProgress.planned)}%`}>
+                <div className="edit-activity__header-progress-copy">
+                  <span>Planned Progress</span>
+                  <strong>{Math.round(milestoneProjectProgress.planned)}%</strong>
+                </div>
+                <div
+                  aria-hidden="true"
+                  className="edit-activity__header-progress-ring"
+                  style={{ '--progress': `${milestoneProjectProgress.planned}%` } as CSSProperties}
+                >
+                  <span>{Math.round(milestoneProjectProgress.planned)}%</span>
+                </div>
+              </div>
+              <div className="edit-activity__header-progress" aria-label={`Actual Progress ${Math.round(milestoneProjectProgress.actual)}%`}>
+                <div className="edit-activity__header-progress-copy">
+                  <span>Actual Progress</span>
+                  <strong>{Math.round(milestoneProjectProgress.actual)}%</strong>
+                </div>
+                <div
+                  aria-hidden="true"
+                  className="edit-activity__header-progress-ring edit-activity__header-progress-ring--actual"
+                  style={{ '--progress': `${milestoneProjectProgress.actual}%` } as CSSProperties}
+                >
+                  <span>{Math.round(milestoneProjectProgress.actual)}%</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="edit-activity__header-progress" aria-label={headerProgressAriaLabel}>
+              <div className="edit-activity__header-progress-copy">
+                <span>{displayedMilestoneProgressLabel}</span>
+                <strong>{Math.round(displayedMilestoneProgress)}%</strong>
+              </div>
+              <div
+                aria-hidden="true"
+                className="edit-activity__header-progress-ring"
+                style={{ '--progress': `${displayedMilestoneProgress}%` } as CSSProperties}
+              >
+                <span>{Math.round(displayedMilestoneProgress)}%</span>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="edit-activity__hero-main">
