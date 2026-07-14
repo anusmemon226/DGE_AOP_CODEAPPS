@@ -192,6 +192,17 @@ export const appSlice = createSlice({
     closeNotificationPanel: (state) => {
       state.isNotificationPanelOpen = false
     },
+    markAllNotificationsRead: (state) => {
+      state.notifications.forEach((notification) => {
+        notification.unread = false
+      })
+    },
+    markNotificationRead: (state, action: PayloadAction<string>) => {
+      const notification = state.notifications.find((item) => item.id === action.payload)
+      if (notification) {
+        notification.unread = false
+      }
+    },
     toggleAiAssistant: (state) => {
       state.isAiAssistantOpen = !state.isAiAssistantOpen
     },
@@ -265,6 +276,8 @@ export const {
   closeAiAssistant,
   closeMobileSidebar,
   closeNotificationPanel,
+  markAllNotificationsRead,
+  markNotificationRead,
   setLanguage,
   setDefaultCycle,
   setSelectedCycle,

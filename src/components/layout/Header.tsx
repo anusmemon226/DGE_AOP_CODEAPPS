@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   Bell,
-  BriefcaseBusiness,
   CalendarDays,
   Check,
   ChevronDown,
@@ -278,7 +277,7 @@ export function Header() {
                 </span>
                 <div>
                   <strong>Switch Cycle</strong>
-                  <span>{assessmentCycles.length} cycles available</span>
+                  <span>{assessmentCycles.length} {assessmentCycles.length === 1 ? 'cycle' : 'cycles'} available</span>
                 </div>
                 <button aria-label="Refresh cycles" type="button">
                   <RefreshCw size={15} />
@@ -384,7 +383,7 @@ export function Header() {
           </button>
 
           {isRoleOpen ? (
-            <div className="role-popover" role="dialog" aria-label="Profile and role">
+            <div className="role-popover" role="dialog" aria-label="Switch role">
               <div className="role-popover__account">
                 <span className="header__avatar role-popover__avatar">
                   {currentUser?.entityimage_url
@@ -436,11 +435,6 @@ export function Header() {
                   })
                 )}
               </div>
-
-              <button className="role-popover__profile" type="button">
-                <BriefcaseBusiness size={15} />
-                <span>Manage Profile</span>
-              </button>
             </div>
           ) : null}
         </div>

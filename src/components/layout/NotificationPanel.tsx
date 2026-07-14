@@ -1,13 +1,17 @@
 import { useEffect, useRef } from 'react'
-import { CheckCheck, FileText, Info, TriangleAlert } from 'lucide-react'
+import { Bell, CheckCheck, FileText, Info, TriangleAlert } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '../../store/hooks'
-import { closeNotificationPanel } from '../../store/appSlice'
+import { closeNotificationPanel, markAllNotificationsRead, markNotificationRead } from '../../store/appSlice'
 import type { NotificationTone } from '../../constants/app'
 
 const toneIcon: Record<NotificationTone, typeof Info> = {
   info: FileText,
   warning: TriangleAlert,
   success: CheckCheck,
+}
+
+function notificationReference(id: string, index: number) {
+  return /^N-\d+$/i.test(id) ? id.toUpperCase() : `N-${String(index + 1).padStart(3, '0')}`
 }
 
 export function NotificationPanel() {
@@ -45,17 +49,27 @@ export function NotificationPanel() {
   return (
     <div aria-label="Notifications" className="notifications-popover" ref={panelRef} role="dialog">
       <div className="notifications-popover__header">
+        <span className="notifications-popover__header-icon">
+          <Bell aria-hidden="true" size={17} />
+        </span>
         <div>
           <h2>Notifications</h2>
-          <p>You have {unreadCount} unread notifications</p>
+          <p>{unreadCount === 0 ? 'All caught up' : `${unreadCount} open ${unreadCount === 1 ? 'item' : 'items'}`}</p>
         </div>
-        <button className="notifications-popover__mark-read" type="button">
-          Mark all read
+        <button
+          className="notifications-popover__mark-read"
+          disabled={unreadCount === 0}
+          onClick={() => dispatch(markAllNotificationsRead())}
+          type="button"
+        >
+          Mark All as Read
         </button>
       </div>
 
       <div className="notifications-popover__list">
-        {notifications.map((notification) => {
+        {notifications.length === 0 ? (
+          <div className="notifications-popover__empty">No open notifications.</div>
+        ) : notifications.map((notification, index) => {
           const NotificationIcon = toneIcon[notification.tone]
 
           return (
@@ -65,15 +79,26 @@ export function NotificationPanel() {
               }`}
               key={notification.id}
             >
-              <div className={`notifications-popover__icon notifications-popover__icon--${notification.tone}`}>
-                <NotificationIcon aria-hidden="true" size={15} />
+              <div className="notifications-popover__item-meta">
+                <span className={`notifications-popover__reference notifications-popover__reference--${notification.tone}`}>
+                  <NotificationIcon aria-hidden="true" size={13} />
+                  {notificationReference(notification.id, index)}
+                </span>
+                <time>{notification.time}</time>
+                {notification.unread ? (
+                  <button
+                    className="notifications-popover__item-action"
+                    onClick={() => dispatch(markNotificationRead(notification.id))}
+                    type="button"
+                  >
+                    Mark as Read
+                  </button>
+                ) : null}
               </div>
               <div className="notifications-popover__content">
                 <h3>{notification.title}</h3>
                 <p>{notification.description}</p>
-                <time>{notification.time}</time>
               </div>
-              {notification.unread ? <span className="notifications-popover__dot" aria-label="Unread notification" /> : null}
             </article>
           )
         })}

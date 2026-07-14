@@ -93,7 +93,6 @@
   background: var(--control-bg);
   border: 1px solid var(--control-border);
   border-radius: var(--radius-sm);
-  box-shadow: var(--control-shadow);
   color: var(--color-text-secondary);
   cursor: pointer;
   display: inline-flex;
