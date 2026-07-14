@@ -33,6 +33,25 @@
         "workflowDisplayName": "Power Apps (V2) - Create/Update AOP Project Related AI Summary",
         "workflowName": "75a524b3-7809-c62d-2eb1-9bb05b2f4146"
       }
+    },
+    "510f5d63-441c-4309-9896-8be0a86ef8f8": {
+      "id": "/providers/microsoft.powerapps/apis/shared_sharepointonline",
+      "displayName": "SharePoint"
+    },
+    "670112c3-2fdc-42c3-a05b-44fcfbbc4f2a": {
+      "id": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
+      "displayName": "Logic flows",
+      "dataSources": [
+        "uploadfileinaopproject"
+      ],
+      "workflowDetails": {
+        "workflowEntityId": "11af4796-6f7f-f111-ab0e-000d3ae0324d",
+        "workflowDisplayName": "Upload File in AOP Project",
+        "workflowName": "ad83a02c-1221-4d3f-3ba2-89ebbd23dc7c",
+        "dependencies": {
+          "shared_sharepointonline_1": "510f5d63-441c-4309-9896-8be0a86ef8f8"
+        }
+      }
     }
   },
   "databaseReferences": {
@@ -151,6 +170,11 @@
         "dga_objective_dga_objective": {
           "entitySetName": "dga_objective_dga_objectiveset",
           "logicalName": "dga_objective_dga_objective",
+          "isHidden": false
+        },
+        "documents": {
+          "entitySetName": "sharepointdocuments",
+          "logicalName": "sharepointdocument",
           "isHidden": false
         }
       },

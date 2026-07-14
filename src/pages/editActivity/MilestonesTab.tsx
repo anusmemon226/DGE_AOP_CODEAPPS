@@ -28,6 +28,7 @@ import {
 import type { Dga_aop_projectsesBase } from '../../generated/models/Dga_aop_projectsesModel'
 import { Dga_aop_project_milestone_detailsesService } from '../../generated/services/Dga_aop_project_milestone_detailsesService'
 import { Dga_aop_projectsesService } from '../../generated/services/Dga_aop_projectsesService'
+import { UploadFileinAOPProjectService } from '../../generated/services/UploadFileinAOPProjectService'
 import { formatDateDisplay } from '../../utils/formatting'
 import { getQuarter } from './helpers/sharedHelpers'
 import {
@@ -189,6 +190,33 @@ function assertOperationSuccess(result: unknown, fallbackMessage: string) {
   if ((result as { success?: boolean })?.success === false) {
     throw new Error(getOperationErrorMessage(result, fallbackMessage))
   }
+}
+
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') {
+        reject(new Error('Unable to read the selected file. Please try again.'))
+        return
+      }
+
+      const base64DelimiterIndex = reader.result.indexOf(',')
+      if (base64DelimiterIndex < 0) {
+        reject(new Error('Unable to prepare the selected file for upload. Please try again.'))
+        return
+      }
+
+      resolve(reader.result.slice(base64DelimiterIndex + 1))
+    }
+
+    reader.onerror = () => {
+      reject(new Error('Unable to read the selected file. Please try again.'))
+    }
+
+    reader.readAsDataURL(file)
+  })
 }
 
 function normalizeId(id?: string | null) {
@@ -835,12 +863,6 @@ export function MilestonesTab({
             oldValue: previousExecutionValue('dga_justification', editingMilestone.executionJustification),
             newValue: form.executionJustification,
           },
-          {
-            logType: EXECUTION_LOG_TYPES.milestone,
-            name: `${editingMilestone.name} - Upload File`,
-            oldValue: previousExecutionValue('uploaded_file'),
-            newValue: uploadedFile?.name ?? '',
-          },
         ], { milestoneId: editingMilestone.id })
 
         setLocalProjectRelatedChanges({ projectId, value: nextRelatedChanges })
@@ -861,6 +883,35 @@ export function MilestonesTab({
               : milestone,
           ),
         )
+
+        try {
+          const fileContentBytes = await readFileAsBase64(uploadedFile!.file)
+          const uploadResult = await UploadFileinAOPProjectService.Run({
+            text: 'dga_aop_project_milestone_detailses',
+            text_2: editingMilestone.id,
+            text_1: projectId,
+            file: {
+              name: uploadedFile!.name,
+              contentBytes: fileContentBytes,
+            },
+          })
+          assertOperationSuccess(uploadResult, 'Unable to upload the milestone file.')
+
+          void createExecutionFieldLogs(projectId, [
+            {
+              logType: EXECUTION_LOG_TYPES.milestone,
+              name: `${editingMilestone.name} - Upload File`,
+              oldValue: previousExecutionValue('uploaded_file'),
+              newValue: uploadedFile!.name,
+            },
+          ], { milestoneId: editingMilestone.id })
+        } catch (uploadError) {
+          const uploadMessage = uploadError instanceof Error ? uploadError.message : 'Unable to upload the milestone file.'
+          setError(`Milestone execution changes were saved, but the file upload failed. ${uploadMessage}`)
+          onActivityDataChanged?.()
+          return
+        }
+
         setNotice('Milestone execution changes updated successfully.')
       } else if (editingMilestone) {
         const result = await Dga_aop_project_milestone_detailsesService.update(

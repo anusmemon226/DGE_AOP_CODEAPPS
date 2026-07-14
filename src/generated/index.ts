@@ -29,11 +29,13 @@ export * as Dga_project_planning_instancesModel from './models/Dga_project_plann
 export * as PowerApps_V2__Create_UpdateAOPProjectRelatedAISummaryModel from './models/PowerApps_V2__Create_UpdateAOPProjectRelatedAISummaryModel';
 export * as PowerApps_V2__RetrieveAOPProjectDatafromExcelModel from './models/PowerApps_V2__RetrieveAOPProjectDatafromExcelModel';
 export * as RolesModel from './models/RolesModel';
+export * as SharepointdocumentsModel from './models/SharepointdocumentsModel';
 export * as SystemuserrolescollectionModel from './models/SystemuserrolescollectionModel';
 export * as SystemusersModel from './models/SystemusersModel';
 export * as TeammembershipsModel from './models/TeammembershipsModel';
 export * as TeamrolescollectionModel from './models/TeamrolescollectionModel';
 export * as TeamsModel from './models/TeamsModel';
+export * as UploadFileinAOPProjectModel from './models/UploadFileinAOPProjectModel';
 
 // Services
 export * from './services/AccountsService';
@@ -60,8 +62,10 @@ export * from './services/Dga_project_planning_instancesService';
 export * from './services/PowerApps_V2__Create_UpdateAOPProjectRelatedAISummaryService';
 export * from './services/PowerApps_V2__RetrieveAOPProjectDatafromExcelService';
 export * from './services/RolesService';
+export * from './services/SharepointdocumentsService';
 export * from './services/SystemuserrolescollectionService';
 export * from './services/SystemusersService';
 export * from './services/TeammembershipsService';
 export * from './services/TeamrolescollectionService';
 export * from './services/TeamsService';
+export * from './services/UploadFileinAOPProjectService';

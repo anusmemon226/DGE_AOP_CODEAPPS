@@ -1,10 +1,13 @@
-import { PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
+import { ChevronsLeft, ChevronsRight, X } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
+import logoSource from '../../assets/Logo.ts?raw'
 import { getNavigationForRole } from '../../utils/permissions'
 import { closeMobileSidebar, toggleSidebarCollapsed } from '../../store/appSlice'
 import { useAppDispatch, useAppSelector } from '../../store/hooks'
 import { IconButton } from '../ui/IconButton'
 import type { DivisionalHierarchyRef, UserRole } from '../../store/userSlice'
+
+const logoBase64 = logoSource.match(/'([^']+)'/)?.[1] ?? ''
 
 function getRoleDisplayName(
   role: UserRole,
@@ -45,19 +48,12 @@ export function Sidebar() {
       >
         <div className="sidebar__brand">
           <div className="sidebar__brand-mark">
-            <img alt="" src="/logo.png" />
+            <img alt="Digital Connect" src={`data:image/png;base64,${logoBase64}`} />
           </div>
           <div className="sidebar__brand-copy">
             <span>Digital Connect</span>
             <strong>Annual Operating Plan</strong>
           </div>
-          <IconButton
-            className="sidebar__collapse"
-            label={isSidebarCollapsed ? 'Expand navigation' : 'Collapse navigation'}
-            onClick={() => dispatch(toggleSidebarCollapsed())}
-          >
-            {isSidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
-          </IconButton>
           <IconButton className="sidebar__mobile-close" label="Close navigation" onClick={() => dispatch(closeMobileSidebar())}>
             <X size={18} />
           </IconButton>
@@ -95,6 +91,13 @@ export function Sidebar() {
             </span>
           </div>
         </div>
+        <IconButton
+          className="sidebar__collapse"
+          label={isSidebarCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+          onClick={() => dispatch(toggleSidebarCollapsed())}
+        >
+          {isSidebarCollapsed ? <ChevronsRight size={15} /> : <ChevronsLeft size={15} />}
+        </IconButton>
       </aside>
     </>
   )

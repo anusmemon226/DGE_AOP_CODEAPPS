@@ -801,6 +801,8 @@ export function ActivityInfoTab({
     showPlanningReadOnlyView,
   ])
 
+  void guidancePanel
+
   return (
     <div className="create-activity__manual-layout">
       <div className="create-activity__manual-ai-summary">
@@ -815,7 +817,6 @@ export function ActivityInfoTab({
       <div className="create-activity__manual-form">
         {formCards}
       </div>
-      {guidancePanel}
     </div>
   )
 }

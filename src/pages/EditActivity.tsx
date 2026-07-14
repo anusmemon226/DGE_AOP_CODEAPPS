@@ -2809,28 +2809,6 @@ export function EditActivity() {
             </div>
           </div>
 
-          {/* Guidance panel skeleton */}
-          <aside className="create-activity__guidance" aria-hidden="true">
-            <div className="create-activity__guidance-card">
-              <div className="create-activity__guidance-inner" style={{ padding: '1.15rem' }}>
-                <div className="skeleton-guidance-header">
-                  <div className="skeleton-guidance-icon skeleton-shimmer" />
-                  <div>
-                    <div className="skeleton-line skeleton-shimmer" style={{ width: '60%', height: '0.85rem', marginBottom: '0.3rem' }} />
-                    <div className="skeleton-line skeleton-shimmer" style={{ width: '45%', height: '0.7rem' }} />
-                  </div>
-                </div>
-                <div className="skeleton-progress-ring skeleton-shimmer" />
-                <div className="skeleton-line skeleton-shimmer" style={{ width: '100%', height: '0.75rem' }} />
-                <div className="skeleton-guidance-items">
-                  <div className="skeleton-line skeleton-shimmer" style={{ width: '75%', height: '0.7rem' }} />
-                  <div className="skeleton-line skeleton-shimmer" style={{ width: '60%', height: '0.7rem' }} />
-                  <div className="skeleton-line skeleton-shimmer" style={{ width: '80%', height: '0.7rem' }} />
-                  <div className="skeleton-line skeleton-shimmer" style={{ width: '50%', height: '0.7rem' }} />
-                </div>
-              </div>
-            </div>
-          </aside>
         </div>
       </div>
     )

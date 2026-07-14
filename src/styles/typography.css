@@ -292,6 +292,41 @@ table td {
   transform: none !important;
 }
 
+/* Manual Entry stays compact and neutral: selected choices should not become bold. */
+.create-activity__manual-form .select-field__value,
+.create-activity__manual-form .select-menu__option,
+.create-activity__manual-form .date-picker__trigger,
+.create-activity__manual-form .field__control,
+.create-activity__manual-form .select-field__control,
+.create-activity__manual-form .radio-group .choice,
+.create-activity__manual-form .checkbox-group .choice,
+.create-activity__manual-form .choice__copy,
+.create-activity__manual-form .choice__copy > span,
+.create-activity__manual-form .radio-group .choice:has(input:checked),
+.create-activity__manual-form .checkbox-group .choice:has(input:checked),
+.create-activity__manual-form .choice:has(input:checked) .choice__copy,
+.create-activity__manual-form .choice:has(input:checked) .choice__copy > span {
+  font-weight: var(--font-weight-regular) !important;
+}
+
+.create-activity__manual-form .select-field__value,
+.create-activity__manual-form .select-menu__option,
+.create-activity__manual-form .date-picker__trigger,
+.create-activity__manual-form .field__control,
+.create-activity__manual-form .select-field__control,
+.create-activity__manual-form .radio-group .choice,
+.create-activity__manual-form .checkbox-group .choice,
+.create-activity__manual-form .choice__copy > span {
+  font-size: 0.75rem !important;
+}
+
+/* These controls are buttons, so they need to outrank the global button rule. */
+.create-activity__manual-form .select-field button.select-field__control[aria-expanded],
+.create-activity__manual-form button.date-picker__trigger.field__control[aria-haspopup] {
+  font-size: 0.75rem !important;
+  font-weight: var(--font-weight-regular) !important;
+}
+
 .radio-group--disabled .choice:has(input:checked),
 .checkbox-group--disabled .choice:has(input:checked),
 .radio-group .choice:has(input:disabled:checked),
