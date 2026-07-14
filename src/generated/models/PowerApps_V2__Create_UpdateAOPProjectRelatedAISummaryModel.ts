@@ -8,4 +8,8 @@ export interface ManualTriggerInput {
   text: string;
   // Please enter your input
   text_1: string;
+  // Please enter your input
+  text_2: string;
+  // Please enter your input
+  text_3: string;
 }

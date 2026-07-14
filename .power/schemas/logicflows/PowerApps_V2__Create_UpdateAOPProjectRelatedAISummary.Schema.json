@@ -78,11 +78,27 @@
               "x-ms-dynamically-added": true,
               "description": "Please enter your input",
               "x-ms-content-hint": "TEXT"
+            },
+            "text_2": {
+              "title": "Ojbective Details",
+              "type": "string",
+              "x-ms-dynamically-added": true,
+              "description": "Please enter your input",
+              "x-ms-content-hint": "TEXT"
+            },
+            "text_3": {
+              "title": "Phase",
+              "type": "string",
+              "x-ms-dynamically-added": true,
+              "description": "Please enter your input",
+              "x-ms-content-hint": "TEXT"
             }
           },
           "required": [
             "text",
-            "text_1"
+            "text_1",
+            "text_2",
+            "text_3"
           ]
         }
       },
