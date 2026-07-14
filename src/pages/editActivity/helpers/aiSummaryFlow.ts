@@ -100,7 +100,6 @@ const ACTIVITY_SELECT_FIELDS = [
   'dga_project_kpi',
   'dga_project_plan_if_any',
   'dga_risks',
-  'dga_multi_year_project',
   'dga_is_project_start',
   'dga_is_rejected',
   'dga_rejection_reason',
