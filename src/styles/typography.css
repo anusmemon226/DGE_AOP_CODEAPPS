@@ -48,6 +48,16 @@ button:not(.icon-button):not(.modal__close):not(.date-picker__grid button) {
   letter-spacing: -0.005em;
 }
 
+.date-picker__popover .date-picker__header strong,
+.date-picker__popover button.date-picker__header-select:not(.icon-button):not(.modal__close):not(.date-picker__grid button),
+.date-picker__popover .date-picker__month-grid button:not(.icon-button):not(.modal__close):not(.date-picker__grid button),
+.date-picker__popover .date-picker__year-grid button:not(.icon-button):not(.modal__close):not(.date-picker__grid button),
+.date-picker__popover .date-picker__quick-actions button:not(.icon-button):not(.modal__close):not(.date-picker__grid button) {
+  font-size: 0.6875rem !important;
+  font-weight: var(--font-weight-medium) !important;
+  letter-spacing: 0 !important;
+}
+
 .button--primary,
 .button--danger,
 .button--secondary,

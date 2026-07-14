@@ -2264,8 +2264,8 @@ export function CreateActivity() {
               <Textarea error={errors.overallLongTermImpact} label="طويلة المدى / اهداف المشروع العامة" onChange={(event) => updateForm({ overallLongTermImpact: event.target.value })} placeholder="اكتب الأهداف العامة طويلة المدى للمشروع" required value={form.overallLongTermImpact} />
               <Input error={errors.stakeholder} label="Stakeholder" onChange={(event) => updateForm({ stakeholder: event.target.value })} placeholder="Enter the primary stakeholder or entity" required value={form.stakeholder} />
               <Input error={errors.activityKpi} label="Activity KPI" onChange={(event) => updateForm({ activityKpi: event.target.value })} placeholder="Enter the KPI used to measure success" required value={form.activityKpi} />
-              <Textarea error={errors.risks} label="Risks" onChange={(event) => updateForm({ risks: event.target.value })} placeholder="Describe key risks, dependencies, or mitigation needs" required value={form.risks} />
               <Input label="Activity Plan (If any)" onChange={(event) => updateForm({ activityPlan: event.target.value })} placeholder="Enter the activity plan reference, if available" value={form.activityPlan} />
+              <Textarea error={errors.risks} label="Risks" onChange={(event) => updateForm({ risks: event.target.value })} placeholder="Describe key risks, dependencies, or mitigation needs" required value={form.risks} />
             </div>
           </Card> : null}
           </div>

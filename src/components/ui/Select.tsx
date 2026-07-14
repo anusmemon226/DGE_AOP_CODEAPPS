@@ -94,7 +94,7 @@ export function Select<TValue extends string>({
       const openUp = menuHeight > spaceBelow && rect.top - 8 > spaceBelow
 
       setMenuPos({
-        top: openUp ? Math.max(8, rect.top - menuHeight - 4) : rect.bottom + 4,
+        top: openUp ? Math.max(8, rect.top - menuHeight) : rect.bottom,
         left: rect.left,
         width: rect.width,
       })
@@ -163,7 +163,7 @@ export function Select<TValue extends string>({
               const spaceBelow = window.innerHeight - rect.bottom - 8
               const openUp = estHeight > spaceBelow && rect.top - 8 > spaceBelow
               setMenuPos({
-                top: openUp ? Math.max(8, rect.top - estHeight - 4) : rect.bottom + 4,
+                top: openUp ? Math.max(8, rect.top - estHeight) : rect.bottom,
                 left: rect.left,
                 width: rect.width,
               })
