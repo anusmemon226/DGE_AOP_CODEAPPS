@@ -2049,9 +2049,7 @@
 }
 
 .edit-activity__dependencies--embedded .edit-activity__members-pagination {
-  flex-wrap: wrap;
-  justify-content: space-between;
-  margin-bottom: 1rem;
+  flex-wrap: nowrap;
   min-width: 0;
   overflow: hidden;
   padding-left: 0;
@@ -2059,7 +2057,7 @@
 }
 
 .edit-activity__dependencies--embedded .edit-activity__deps-table-container {
-  margin-bottom: 0.95rem;
+  margin-bottom: 0;
   min-width: 0;
   overflow: hidden;
 }
@@ -2070,8 +2068,8 @@
 }
 
 .edit-activity__dependencies--embedded .edit-activity__members-pagination-controls {
-  flex: 0 1 auto;
-  justify-content: flex-end;
+  flex: 1;
+  justify-content: center;
   min-width: 0;
 }
 
