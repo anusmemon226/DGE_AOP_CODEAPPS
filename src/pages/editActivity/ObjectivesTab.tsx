@@ -7,6 +7,8 @@ import type { Dga_objectives } from '../../generated/models/Dga_objectivesModel'
 import { Dga_aop_projectsesService } from '../../generated/services/Dga_aop_projectsesService'
 import { Dga_objective_dga_objectivesetService } from '../../generated/services/Dga_objective_dga_objectivesetService'
 import { Dga_objectivesService } from '../../generated/services/Dga_objectivesService'
+import { AiSummaryPanel } from './AiSummaryPanel'
+import type { AiSummaryBlocks, AiSummaryMeta } from './types/aiSummaryTypes'
 
 type ObjectiveValue = string
 
@@ -26,6 +28,10 @@ type ObjectiveOption = {
 type ObjectiveErrors = Partial<Record<keyof ObjectiveForm, string>>
 
 type ObjectivesTabProps = {
+  aiSummaryBlocks?: AiSummaryBlocks
+  aiSummaryError?: string
+  aiSummaryMeta?: AiSummaryMeta
+  isAiSummaryLoading?: boolean
   isReadOnly?: boolean
   onActivityDataChanged?: () => void
   onHeaderActionChange?: (action: ObjectiveHeaderAction | null) => void
@@ -159,6 +165,10 @@ function buildProjectPayload(form: ObjectiveForm): Partial<Omit<Dga_aop_projects
 }
 
 export function ObjectivesTab({
+  aiSummaryBlocks,
+  aiSummaryError,
+  aiSummaryMeta,
+  isAiSummaryLoading = false,
   isReadOnly = false,
   onActivityDataChanged,
   onHeaderActionChange,
@@ -414,6 +424,13 @@ export function ObjectivesTab({
 
   return (
     <div className="edit-activity__objectives">
+      <AiSummaryPanel
+        error={aiSummaryError}
+        isLoading={isAiSummaryLoading}
+        meta={aiSummaryMeta}
+        summaries={aiSummaryBlocks}
+        title="Objectives"
+      />
       <div className="edit-activity__members-header">
         <div className="edit-activity__members-header-text">
           <h2>

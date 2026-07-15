@@ -429,6 +429,12 @@
     color 180ms ease;
 }
 
+.header__language-toggle button.header__language-option:not(.icon-button):not(.modal__close):not(.date-picker__grid button) {
+  font-size: 0.75rem !important;
+  font-weight: var(--font-weight-medium) !important;
+  letter-spacing: 0 !important;
+}
+
 .header__language-option:hover {
   background: rgb(231 245 255 / var(--tw-bg-opacity, 1));
   color: var(--color-primary);
@@ -442,6 +448,10 @@
 .header__language-option--active {
   background: var(--color-primary);
   color: var(--color-on-primary);
+  font-weight: var(--font-weight-semibold) !important;
+}
+
+.header__language-toggle button.header__language-option--active:not(.icon-button):not(.modal__close):not(.date-picker__grid button) {
   font-weight: var(--font-weight-semibold) !important;
 }
 

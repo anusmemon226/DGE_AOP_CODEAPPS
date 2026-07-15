@@ -1,21 +1,24 @@
-import type { TextareaHTMLAttributes } from 'react'
+import type { ReactNode, TextareaHTMLAttributes } from 'react'
+import { Tooltip } from './Tooltip'
 import './ui.css'
 
 type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
   error?: string
   hint?: string
   label: string
+  tooltip?: ReactNode
 }
 
-export function Textarea({ className = '', error, hint, id, label, required, rows = 4, ...props }: TextareaProps) {
+export function Textarea({ className = '', error, hint, id, label, required, rows = 4, tooltip, ...props }: TextareaProps) {
   const textareaId = id ?? label.toLowerCase().replace(/\s+/g, '-')
   const isDisabled = Boolean(props.disabled)
 
   return (
     <label className={`field ${isDisabled ? 'field--disabled' : ''} ${className}`.trim()} htmlFor={textareaId}>
-      <span className="field__label">
+      <span className={`field__label${tooltip ? ' field__label--with-tooltip' : ''}`}>
         {label}
         {required ? <span aria-hidden="true" className="field__required"> *</span> : null}
+        {tooltip ? <Tooltip content={tooltip} label={`More information about ${label}`} /> : null}
       </span>
       <textarea
         aria-invalid={Boolean(error)}

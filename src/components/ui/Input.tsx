@@ -1,4 +1,5 @@
 import type { InputHTMLAttributes, ReactNode } from 'react'
+import { Tooltip } from './Tooltip'
 import './ui.css'
 
 type InputProps = InputHTMLAttributes<HTMLInputElement> & {
@@ -6,17 +7,19 @@ type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   hint?: string
   label: string
   rightIcon?: ReactNode
+  tooltip?: ReactNode
 }
 
-export function Input({ className = '', error, hint, id, label, required, rightIcon, ...props }: InputProps) {
+export function Input({ className = '', error, hint, id, label, required, rightIcon, tooltip, ...props }: InputProps) {
   const inputId = id ?? label.toLowerCase().replace(/\s+/g, '-')
   const isDisabled = Boolean(props.disabled)
 
   return (
     <label className={`field ${isDisabled ? 'field--disabled' : ''} ${className}`.trim()} htmlFor={inputId}>
-      <span className="field__label">
+      <span className={`field__label${tooltip ? ' field__label--with-tooltip' : ''}`}>
         {label}
         {required ? <span aria-hidden="true" className="field__required"> *</span> : null}
+        {tooltip ? <Tooltip content={tooltip} label={`More information about ${label}`} /> : null}
       </span>
       <span className={rightIcon ? 'field__input-wrap' : undefined}>
         <input

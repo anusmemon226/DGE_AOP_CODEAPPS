@@ -378,12 +378,23 @@
 }
 
 .create-activity__hero-footer .button {
-  border-radius: 0.6rem;
+  border-radius: 0.5rem;
   box-shadow: none;
-  font-size: 0.84rem;
-  min-height: 2.35rem;
-  padding: 0.45rem 0.9rem;
-  min-width: 9.3rem;
+  font-size: 0.85rem !important;
+  gap: 0.38rem;
+  min-height: 2rem;
+  min-width: 0;
+  padding: 0.35rem 0.68rem;
+}
+
+.create-activity__hero-footer .button:hover:not(:disabled) {
+  box-shadow: none;
+  transform: none;
+}
+
+.create-activity__hero-footer .button__icon svg {
+  height: 14px;
+  width: 14px;
 }
 
 .create-activity__hero-actions {
@@ -1964,10 +1975,10 @@
 }
 
 .create-activity__card-column {
+  align-content: start;
   display: grid;
   gap: 0.9rem;
   min-width: 0;
-  align-content: start;
 }
 
 .create-activity__section--grid-card {
@@ -2074,37 +2085,17 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.create-activity__section--requirements .create-activity__form-stack {
+.create-activity__section--activity-details .create-activity__form-stack {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.create-activity__section--requirements .create-activity__radio--classification {
+.create-activity__section--activity-details .create-activity__radio--classification {
   grid-column: 1 / -1;
 }
 
-.create-activity__requirement-rule {
-  display: grid;
-  gap: 0.28rem;
-  min-width: 0;
-}
-
-.create-activity__requirement-warning {
-  background: var(--color-warning-soft);
-  border-left: 2px solid var(--color-warning);
-  border-radius: 0.35rem;
-  color: #a16207;
-  font-size: 0.6875rem !important;
-  font-weight: var(--font-weight-regular) !important;
-  letter-spacing: 0 !important;
-  line-height: 1.35;
-  margin-top: 0.12rem;
-  padding: 0.28rem 0.42rem;
-}
-
-:root[data-theme='dark'] .create-activity__requirement-warning {
-  background: rgb(245 158 11 / 12%);
-  color: #fbbf24;
+.create-activity__activity-details-full-row {
+  grid-column: 1 / -1;
 }
 
 .create-activity__manual-layout .create-activity__form-stack .field__label,
@@ -3425,11 +3416,35 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .create-activity__card-column {
+    display: contents;
+  }
+
+  .create-activity__section--overview {
+    order: 1;
+  }
+
+  .create-activity__section--activity-details {
+    order: 4;
+  }
+
+  .create-activity__section--timeline {
+    order: 2;
+  }
+
+  .create-activity__section--scope-summary {
+    order: 3;
+  }
+
+  .create-activity__section--adeo {
+    order: 5;
+  }
+
   .create-activity__section--adeo .create-activity__form-stack {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .create-activity__section--requirements .create-activity__form-stack {
+  .create-activity__section--activity-details .create-activity__form-stack {
     grid-template-columns: minmax(0, 1fr);
   }
 

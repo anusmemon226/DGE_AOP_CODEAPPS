@@ -221,17 +221,29 @@ function normalizeId(id?: string | null) {
   return id?.replace(/[{}]/g, '').toLowerCase() ?? ''
 }
 
+type ObjectiveAiSummaryResponse = {
+  'Objective Summary'?: unknown
+  ObjectiveSummary?: unknown
+}
+
 type AiSummaryResponseJson = Partial<Record<
+  | 'Project Summary'
   | 'ProjectSummary'
+  | 'Milestone Summary'
   | 'milestoneSummary'
+  | 'Procurement Summary'
   | 'ProcurementSummary'
+  | 'Budget Summary'
   | 'BudgetSummary'
+  | 'Engagement Plan Summary'
   | 'EngagementPlanSummary',
   unknown
->>
+>> & {
+  Objective?: ObjectiveAiSummaryResponse
+}
 
 type TabAiSummaries = Partial<Record<
-  'activityInfo' | 'milestones' | 'procurement' | 'engagementPlan' | 'budget',
+  'activityInfo' | 'objectives' | 'milestones' | 'procurement' | 'engagementPlan' | 'budget',
   AiSummaryBlocks
 >>
 
@@ -258,19 +270,22 @@ function mapAiSummaryResponse(response: AiSummaryResponseJson | null): TabAiSumm
 
   return {
     activityInfo: {
-      summary: getAiSummaryText(response.ProjectSummary),
+      summary: getAiSummaryText(response['Project Summary'] ?? response.ProjectSummary),
+    },
+    objectives: {
+      summary: getAiSummaryText(response.Objective?.['Objective Summary'] ?? response.Objective?.ObjectiveSummary),
     },
     budget: {
-      summary: getAiSummaryText(response.BudgetSummary),
+      summary: getAiSummaryText(response['Budget Summary'] ?? response.BudgetSummary),
     },
     engagementPlan: {
-      summary: getAiSummaryText(response.EngagementPlanSummary),
+      summary: getAiSummaryText(response['Engagement Plan Summary'] ?? response.EngagementPlanSummary),
     },
     milestones: {
-      summary: getAiSummaryText(response.milestoneSummary),
+      summary: getAiSummaryText(response['Milestone Summary'] ?? response.milestoneSummary),
     },
     procurement: {
-      summary: getAiSummaryText(response.ProcurementSummary),
+      summary: getAiSummaryText(response['Procurement Summary'] ?? response.ProcurementSummary),
     },
   }
 }
@@ -880,6 +895,14 @@ export function EditActivity() {
         })
       })
   }, [loadActivityAiSummary, projectId])
+
+  const handleObjectivesActivityDataChanged = useCallback(() => {
+    refreshActivityAiSummary('objectives-save')
+  }, [refreshActivityAiSummary])
+
+  const handleBudgetActivityDataChanged = useCallback(() => {
+    refreshActivityAiSummary('budget-crud')
+  }, [refreshActivityAiSummary])
 
   // ── Loaded activity data ──
   const loadMilestoneProjectProgress = useCallback(async (relatedChanges?: string | null) => {
@@ -2506,8 +2529,12 @@ export function EditActivity() {
       case 'objectives':
         return (
           <ObjectivesTab
+            aiSummaryBlocks={aiSummaryBlocks.objectives}
+            aiSummaryError={aiSummaryError}
+            aiSummaryMeta={aiSummaryMeta}
+            isAiSummaryLoading={isAiSummaryLoading}
             isReadOnly={editPermissions.objectivesReadOnly}
-            onActivityDataChanged={() => refreshActivityAiSummary('objectives-save')}
+            onActivityDataChanged={handleObjectivesActivityDataChanged}
             onHeaderActionChange={setObjectiveHeaderAction}
             projectId={projectId}
             statusCode={statusCode}
@@ -2577,7 +2604,7 @@ export function EditActivity() {
             isExecutionPhase={isExecutionPhase}
             isReadOnly={editPermissions.budgetReadOnly}
             onHeaderActionChange={setBudgetHeaderAction}
-            onActivityDataChanged={() => refreshActivityAiSummary('budget-crud')}
+            onActivityDataChanged={handleBudgetActivityDataChanged}
             plannedEndDate={form.plannedEndDate}
             plannedStartDate={form.plannedStartDate}
             onProjectRelatedChangesChange={handleProjectRelatedChangesUpdate}

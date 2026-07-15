@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
 import { formatDateDisplay } from '../../utils/formatting'
+import { Tooltip } from './Tooltip'
 import './ui.css'
 
 type DatePickerView = 'day' | 'month' | 'year'
@@ -18,6 +19,7 @@ type DatePickerProps = {
   onChange: (value: string) => void
   readOnly?: boolean
   required?: boolean
+  tooltip?: ReactNode
   value?: string
 }
 
@@ -106,6 +108,7 @@ export function DatePicker({
   onChange,
   readOnly = false,
   required = false,
+  tooltip,
   value,
 }: DatePickerProps) {
   const [isOpen, setIsOpen] = useState(false)
@@ -284,9 +287,10 @@ export function DatePicker({
 
   return (
     <div className={`field date-picker ${disabled ? 'field--disabled' : ''} ${className}`.trim()} ref={rootRef}>
-      <span className="field__label" id={`${id}-label`}>
+      <span className={`field__label${tooltip ? ' field__label--with-tooltip' : ''}`} id={`${id}-label`}>
         {label}
         {required ? <span aria-hidden="true" className="field__required"> *</span> : null}
+        {tooltip ? <Tooltip content={tooltip} label={`More information about ${label}`} /> : null}
       </span>
       <div className="date-picker__control-wrap">
         <button

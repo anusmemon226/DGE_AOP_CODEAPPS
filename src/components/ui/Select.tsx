@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, ChevronDown, Search } from 'lucide-react'
+import { Tooltip } from './Tooltip'
 import './ui.css'
 
 export type SelectOption<TValue extends string> = {
@@ -29,6 +30,7 @@ type SelectProps<TValue extends string> = {
   renderOption?: (option: SelectOption<TValue>, isSelected: boolean) => ReactNode
   renderValue?: (option: SelectOption<TValue>) => ReactNode
   required?: boolean
+  tooltip?: ReactNode
 }
 
 export function Select<TValue extends string>({
@@ -44,6 +46,7 @@ export function Select<TValue extends string>({
   renderOption,
   renderValue,
   required = false,
+  tooltip,
   value,
 }: SelectProps<TValue>) {
   const [isOpen, setIsOpen] = useState(false)
@@ -139,9 +142,10 @@ export function Select<TValue extends string>({
 
   return (
     <div className={`select-field ${disabled ? 'select-field--disabled' : ''} ${className}`.trim()} ref={rootRef}>
-      <span className={`select-field__label ${hideLabel ? 'select-field__label--hidden' : ''}`} id={`${id}-label`}>
+      <span className={`select-field__label ${hideLabel ? 'select-field__label--hidden' : ''}${tooltip ? ' select-field__label--with-tooltip' : ''}`} id={`${id}-label`}>
         {label}
         {required ? <span aria-hidden="true" className="field__required"> *</span> : null}
+        {tooltip ? <Tooltip content={tooltip} label={`More information about ${label}`} /> : null}
       </span>
       <button
         aria-controls={listboxId}

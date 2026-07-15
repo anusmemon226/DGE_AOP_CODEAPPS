@@ -1,5 +1,5 @@
 import { useEffect, useState, type ChangeEvent } from 'react'
-import { Bot, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, FileSpreadsheet, FileText, Paperclip, RefreshCcw, Save, Send, Settings2, Sparkles, Target, Trash2, UploadCloud } from 'lucide-react'
+import { AlignLeft, Bot, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, FileSpreadsheet, FileText, Paperclip, RefreshCcw, Save, Send, Settings2, Sparkles, Trash2, UploadCloud } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import {
@@ -13,6 +13,8 @@ import {
   RadioGroup,
   Select,
   Textarea,
+  Tooltip,
+  TooltipProvider,
   type SelectOption,
 } from '../components/ui'
 import { Dga_aop_projectsesService } from '../generated/services/Dga_aop_projectsesService'
@@ -78,7 +80,7 @@ const FIELD_LABELS: Partial<Record<keyof CreateActivityForm, string>> = {
   activityLeadId: 'Activity Lead / PM Name',
   plannedStartDate: 'Planned Start Date',
   plannedEndDate: 'Planned End Date',
-  scopeDescription: 'Activity Scope Description',
+  scopeDescription: 'Scope',
   summary: 'Summary',
   adeoProjectName: 'اسم المشروع',
   adeoProjectDescription: 'وصف المشروع',
@@ -88,6 +90,24 @@ const FIELD_LABELS: Partial<Record<keyof CreateActivityForm, string>> = {
   activityKpi: 'Activity KPI',
   risks: 'Risks',
 }
+
+const CREATE_ACTIVITY_TOOLTIPS = {
+  activityType: <><p>Select the activity type from the below options:</p><ul><li><strong>New Project:</strong> Started in 2026</li><li><strong>Ongoing Project:</strong> Started before 2026</li><li><strong>Contract:</strong> Contract-based or payment-related item</li><li><strong>Internal Operations:</strong> Activity related to internal departmental operations</li></ul></>,
+  activityName: <>Input the name of the project/activity.</>,
+  activityScope: <><p>Select the project type from the below options:</p><ul><li><strong>Strategic:</strong> The project is derived from the Abu Dhabi Digital Strategy</li><li><strong>Operational:</strong> The project is operational in nature</li></ul></>,
+  strategies: <>Select the strategy under which this project is categorized. You can select multiple options.</>,
+  activityClassification: <><p>Select the activity classification from the below options:</p><ul><li><strong>EPM Registered Project:</strong> Project that is or will be registered in the EPM system</li><li><strong>Operational Activity:</strong> Operational activity with defined deliverables and outcomes</li><li><strong>Payment Only:</strong> Non-project item related to contracts or payments</li></ul></>,
+  budgetRequired: <>This project will require budget.</>,
+  paymentOnlyWarning: <>Payment Only activities are considered budget required.</>,
+  procurementRequired: <>This project will require procurement, either through a new tender, contract renewal, etc.</>,
+  budgetNoWarning: <>Procurement is automatically No when budget is not required.</>,
+  adeoReported: <>This project is or will be included with the DGE Execution Plan and reported to ADEO.</>,
+  activityLead: <>Input the name of the Project Manager/Activity Lead that will be responsible for inputting this activity&apos;s progress.</>,
+  plannedStartDate: <>Input the planned start date of the project or activity.</>,
+  plannedEndDate: <>Input the planned end date of the project or activity.</>,
+  scope: <>Input a detailed description of what will be covered in the scope of this project or activity.</>,
+  summary: <>Input a detailed summary of the project mentioning the objective, high-level scope statement, and the expected value or benefit from completion of this project or activity.</>,
+} as const
 
 type ActivityContext = {
   currentUserId: string
@@ -2217,43 +2237,44 @@ export function CreateActivity() {
       {errors.submit ? <div className="create-activity__notice create-activity__notice--error">{errors.submit}</div> : null}
 
       {activeTab === 'manual' ? (
+        <TooltipProvider>
         <div className="create-activity__manual-layout"><div className="create-activity__manual-form"><div className="create-activity__card-grid">
           <div className="create-activity__card-column create-activity__card-column--left">
-          <Card className="create-activity__section create-activity__section--grid-card create-activity__section--details">
-            <div className="create-activity__section-header"><div className="create-activity__section-header-inner"><span className="create-activity__section-header-icon" aria-hidden="true"><ClipboardList size={17} /></span><div><h2>Activity Details</h2><p>Define the initiative, expected outcome, and accountable lead.</p></div></div></div>
+          <Card className="create-activity__section create-activity__section--grid-card create-activity__section--overview">
+            <div className="create-activity__section-header"><div className="create-activity__section-header-inner"><span className="create-activity__section-header-icon" aria-hidden="true"><ClipboardList size={17} /></span><div><h2>Overview</h2><p>Define the activity, its scope, and strategic alignment.</p></div></div></div>
             <div className="create-activity__form-stack">
-              <Select error={errors.activityType} id="activity-type" label="Activity Type" onChange={(value) => updateForm({ activityType: value })} options={ACTIVITY_TYPE_OPTIONS} required value={form.activityType} />
-              <Input error={errors.activityName} label="Activity / Initiative Name" onChange={(event) => updateForm({ activityName: event.target.value })} placeholder="Enter activity name" required value={form.activityName} />
-              <Textarea error={errors.summary} label="Summary" onChange={(event) => updateForm({ summary: event.target.value })} placeholder="Summarize the expected outcome" required value={form.summary} />
-              <Select error={errors.activityLeadId} id="activity-lead" label="Activity Lead / PM Name" onChange={(value) => updateForm({ activityLeadId: value })} options={activityLeadOptions.length > 0 ? [{ label: 'Select Activity Lead', value: '' }, ...activityLeadOptions] : [{ label: 'No users available', value: '' }]} required value={form.activityLeadId || ''} />
-            </div>
-          </Card>
-          <Card className="create-activity__section create-activity__section--grid-card create-activity__section--requirements">
-            <div className="create-activity__section-header"><div className="create-activity__section-header-inner"><span className="create-activity__section-header-icon" aria-hidden="true"><Settings2 size={17} /></span><div><h2>Requirements</h2><p>Confirm classification, budget, procurement, and ADEO reporting needs.</p></div></div></div>
-            <div className="create-activity__form-stack">
-              <RadioGroup className="create-activity__radio create-activity__radio--classification" error={errors.activityClassification} label="Activity Classification" name="activity-classification" onChange={(value) => updateForm({ activityClassification: value })} options={CLASSIFICATION_OPTIONS.filter((option) => option.value !== '')} required value={form.activityClassification} />
-              {!isPaymentOnly ? <RadioGroup className="create-activity__radio create-activity__radio--yes-no" error={errors.budgetRequired} label="Does this project require Budget?" name="budget-required" onChange={(value) => updateForm({ budgetRequired: value })} options={YES_NO_OPTIONS.filter((option) => option.value !== '')} required value={form.budgetRequired} /> : <div className="create-activity__requirement-rule"><RadioGroup className="create-activity__radio create-activity__radio--yes-no" disabled label="Does this project require Budget?" name="budget-required" onChange={() => undefined} options={YES_NO_OPTIONS.filter((option) => option.value !== '')} required value="1" /><span className="create-activity__requirement-warning">Payment Only activities are considered budget required.</span></div>}
-              <RadioGroup className="create-activity__radio create-activity__radio--yes-no" error={errors.adeoReported} label="Execution plan project reported in ADEO" name="adeo-reported" onChange={(value) => updateForm({ adeoReported: value })} options={YES_NO_OPTIONS.filter((option) => option.value !== '')} required value={form.adeoReported} />
-              {isBudgetNo ? <div className="create-activity__requirement-rule"><RadioGroup className="create-activity__radio create-activity__radio--yes-no" disabled label="Does this project require procurement?" name="procurement-required" onChange={() => undefined} options={YES_NO_OPTIONS.filter((option) => option.value !== '')} required value="0" /><span className="create-activity__requirement-warning">Procurement is automatically No when budget is not required.</span></div> : <RadioGroup className="create-activity__radio create-activity__radio--yes-no" error={errors.procurementRequired} label="Does this project require procurement?" name="procurement-required" onChange={(value) => updateForm({ procurementRequired: value })} options={YES_NO_OPTIONS.filter((option) => option.value !== '')} required value={form.procurementRequired} />}
-            </div>
-          </Card>
-          </div>
-          <div className="create-activity__card-column create-activity__card-column--right">
-          <Card className="create-activity__section create-activity__section--grid-card create-activity__section--scope">
-            <div className="create-activity__section-header"><div className="create-activity__section-header-inner"><span className="create-activity__section-header-icon" aria-hidden="true"><Target size={17} /></span><div><h2>Strategic Alignment</h2><p>Set the activity purpose, strategic alignment, and boundaries.</p></div></div></div>
-            <div className="create-activity__form-stack">
-              <RadioGroup className="create-activity__radio create-activity__radio--scope" error={errors.activityScope} label="Activity Scope" name="activity-scope" onChange={(value) => updateForm({ activityScope: value })} options={ACTIVITY_SCOPE_OPTIONS.filter((option) => option.value !== '')} required value={form.activityScope} />
-              {isStrategic ? <fieldset className="checkbox-group create-activity__strategy-group"><legend className="field__label">What strategy is this project/activity categorized under?</legend><div className="checkbox-group__options">{STRATEGY_OPTIONS.map((option) => <Checkbox checked={form.strategies.includes(option.value)} key={option.value} label={option.label} onChange={() => toggleStrategy(option.value)} />)}</div>{errors.strategies ? <span className="field__error">{errors.strategies}</span> : null}</fieldset> : null}
-              <Textarea error={errors.scopeDescription} label="Activity Scope Description" onChange={(event) => updateForm({ scopeDescription: event.target.value })} placeholder="Describe in-scope and out-of-scope boundaries" required value={form.scopeDescription} />
+              <Select error={errors.activityType} id="activity-type" label="Activity Type" onChange={(value) => updateForm({ activityType: value })} options={ACTIVITY_TYPE_OPTIONS} required tooltip={CREATE_ACTIVITY_TOOLTIPS.activityType} value={form.activityType} />
+              <Input error={errors.activityName} label="Activity / Initiative Name" onChange={(event) => updateForm({ activityName: event.target.value })} placeholder="Enter activity name" required tooltip={CREATE_ACTIVITY_TOOLTIPS.activityName} value={form.activityName} />
+              <RadioGroup className="create-activity__radio create-activity__radio--scope" error={errors.activityScope} label="Activity Scope" name="activity-scope" onChange={(value) => updateForm({ activityScope: value })} options={ACTIVITY_SCOPE_OPTIONS.filter((option) => option.value !== '')} required tooltip={CREATE_ACTIVITY_TOOLTIPS.activityScope} value={form.activityScope} />
+              {isStrategic ? <fieldset className="checkbox-group create-activity__strategy-group"><legend className="field__label field__label--with-tooltip">What strategy is this project/activity categorized under?<Tooltip content={CREATE_ACTIVITY_TOOLTIPS.strategies} label="More information about strategy categorization" /></legend><div className="checkbox-group__options">{STRATEGY_OPTIONS.map((option) => <Checkbox checked={form.strategies.includes(option.value)} key={option.value} label={option.label} onChange={() => toggleStrategy(option.value)} />)}</div>{errors.strategies ? <span className="field__error">{errors.strategies}</span> : null}</fieldset> : null}
             </div>
           </Card>
           <Card className="create-activity__section create-activity__section--grid-card create-activity__section--timeline">
             <div className="create-activity__section-header"><div className="create-activity__section-header-inner"><span className="create-activity__section-header-icon" aria-hidden="true"><CalendarDays size={17} /></span><div><h2>Activity Timeline</h2><p>Set the planned start and end dates for this activity.</p></div></div></div>
             <div className="create-activity__form-stack"><div className="create-activity__date-range" role="group" aria-label="Activity timeline">
-              <DatePicker error={errors.plannedStartDate} id="planned-start-date" label="Planned Start Date" onChange={(value) => updateForm({ plannedStartDate: value })} required value={form.plannedStartDate} />
+              <DatePicker error={errors.plannedStartDate} id="planned-start-date" label="Planned Start Date" onChange={(value) => updateForm({ plannedStartDate: value })} required tooltip={CREATE_ACTIVITY_TOOLTIPS.plannedStartDate} value={form.plannedStartDate} />
               <span className="create-activity__date-connector" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 5l7 7-7 7" /></svg></span>
-              <DatePicker error={errors.plannedEndDate} id="planned-end-date" label="Planned End Date" min={form.plannedStartDate} onChange={(value) => updateForm({ plannedEndDate: value })} required value={form.plannedEndDate} />
+              <DatePicker error={errors.plannedEndDate} id="planned-end-date" label="Planned End Date" min={form.plannedStartDate} onChange={(value) => updateForm({ plannedEndDate: value })} required tooltip={CREATE_ACTIVITY_TOOLTIPS.plannedEndDate} value={form.plannedEndDate} />
             </div></div>
+          </Card>
+          <Card className="create-activity__section create-activity__section--grid-card create-activity__section--scope-summary">
+            <div className="create-activity__section-header"><div className="create-activity__section-header-inner"><span className="create-activity__section-header-icon" aria-hidden="true"><AlignLeft size={17} /></span><div><h2>Scope &amp; Summary</h2><p>Describe the activity boundaries and expected outcome.</p></div></div></div>
+            <div className="create-activity__form-stack">
+              <Textarea error={errors.scopeDescription} label="Scope" onChange={(event) => updateForm({ scopeDescription: event.target.value })} placeholder="Describe in-scope and out-of-scope boundaries" required tooltip={CREATE_ACTIVITY_TOOLTIPS.scope} value={form.scopeDescription} />
+              <Textarea error={errors.summary} label="Summary" onChange={(event) => updateForm({ summary: event.target.value })} placeholder="Summarize the expected outcome" required tooltip={CREATE_ACTIVITY_TOOLTIPS.summary} value={form.summary} />
+            </div>
+          </Card>
+          </div>
+          <div className="create-activity__card-column create-activity__card-column--right">
+          <Card className="create-activity__section create-activity__section--grid-card create-activity__section--activity-details">
+            <div className="create-activity__section-header"><div className="create-activity__section-header-inner"><span className="create-activity__section-header-icon" aria-hidden="true"><Settings2 size={17} /></span><div><h2>Activity Details</h2><p>Confirm classification, ownership, and reporting requirements.</p></div></div></div>
+            <div className="create-activity__form-stack">
+              <RadioGroup className="create-activity__radio create-activity__radio--classification" error={errors.activityClassification} label="Activity Classification" name="activity-classification" onChange={(value) => updateForm({ activityClassification: value })} options={CLASSIFICATION_OPTIONS.filter((option) => option.value !== '')} required tooltip={CREATE_ACTIVITY_TOOLTIPS.activityClassification} value={form.activityClassification} />
+              {!isPaymentOnly ? <RadioGroup className="create-activity__radio create-activity__radio--yes-no" error={errors.budgetRequired} label="Does this project require Budget?" name="budget-required" onChange={(value) => updateForm({ budgetRequired: value })} options={YES_NO_OPTIONS.filter((option) => option.value !== '')} required tooltip={CREATE_ACTIVITY_TOOLTIPS.budgetRequired} value={form.budgetRequired} /> : <RadioGroup className="create-activity__radio create-activity__radio--yes-no" disabled label="Does this project require Budget?" name="budget-required" onChange={() => undefined} options={YES_NO_OPTIONS.filter((option) => option.value !== '')} required tooltip={CREATE_ACTIVITY_TOOLTIPS.paymentOnlyWarning} tooltipTone="warning" value="1" />}
+              {isBudgetNo ? <RadioGroup className="create-activity__radio create-activity__radio--yes-no" disabled label="Does this project require procurement?" name="procurement-required" onChange={() => undefined} options={YES_NO_OPTIONS.filter((option) => option.value !== '')} required tooltip={CREATE_ACTIVITY_TOOLTIPS.budgetNoWarning} tooltipTone="warning" value="0" /> : <RadioGroup className="create-activity__radio create-activity__radio--yes-no" error={errors.procurementRequired} label="Does this project require procurement?" name="procurement-required" onChange={(value) => updateForm({ procurementRequired: value })} options={YES_NO_OPTIONS.filter((option) => option.value !== '')} required tooltip={CREATE_ACTIVITY_TOOLTIPS.procurementRequired} value={form.procurementRequired} />}
+              <RadioGroup className="create-activity__radio create-activity__radio--yes-no" error={errors.adeoReported} label="Execution plan project reported in ADEO" name="adeo-reported" onChange={(value) => updateForm({ adeoReported: value })} options={YES_NO_OPTIONS.filter((option) => option.value !== '')} required tooltip={CREATE_ACTIVITY_TOOLTIPS.adeoReported} value={form.adeoReported} />
+              <Select className="create-activity__activity-details-full-row" error={errors.activityLeadId} id="activity-lead" label="Activity Lead / PM Name" onChange={(value) => updateForm({ activityLeadId: value })} options={activityLeadOptions.length > 0 ? [{ label: 'Select Activity Lead', value: '' }, ...activityLeadOptions] : [{ label: 'No users available', value: '' }]} required tooltip={CREATE_ACTIVITY_TOOLTIPS.activityLead} value={form.activityLeadId || ''} />
+            </div>
           </Card>
           {isAdeoVisible ? <Card className="create-activity__section create-activity__section--grid-card create-activity__section--adeo">
             <div className="create-activity__section-header"><div className="create-activity__section-header-inner"><span className="create-activity__section-header-icon" aria-hidden="true"><FileText size={17} /></span><div><h2>ADEO Activity Overview</h2><p>Capture the ADEO reporting details required for this activity.</p></div></div></div>
@@ -2270,6 +2291,7 @@ export function CreateActivity() {
           </Card> : null}
           </div>
         </div></div></div>
+        </TooltipProvider>
       ) : (
        <div className="create-activity__copilot">
           <section className="copilot-assistant">

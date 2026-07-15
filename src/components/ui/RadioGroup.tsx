@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react'
+import { Tooltip } from './Tooltip'
 import './ui.css'
 
 type RadioOption<TValue extends string> = {
@@ -17,6 +19,8 @@ type RadioGroupProps<TValue extends string> = {
   onChange: (value: TValue) => void
   options: readonly RadioOption<TValue>[]
   required?: boolean
+  tooltip?: ReactNode
+  tooltipTone?: 'info' | 'warning'
   value: TValue
 }
 
@@ -29,13 +33,16 @@ export function RadioGroup<TValue extends string>({
   onChange,
   options,
   required = false,
+  tooltip,
+  tooltipTone,
   value,
 }: RadioGroupProps<TValue>) {
   return (
     <fieldset className={`radio-group ${error ? 'radio-group--invalid' : ''} ${disabled ? 'radio-group--disabled' : ''} ${className}`.trim()} disabled={disabled}>
-      <legend className="field__label">
+      <legend className={`field__label${tooltip ? ' field__label--with-tooltip' : ''}`}>
         {label}
         {required ? <span aria-hidden="true" className="field__required"> *</span> : null}
+        {tooltip ? <Tooltip content={tooltip} label={`More information about ${label}`} tone={tooltipTone} /> : null}
       </legend>
       <div className="radio-group__options">
         {options.map((option) => {

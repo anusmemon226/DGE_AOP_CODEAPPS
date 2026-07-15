@@ -221,9 +221,9 @@ table td {
 .approvals-page__header-text p,
 .activities-list__header-text p,
 .empty-state p,
-[class*='__description'],
+[class*='__description']:not(.select-menu__description),
 [class*='__supporting-text'],
-[class*='__helper-text'] {
+[class*='__helper-text']:not(.select-menu__meta) {
   font-size: var(--font-size-body) !important;
   line-height: 1.55;
 }
