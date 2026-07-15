@@ -251,23 +251,25 @@ export function ReviewChangesPanel({ activeTab, relatedChanges }: ReviewChangesP
       <div className="edit-activity__review-changes-header">
         <div className="edit-activity__review-changes-title">
           <span className="edit-activity__review-changes-icon" aria-hidden="true">
-            <GitCompareArrows size={19} />
+            <GitCompareArrows size={17} />
           </span>
           <div>
-            <span>Execution review</span>
             <h2>Review Changes</h2>
+            <p>Review submitted execution updates before approving or rejecting them.</p>
           </div>
         </div>
-        <button
-          aria-controls="review-changes-groups"
-          aria-expanded={isExpanded}
-          className="edit-activity__review-changes-toggle"
-          type="button"
-          onClick={() => setIsExpanded((current) => !current)}
-        >
-          <span>{isExpanded ? 'Hide changes' : `Show ${totalChanges} changes`}</span>
-          <ChevronDown size={16} aria-hidden="true" />
-        </button>
+        <div className="edit-activity__review-header-actions">
+          <button
+            aria-controls="review-changes-groups"
+            aria-expanded={isExpanded}
+            className="edit-activity__review-changes-toggle"
+            type="button"
+            onClick={() => setIsExpanded((current) => !current)}
+          >
+            <span>{isExpanded ? 'Hide changes' : `Show ${totalChanges} changes`}</span>
+            <ChevronDown size={16} aria-hidden="true" />
+          </button>
+        </div>
       </div>
 
       {isExpanded ? (
@@ -296,33 +298,28 @@ export function ReviewChangesPanel({ activeTab, relatedChanges }: ReviewChangesP
             <section className="edit-activity__review-group" key={activeGroup.key}>
               <div className="edit-activity__review-group-header">
                 <div className="edit-activity__review-group-title">
-                  <span>{activeGroup.label}</span>
-                  <strong>{activeGroup.description}</strong>
+                  <h3>{activeGroup.label}</h3>
+                  <p>{activeGroup.description}</p>
                 </div>
               </div>
 
-              <div className="edit-activity__review-change-grid">
+              <div className="edit-activity__review-diff-list">
                 {activeGroup.changes.map((change) => (
-                  <article className="edit-activity__review-change-card" key={`${activeGroup.key}-${change.field}`}>
-                    <div className="edit-activity__review-change-top">
-                      <div>
-                        <span className="edit-activity__review-change-label">{activeGroup.label}</span>
-                        <strong>{change.field}</strong>
-                      </div>
+                  <article className="edit-activity__review-diff-row" key={`${activeGroup.key}-${change.field}`}>
+                    <div className="edit-activity__review-diff-field">
+                      <span>{activeGroup.label}</span>
+                      <strong>{change.field}</strong>
                     </div>
-
-                    <div className="edit-activity__review-change-values">
-                      <div className="edit-activity__review-change-value edit-activity__review-change-value--old">
-                        <span>Old value</span>
-                        <strong>{change.oldValue}</strong>
-                      </div>
-                      <span className="edit-activity__review-change-arrow" aria-hidden="true">
-                        <ArrowRight size={15} />
+                    <div className="edit-activity__review-diff-values">
+                      <span className="edit-activity__review-value-chip edit-activity__review-value-chip--old">
+                        {change.oldValue}
                       </span>
-                      <div className="edit-activity__review-change-value edit-activity__review-change-value--new">
-                        <span>New value</span>
-                        <strong>{change.newValue}</strong>
-                      </div>
+                      <span className="edit-activity__review-change-arrow" aria-hidden="true">
+                        <ArrowRight size={14} />
+                      </span>
+                      <span className="edit-activity__review-value-chip edit-activity__review-value-chip--new">
+                        {change.newValue}
+                      </span>
                     </div>
                   </article>
                 ))}

@@ -22,6 +22,18 @@ type ConfirmationDialogProps = {
   title: string
 }
 
+type UnsavedChangesDialogProps = {
+  description: string
+  discardLabel?: string
+  isOpen: boolean
+  isSaving?: boolean
+  onDiscard: () => void
+  onDismiss: () => void
+  onSave: () => void
+  saveLabel: string
+  title: string
+}
+
 export function Modal({ actions, children, isOpen, onClose, title }: ModalProps) {
   useEffect(() => {
     if (!isOpen) {
@@ -120,6 +132,72 @@ export function ConfirmationDialog({
           </Button>
           <Button className={danger ? 'button--danger' : ''} onClick={onConfirm}>
             {confirmLabel}
+          </Button>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+export function UnsavedChangesDialog({
+  description,
+  discardLabel = 'Discard Changes',
+  isOpen,
+  isSaving = false,
+  onDiscard,
+  onDismiss,
+  onSave,
+  saveLabel,
+  title,
+}: UnsavedChangesDialogProps) {
+  const titleId = useId()
+  const descriptionId = useId()
+
+  useEffect(() => {
+    if (!isOpen) return undefined
+
+    const originalOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') onDismiss()
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.body.style.overflow = originalOverflow
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen, onDismiss])
+
+  if (!isOpen) return null
+
+  return (
+    <div className="modal" role="presentation">
+      <button aria-label="Close dialog" className="modal__backdrop" onClick={onDismiss} type="button" />
+      <section
+        aria-describedby={descriptionId}
+        aria-labelledby={titleId}
+        aria-modal="true"
+        className="confirm-dialog confirm-dialog--warning"
+        role="alertdialog"
+      >
+        <button aria-label="Close dialog" className="confirm-dialog__close" onClick={onDismiss} type="button">
+          <X size={16} />
+        </button>
+        <div className="confirm-dialog__icon confirm-dialog__icon--warning">
+          <AlertTriangle size={30} />
+        </div>
+        <div className="confirm-dialog__content">
+          <h2 className="confirm-dialog__title" id={titleId}>{title}</h2>
+          <p className="confirm-dialog__description" id={descriptionId}>{description}</p>
+        </div>
+        <div className="confirm-dialog__actions">
+          <Button disabled={isSaving} onClick={onDiscard} variant="secondary">
+            {discardLabel}
+          </Button>
+          <Button disabled={isSaving} onClick={onSave}>
+            {isSaving ? 'Saving...' : saveLabel}
           </Button>
         </div>
       </section>

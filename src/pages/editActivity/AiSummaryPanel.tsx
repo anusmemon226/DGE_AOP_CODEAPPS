@@ -29,11 +29,10 @@ export function AiSummaryPanel({
             <Sparkles size={16} className="ai-summary-card__sparkle-icon" />
           </div>
           <div className="ai-summary-card__titles">
-            <span className="ai-summary-card__subtitle">AI Insights</span>
             <h2 className="ai-summary-card__title">{title}</h2>
+            <p className="ai-summary-card__description">AI-generated summary based on the latest saved activity data.</p>
           </div>
         </div>
-
       </div>
 
       <div className="ai-summary-card__body">

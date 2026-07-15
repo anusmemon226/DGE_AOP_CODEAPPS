@@ -17,6 +17,7 @@ import {
   type LanguageCode,
   type ThemeMode,
 } from '../../constants/app'
+import { useNavigationGuard } from '../../contexts/useNavigationGuard'
 import { APP_ROUTE_PATHS } from '../../routes/appRoutes'
 import {
   fetchAssessmentCycles,
@@ -112,6 +113,7 @@ function getInitials(name: string | null | undefined): string {
 export function Header() {
   const dispatch = useAppDispatch()
   const navigate = useNavigate()
+  const { confirmNavigation } = useNavigationGuard()
   const { assessmentCycles, assessmentCyclesLoading, currentUser, isNotificationPanelOpen, language, notifications, selectedCycle, selectedRole, themeMode } = useAppSelector(
     (state) => state.app,
   )
@@ -242,12 +244,29 @@ export function Header() {
   function handleCycleSelect(cycleId: string) {
     const isChangingCycle = cycleId !== selectedCycle
 
-    dispatch(setSelectedCycle(cycleId))
-    setIsCycleOpen(false)
-
-    if (isChangingCycle) {
-      navigate(APP_ROUTE_PATHS.dashboard)
+    if (!isChangingCycle) {
+      setIsCycleOpen(false)
+      return
     }
+
+    confirmNavigation(() => {
+      dispatch(setSelectedCycle(cycleId))
+      setIsCycleOpen(false)
+      navigate(APP_ROUTE_PATHS.dashboard)
+    })
+  }
+
+  function handleRoleSelect(role: UserRole) {
+    confirmNavigation(() => {
+      setStoredRoleAssignmentId(role.roleId)
+      dispatch(setCurrentRole(role))
+      // Backward compat: set old-style selectedRole for other pages
+      const mapped = REVERSE_ROLE_MAP[role.roleName]
+      if (mapped) {
+        dispatch(setSelectedRole(mapped))
+      }
+      setIsRoleOpen(false)
+    })
   }
 
   return (
@@ -426,16 +445,7 @@ export function Header() {
                       <button
                         className={`role-popover__item ${isSelected ? 'role-popover__item--selected' : ''}`}
                         key={role.roleId}
-                        onClick={() => {
-                          setStoredRoleAssignmentId(role.roleId)
-                          dispatch(setCurrentRole(role))
-                          // Backward compat: set old-style selectedRole for other pages
-                          const mapped = REVERSE_ROLE_MAP[role.roleName]
-                          if (mapped) {
-                            dispatch(setSelectedRole(mapped))
-                          }
-                          setIsRoleOpen(false)
-                        }}
+                        onClick={() => handleRoleSelect(role)}
                         type="button"
                       >
                         <span className="role-popover__item-icon">

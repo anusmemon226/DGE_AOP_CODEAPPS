@@ -64,9 +64,11 @@ import type { EditActivityOperationNotifier } from './types/operationAlert'
 
 export type BudgetHeaderAction = {
   canSave: boolean
+  discardChanges?: () => void
+  hasUnsavedChanges?: boolean
   isSaving: boolean
   label: string
-  onSave: () => void
+  onSave: () => Promise<boolean> | boolean
   savingLabel: string
 }
 
@@ -502,6 +504,10 @@ function validateDetailDraft(draft: BudgetDetailDraft) {
   return errors
 }
 
+function isSameBudgetForm(left: BudgetFormData, right: BudgetFormData) {
+  return JSON.stringify(left) === JSON.stringify(right)
+}
+
 export function BudgetTab({
   activityScope,
   aiSummaryBlocks,
@@ -523,6 +529,7 @@ export function BudgetTab({
   statusCode = 1,
 }: BudgetTabProps) {
   const [form, setForm] = useState<BudgetFormData>(INITIAL_BUDGET_FORM)
+  const [savedForm, setSavedForm] = useState<BudgetFormData>(INITIAL_BUDGET_FORM)
   const [monthRecords, setMonthRecords] = useState<BudgetMonthRecord[]>([])
   const [accountCodeOptions, setAccountCodeOptions] = useState<SelectOption<string>[]>([])
   const [errors, setErrors] = useState<BudgetFieldErrors & { context?: string; submit?: string }>({})
@@ -561,6 +568,7 @@ export function BudgetTab({
 
   const hasAllMonthlyRows = missingMonths.length === 0
   const saveLabel = statusCode === 1 ? 'Save Draft' : 'Save Changes'
+  const hasUnsavedChanges = !isSameBudgetForm(form, savedForm)
   const actualBudgetSpent = monthRecords.reduce((sum, record) => sum + record.actualBudget, 0)
   const remainingBudget = parseNum(form.allocatedBudget) - actualBudgetSpent
   const accountCodeOptionMap = useMemo(
@@ -750,6 +758,7 @@ export function BudgetTab({
           setInlineDeliveredErrors({})
           setMonthRecords(monthsWithDetails)
           setForm(nextForm)
+          setSavedForm(nextForm)
           return
         }
 
@@ -759,7 +768,9 @@ export function BudgetTab({
         )
         setInlineDeliveredErrors({})
         setMonthRecords(months)
-        setForm(buildForm(project, months))
+        const nextForm = buildForm(project, months)
+        setForm(nextForm)
+        setSavedForm(nextForm)
       } catch (error) {
         if (isMounted) {
           setErrors({
@@ -822,18 +833,18 @@ export function BudgetTab({
   }
 
   const handleSave = useCallback(async () => {
-    if (isReadOnly) return
-    if (isSaving) return
+    if (isReadOnly) return false
+    if (isSaving) return false
 
     if (!projectId) {
       setErrors({ context: 'Activity id is missing from the edit URL.' })
-      return
+      return false
     }
 
     const nextErrors = validateBudgetForm(form, showTotalActivityBudget, hasAllMonthlyRows)
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors)
-      return
+      return false
     }
 
     setIsSaving(true)
@@ -876,12 +887,15 @@ export function BudgetTab({
         title: 'Budget saved',
       })
       onActivityDataChanged?.()
+      setSavedForm(form)
+      return true
     } catch (error) {
       onOperationAlert?.({
         kind: 'error',
         message: error instanceof Error ? error.message : 'Failed to save budget information.',
         title: 'Budget was not saved',
       })
+      return false
     } finally {
       setIsSaving(false)
     }
@@ -908,6 +922,8 @@ export function BudgetTab({
 
     onHeaderActionChange?.({
       canSave: !isReadOnly && !isLoading && !isSaving && !errors.context,
+      discardChanges: () => setForm(savedForm),
+      hasUnsavedChanges,
       isSaving,
       label: saveLabel,
       onSave: handleSave,
@@ -915,7 +931,7 @@ export function BudgetTab({
     })
 
     return () => onHeaderActionChange?.(null)
-  }, [errors.context, executionMonthlyEditAllowed, handleSave, isLoading, isReadOnly, isSaving, onHeaderActionChange, saveLabel])
+  }, [errors.context, executionMonthlyEditAllowed, handleSave, hasUnsavedChanges, isLoading, isReadOnly, isSaving, onHeaderActionChange, saveLabel, savedForm])
 
   function updateMonthRecord(monthId: string, updater: (current: BudgetMonthRecord) => BudgetMonthRecord) {
     setMonthRecords((current) =>

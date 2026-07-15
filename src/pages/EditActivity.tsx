@@ -21,9 +21,10 @@ import {
   Wallet,
   X,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Badge, Button, ConfirmationDialog, Modal, Textarea, type SelectOption } from '../components/ui'
+import { Badge, Button, ConfirmationDialog, Textarea, UnsavedChangesDialog, type SelectOption } from '../components/ui'
+import { useNavigationGuard } from '../contexts/useNavigationGuard'
 import {
   Dga_aop_projectsesdga_project_activity_status,
   Dga_aop_projectsesstatuscode,
@@ -99,6 +100,10 @@ type TabId =
   | 'budget'
   | 'clarifications'
   | 'logs'
+
+type PendingNavigation = {
+  action: () => void
+}
 
 type TabConfig = {
   id: TabId
@@ -795,11 +800,25 @@ function buildPmoActivityInfoUpdatePayload(form: ActivityForm): Partial<Omit<Dga
   }
 }
 
+function areActivityFormsEqual(left: ActivityForm, right: ActivityForm) {
+  return (Object.keys(INITIAL_FORM) as Array<keyof ActivityForm>).every((key) => {
+    const leftValue = left[key]
+    const rightValue = right[key]
+
+    if (Array.isArray(leftValue) || Array.isArray(rightValue)) {
+      return JSON.stringify(leftValue ?? []) === JSON.stringify(rightValue ?? [])
+    }
+
+    return String(leftValue ?? '') === String(rightValue ?? '')
+  })
+}
+
 
 // ── Component ──
 
 export function EditActivity() {
   const navigate = useNavigate()
+  const { confirmNavigation, registerNavigationGuard } = useNavigationGuard()
   const [searchParams] = useSearchParams()
   const projectId = searchParams.get('id') ?? ''
   const selectedRole = useAppSelector((state) => state.app.selectedRole)
@@ -809,6 +828,7 @@ export function EditActivity() {
   const [isStickyStageTabsVisible, setIsStickyStageTabsVisible] = useState(false)
   const [activity, setActivity] = useState<Dga_aop_projectses | null>(null)
   const [form, setForm] = useState<ActivityForm>(INITIAL_FORM)
+  const [activityInfoSavedForm, setActivityInfoSavedForm] = useState<ActivityForm>(INITIAL_FORM)
   const [errors, setErrors] = useState<FieldErrors>({})
   const [activityLeadOptions, setActivityLeadOptions] = useState<SelectOption<string>[]>([])
   const [isContextLoading, setIsContextLoading] = useState(true)
@@ -820,6 +840,8 @@ export function EditActivity() {
   const [createdByName, setCreatedByName] = useState('')
   const [objectiveHeaderAction, setObjectiveHeaderAction] = useState<ObjectiveHeaderAction | null>(null)
   const [budgetHeaderAction, setBudgetHeaderAction] = useState<BudgetHeaderAction | null>(null)
+  const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation | null>(null)
+  const [isUnsavedDialogSaving, setIsUnsavedDialogSaving] = useState(false)
   const [isSubmitConfirmOpen, setIsSubmitConfirmOpen] = useState(false)
   const [isSubmittingToDirector, setIsSubmittingToDirector] = useState(false)
   const [isStrategySubmitConfirmOpen, setIsStrategySubmitConfirmOpen] = useState(false)
@@ -835,7 +857,7 @@ export function EditActivity() {
   const [isActivityUpdateSubmitConfirmOpen, setIsActivityUpdateSubmitConfirmOpen] = useState(false)
   const [isExecutionApproveConfirmOpen, setIsExecutionApproveConfirmOpen] = useState(false)
   const [isApprovingExecutionUpdates, setIsApprovingExecutionUpdates] = useState(false)
-  const [isExecutionRejectModalOpen, setIsExecutionRejectModalOpen] = useState(false)
+  const [isExecutionRejectFormOpen, setIsExecutionRejectFormOpen] = useState(false)
   const [isRejectingExecutionUpdates, setIsRejectingExecutionUpdates] = useState(false)
   const [executionRejectionReason, setExecutionRejectionReason] = useState('')
   const [executionRejectionError, setExecutionRejectionError] = useState('')
@@ -1160,6 +1182,19 @@ export function EditActivity() {
   const canShowExecutiveDirectorReviewActions = !isExecutiveDirector
   const canShowDirectorGeneralReviewActions = !isDirectorGeneral
   const canShowHeaderSaveActions = canShowDivisionMemberEditActions && canShowDivisionDirectorReviewActions && canShowExecutiveDirectorReviewActions && canShowDirectorGeneralReviewActions
+  const activityInfoHasUnsavedChanges = !areActivityFormsEqual(form, activityInfoSavedForm)
+  const activeTabHasUnsavedChanges = activeTab === 'activity-info'
+    ? activityInfoHasUnsavedChanges && editPermissions.activityInfoCanSave
+    : activeTab === 'objectives'
+      ? Boolean(objectiveHeaderAction?.hasUnsavedChanges)
+      : activeTab === 'budget'
+        ? Boolean(budgetHeaderAction?.hasUnsavedChanges)
+        : false
+  const activeSaveLabel = activeTab === 'objectives'
+    ? objectiveHeaderAction?.label ?? (statusCode === 1 ? 'Save Draft' : 'Save Changes')
+    : activeTab === 'budget'
+      ? budgetHeaderAction?.label ?? (statusCode === 1 ? 'Save Draft' : 'Save Changes')
+      : statusCode === 1 ? 'Save Draft' : 'Save Changes'
 
   // ── Context loading ──
 
@@ -1371,7 +1406,7 @@ export function EditActivity() {
         setPendingWith(ownerName || 'Not assigned')
         setCreatedByName(nextCreatedByName)
         setActivity(project)
-        setForm(applyActivityInformationRelatedChanges(
+        const loadedForm = applyActivityInformationRelatedChanges(
           projectToActivityForm(project, {
             sectorId: project._dga_sector_value ?? sector?.dga_divisional_hierarchyid ?? '',
             sectorName: sector?.dga_name ?? '',
@@ -1379,7 +1414,9 @@ export function EditActivity() {
             divisionName: division?.dga_name ?? '',
           }),
           project.dga_project_related_changes,
-        ))
+        )
+        setForm(loadedForm)
+        setActivityInfoSavedForm(loadedForm)
       } catch (error) {
         if (isMounted) {
           setErrors({ context: error instanceof Error ? error.message : 'Failed to load context.' })
@@ -1448,6 +1485,112 @@ export function EditActivity() {
     })
   }
 
+  async function saveActiveTabForNavigation() {
+    if (activeTab === 'activity-info') {
+      return handleSaveActivityInfo()
+    }
+
+    if (activeTab === 'objectives' && objectiveHeaderAction) {
+      const result = await objectiveHeaderAction.onSave()
+      return result !== false
+    }
+
+    if (activeTab === 'budget' && budgetHeaderAction) {
+      const result = await budgetHeaderAction.onSave()
+      return result !== false
+    }
+
+    return true
+  }
+
+  const discardActiveTabChanges = useCallback(() => {
+    if (activeTab === 'activity-info') {
+      setForm(activityInfoSavedForm)
+      setErrors((currentErrors) => ({ ...currentErrors, submit: undefined }))
+      return
+    }
+
+    if (activeTab === 'objectives') {
+      objectiveHeaderAction?.discardChanges?.()
+      return
+    }
+
+    if (activeTab === 'budget') {
+      budgetHeaderAction?.discardChanges?.()
+    }
+  }, [activeTab, activityInfoSavedForm, budgetHeaderAction, objectiveHeaderAction])
+
+  const handleNavigationGuardRequest = useCallback((action: () => void) => {
+    if (!activeTabHasUnsavedChanges) {
+      action()
+      return true
+    }
+
+    setPendingNavigation({ action })
+    return false
+  }, [activeTabHasUnsavedChanges])
+
+  useEffect(() => {
+    return registerNavigationGuard(handleNavigationGuardRequest)
+  }, [handleNavigationGuardRequest, registerNavigationGuard])
+
+  useEffect(() => {
+    if (!activeTabHasUnsavedChanges) return undefined
+
+    function handleBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [activeTabHasUnsavedChanges])
+
+  async function handleSaveUnsavedChangesAndContinue() {
+    if (!pendingNavigation || isUnsavedDialogSaving) return
+
+    setIsUnsavedDialogSaving(true)
+    try {
+      const saved = await saveActiveTabForNavigation()
+      if (!saved) {
+        setPendingNavigation(null)
+        return
+      }
+
+      const nextAction = pendingNavigation.action
+      setPendingNavigation(null)
+      nextAction()
+    } finally {
+      setIsUnsavedDialogSaving(false)
+    }
+  }
+
+  function handleDiscardUnsavedChangesAndContinue() {
+    if (!pendingNavigation || isUnsavedDialogSaving) return
+
+    discardActiveTabChanges()
+    const nextAction = pendingNavigation.action
+    setPendingNavigation(null)
+    nextAction()
+  }
+
+  function handleDismissUnsavedChangesDialog() {
+    if (isUnsavedDialogSaving) return
+    setPendingNavigation(null)
+  }
+
+  function handleGuardedRouteClick(event: MouseEvent<HTMLAnchorElement>, path: string) {
+    if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
+      return
+    }
+
+    event.preventDefault()
+    confirmNavigation(() => navigate(path))
+  }
+
   // ── Action handlers ──
 
   async function handleSaveActivityInfo() {
@@ -1459,7 +1602,7 @@ export function EditActivity() {
         message: 'You do not have permission to edit Activity Information for this activity.',
         title: 'Activity information was not saved',
       })
-      return
+      return false
     }
 
     if (!projectId) {
@@ -1467,7 +1610,7 @@ export function EditActivity() {
         ...currentErrors,
         context: 'Activity id is missing from the edit URL.',
       }))
-      return
+      return false
     }
 
     const nextErrors = editPermissions.isPmoClassificationOnly
@@ -1478,7 +1621,7 @@ export function EditActivity() {
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors)
       setActiveTab('activity-info')
-      return
+      return false
     }
 
     setIsSavingActivityInfo(true)
@@ -1576,13 +1719,16 @@ export function EditActivity() {
       } : currentActivity)
       setErrors((currentErrors) => ({ ...currentErrors, submit: undefined }))
       setSuccessMessage('Activity information saved successfully.')
+      setActivityInfoSavedForm(form)
       refreshActivityAiSummary('activity-information-save')
+      return true
     } catch (error) {
       setTabOperationAlert({
         kind: 'error',
         message: error instanceof Error ? error.message : 'Failed to save activity information.',
         title: 'Activity information was not saved',
       })
+      return false
     } finally {
       setIsSavingActivityInfo(false)
     }
@@ -2591,8 +2737,15 @@ export function EditActivity() {
     if (!canReviewExecutionUpdates || isRejectingExecutionUpdates) return
     setExecutionRejectionReason('')
     setExecutionRejectionError('')
-    setIsExecutionRejectModalOpen(true)
+    setIsExecutionRejectFormOpen(true)
   }, [canReviewExecutionUpdates, isRejectingExecutionUpdates])
+
+  const handleCancelRejectExecutionUpdates = useCallback(() => {
+    if (isRejectingExecutionUpdates) return
+    setExecutionRejectionReason('')
+    setExecutionRejectionError('')
+    setIsExecutionRejectFormOpen(false)
+  }, [isRejectingExecutionUpdates])
 
   const handleConfirmRejectExecutionUpdates = useCallback(async () => {
     if (!canReviewExecutionUpdates || isRejectingExecutionUpdates) return
@@ -2641,7 +2794,7 @@ export function EditActivity() {
       setExecutionRejectionReason('')
       setExecutionRejectionError('')
       setSuccessMessage('Activity updates rejected and returned to Division Member.')
-      setIsExecutionRejectModalOpen(false)
+      setIsExecutionRejectFormOpen(false)
       refreshActivityAiSummary('reject-execution-updates')
     } catch (error) {
       setExecutionRejectionError(error instanceof Error ? error.message : 'Failed to reject activity updates.')
@@ -2673,9 +2826,12 @@ export function EditActivity() {
 
   function handleStageTabClick(tabId: TabId, locked: boolean) {
     if (locked) return
+    if (tabId === activeTab) return
 
-    setActiveTab(tabId)
-    scrollPageToTop()
+    confirmNavigation(() => {
+      setActiveTab(tabId)
+      scrollPageToTop()
+    })
   }
 
   function renderStageTabs({
@@ -2986,7 +3142,7 @@ export function EditActivity() {
             {isApprovingExecutionUpdates ? 'Approving...' : 'Approve Activity'}
           </Button>
         ) : null}
-        {canReviewExecutionUpdates ? (
+        {canReviewExecutionUpdates && !isExecutionRejectFormOpen ? (
           <Button
             className="button--danger"
             disabled={isRejectingExecutionUpdates || Boolean(errors.context)}
@@ -2996,6 +3152,41 @@ export function EditActivity() {
           >
             {isRejectingExecutionUpdates ? 'Rejecting...' : 'Reject Activity'}
           </Button>
+        ) : null}
+        {canReviewExecutionUpdates && isExecutionRejectFormOpen ? (
+          <div className="edit-activity__inline-rejection">
+            <p>
+              Please provide a rejection reason. The submitted execution updates will be discarded and the activity will return to the Division Member.
+            </p>
+            <Textarea
+              disabled={isRejectingExecutionUpdates}
+              error={executionRejectionError}
+              label="Rejection Reason"
+              onChange={(event) => {
+                setExecutionRejectionReason(event.target.value)
+                if (executionRejectionError) setExecutionRejectionError('')
+              }}
+              required
+              rows={4}
+              value={executionRejectionReason}
+            />
+            <div className="edit-activity__inline-rejection-actions">
+              <Button
+                disabled={isRejectingExecutionUpdates}
+                onClick={handleCancelRejectExecutionUpdates}
+                variant="secondary"
+              >
+                Cancel
+              </Button>
+              <Button
+                className="button--danger"
+                disabled={isRejectingExecutionUpdates}
+                onClick={handleConfirmRejectExecutionUpdates}
+              >
+                {isRejectingExecutionUpdates ? 'Rejecting...' : 'Confirm Reject'}
+              </Button>
+            </div>
+          </div>
         ) : null}
         {isDivisionMember && editPermissions.canStartActivity ? (
           <Button disabled={isStartingActivity || Boolean(errors.context)} icon={<Send size={16} />} onClick={handleStartActivity}>
@@ -3327,7 +3518,7 @@ export function EditActivity() {
           <Button
             className="edit-activity__back-link"
             icon={<ArrowLeft size={14} />}
-            onClick={() => navigate(APP_ROUTE_PATHS.activitiesList)}
+            onClick={() => confirmNavigation(() => navigate(APP_ROUTE_PATHS.activitiesList))}
             variant="ghost"
           >
             Back to Activities
@@ -3391,9 +3582,9 @@ export function EditActivity() {
         </div>
 
         <nav aria-label="Breadcrumb" className="create-activity__breadcrumb">
-          <Link to={APP_ROUTE_PATHS.dashboard}>Dashboard</Link>
+          <Link onClick={(event) => handleGuardedRouteClick(event, APP_ROUTE_PATHS.dashboard)} to={APP_ROUTE_PATHS.dashboard}>Dashboard</Link>
           <ChevronRight aria-hidden="true" size={14} />
-          <Link to={APP_ROUTE_PATHS.activitiesList}>Activities</Link>
+          <Link onClick={(event) => handleGuardedRouteClick(event, APP_ROUTE_PATHS.activitiesList)} to={APP_ROUTE_PATHS.activitiesList}>Activities</Link>
           <ChevronRight aria-hidden="true" size={14} />
           <span title={activityName}>{activityName}</span>
         </nav>
@@ -3566,51 +3757,17 @@ export function EditActivity() {
         title="Approve Activity Updates"
       />
 
-      <Modal
-        actions={(
-          <>
-            <Button
-              disabled={isRejectingExecutionUpdates}
-              onClick={() => {
-                if (!isRejectingExecutionUpdates) setIsExecutionRejectModalOpen(false)
-              }}
-              variant="secondary"
-            >
-              Cancel
-            </Button>
-            <Button
-              className="button--danger"
-              disabled={isRejectingExecutionUpdates}
-              onClick={handleConfirmRejectExecutionUpdates}
-            >
-              {isRejectingExecutionUpdates ? 'Rejecting...' : 'Confirm Reject'}
-            </Button>
-          </>
-        )}
-        isOpen={isExecutionRejectModalOpen}
-        onClose={() => {
-          if (!isRejectingExecutionUpdates) setIsExecutionRejectModalOpen(false)
-        }}
-        title="Reject Activity Updates"
-      >
-        <div className="edit-activity__procurement-drawer-section">
-          <p className="confirm-dialog__description">
-            Please provide a rejection reason. The submitted execution updates will be discarded and the activity will return to the Division Member.
-          </p>
-          <Textarea
-            disabled={isRejectingExecutionUpdates}
-            error={executionRejectionError}
-            label="Rejection Reason"
-            onChange={(event) => {
-              setExecutionRejectionReason(event.target.value)
-              if (executionRejectionError) setExecutionRejectionError('')
-            }}
-            required
-            rows={5}
-            value={executionRejectionReason}
-          />
-        </div>
-      </Modal>
+      <UnsavedChangesDialog
+        description="You have unsaved changes on this activity. Save your changes before leaving, or discard them to continue without saving."
+        isOpen={Boolean(pendingNavigation)}
+        isSaving={isUnsavedDialogSaving}
+        onDiscard={handleDiscardUnsavedChangesAndContinue}
+        onDismiss={handleDismissUnsavedChangesDialog}
+        onSave={handleSaveUnsavedChangesAndContinue}
+        saveLabel={activeSaveLabel}
+        title="Unsaved changes"
+      />
+
     </div>
   )
 }

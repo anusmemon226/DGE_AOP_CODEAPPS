@@ -90,14 +90,19 @@ function groupByDate(messages: ClarificationMessage[]) {
 export function ClarificationTab() {
   const [messages, setMessages] = useState<ClarificationMessage[]>([])
   const [inputValue, setInputValue] = useState('')
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const grouped = useMemo(() => groupByDate(messages), [messages])
 
   // Scroll to bottom on new messages
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (messages.length === 0) return
+
+    const messagesElement = messagesRef.current
+    if (!messagesElement) return
+
+    messagesElement.scrollTop = messagesElement.scrollHeight
   }, [messages])
 
   function handleSend() {
@@ -147,7 +152,7 @@ export function ClarificationTab() {
       </div>
 
       {/* ── Messages area ── */}
-      <div className="edit-activity__clar-messages">
+      <div className="edit-activity__clar-messages" ref={messagesRef}>
         {grouped.length === 0 ? (
           <div className="edit-activity__clar-empty">
             <HelpCircle size={32} />
@@ -164,7 +169,6 @@ export function ClarificationTab() {
             </div>
           ))
         )}
-        <div ref={messagesEndRef} />
       </div>
 
       {/* ── Input area ── */}

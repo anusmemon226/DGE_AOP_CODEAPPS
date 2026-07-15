@@ -43,8 +43,10 @@ type ObjectivesTabProps = {
 
 export type ObjectiveHeaderAction = {
   canSave: boolean
+  discardChanges?: () => void
+  hasUnsavedChanges?: boolean
   label: string
-  onSave: () => void
+  onSave: () => Promise<boolean> | boolean
   savingLabel: string
   isSaving: boolean
 }
@@ -333,8 +335,8 @@ export function ObjectivesTab({
   const saveLabel = statusCode === 1 ? 'Save Draft' : 'Save Changes'
 
   const saveObjectives = useCallback(async (nextForm: ObjectiveForm, successMessage = 'Objectives saved successfully.') => {
-    if (isReadOnly) return
-    if (!projectId || isSaving) return
+    if (isReadOnly) return false
+    if (!projectId || isSaving) return false
 
     setIsSaving(true)
     setError('')
@@ -345,12 +347,14 @@ export function ObjectivesTab({
       setSavedForm(nextForm)
       onOperationAlert?.({ kind: 'success', message: successMessage, title: 'Objectives saved' })
       onActivityDataChanged?.()
+      return true
     } catch (saveError) {
       onOperationAlert?.({
         kind: 'error',
         message: saveError instanceof Error ? saveError.message : 'Unable to save objective links.',
         title: 'Objectives were not saved',
       })
+      return false
     } finally {
       setIsSaving(false)
     }
@@ -379,8 +383,8 @@ export function ObjectivesTab({
     })
   }, [isReadOnly])
 
-  const handleSave = useCallback(() => {
-    if (!canSave) return
+  const handleSave = useCallback(async () => {
+    if (!canSave) return false
 
     const nextErrors = validateObjectiveForm(form)
     if (form.digitalPillarId && !selectedDigitalObjectiveId) {
@@ -391,26 +395,28 @@ export function ObjectivesTab({
     }
     if (Object.keys(nextErrors).length > 0) {
       setFieldErrors(nextErrors)
-      return
+      return false
     }
 
     if (!hasUnsavedChanges) {
       onOperationAlert?.({ kind: 'success', message: 'No objective changes to save.', title: 'Objectives already current' })
-      return
+      return true
     }
 
-    void saveObjectives(form)
+    return saveObjectives(form)
   }, [canSave, form, hasUnsavedChanges, onOperationAlert, saveObjectives, selectedDigitalObjectiveId, selectedStrategicKpiId])
 
   useEffect(() => {
     onHeaderActionChange?.(!isLoading ? {
       canSave,
+      discardChanges: () => setForm(savedForm),
+      hasUnsavedChanges,
       isSaving,
       label: saveLabel,
       onSave: handleSave,
       savingLabel: 'Saving...',
     } : null)
-  }, [canSave, handleSave, isLoading, isSaving, onHeaderActionChange, saveLabel])
+  }, [canSave, handleSave, hasUnsavedChanges, isLoading, isSaving, onHeaderActionChange, saveLabel, savedForm])
 
   useEffect(() => {
     return () => onHeaderActionChange?.(null)

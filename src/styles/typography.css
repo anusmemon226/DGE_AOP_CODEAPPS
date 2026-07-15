@@ -116,7 +116,7 @@ b {
 [class*='__chip'],
 [class*='__pill'],
 [class*='capsule'],
-[class*='badge'] {
+[class*='badge']:not(.ai-summary-card__badge):not(.ai-summary-badge) {
   font-size: var(--font-size-caption) !important;
   font-weight: var(--font-weight-semibold) !important;
 }
@@ -220,11 +220,17 @@ table td {
 .approvals-page__header-text p,
 .activities-list__header-text p,
 .empty-state p,
-[class*='__description']:not(.select-menu__description),
+[class*='__description']:not(.select-menu__description):not(.confirm-dialog__description):not(.ai-summary-card__description),
 [class*='__supporting-text'],
 [class*='__helper-text']:not(.select-menu__meta) {
   font-size: var(--font-size-body) !important;
   line-height: 1.55;
+}
+
+.confirm-dialog .confirm-dialog__description {
+  font-size: 0.78rem !important;
+  font-weight: var(--font-weight-regular) !important;
+  line-height: 1.55 !important;
 }
 
 .app-layout,

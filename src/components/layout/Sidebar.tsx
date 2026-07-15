@@ -1,6 +1,7 @@
 import { ChevronsLeft, ChevronsRight, X } from 'lucide-react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import logoSource from '../../assets/Logo.ts?raw'
+import { useNavigationGuard } from '../../contexts/useNavigationGuard'
 import { getNavigationForRole } from '../../utils/permissions'
 import { closeMobileSidebar, toggleSidebarCollapsed } from '../../store/appSlice'
 import { useAppDispatch, useAppSelector } from '../../store/hooks'
@@ -28,6 +29,9 @@ function getInitials(name: string): string {
 
 export function Sidebar() {
   const dispatch = useAppDispatch()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const { confirmNavigation } = useNavigationGuard()
   const { isMobileSidebarOpen, isSidebarCollapsed, selectedRole } = useAppSelector((state) => state.app)
   const { currentRole, currentRolesDivisionalHierarchies } = useAppSelector((state) => state.user)
   const navigationItems = getNavigationForRole(selectedRole)
@@ -68,7 +72,22 @@ export function Sidebar() {
                 aria-label={item.label}
                 className={({ isActive }) => `sidebar__link ${isActive ? 'sidebar__link--active' : ''}`}
                 key={item.id}
-                onClick={() => dispatch(closeMobileSidebar())}
+                onClick={(event) => {
+                  if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
+                    return
+                  }
+
+                  event.preventDefault()
+                  if (item.path === location.pathname) {
+                    dispatch(closeMobileSidebar())
+                    return
+                  }
+
+                  confirmNavigation(() => {
+                    dispatch(closeMobileSidebar())
+                    navigate(item.path)
+                  })
+                }}
                 to={item.path}
                 title={item.label}
               >

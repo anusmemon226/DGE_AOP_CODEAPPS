@@ -1,4 +1,4 @@
-import { useEffect, useState, type ChangeEvent } from 'react'
+import { useEffect, useState, type ChangeEvent, type MouseEvent } from 'react'
 import { AlignLeft, Bot, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, FileSpreadsheet, FileText, Paperclip, RefreshCcw, Save, Send, Settings2, Sparkles, Trash2, UploadCloud } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import * as XLSX from 'xlsx'
@@ -15,8 +15,10 @@ import {
   Textarea,
   Tooltip,
   TooltipProvider,
+  UnsavedChangesDialog,
   type SelectOption,
 } from '../components/ui'
+import { useNavigationGuard } from '../contexts/useNavigationGuard'
 import { Dga_aop_projectsesService } from '../generated/services/Dga_aop_projectsesService'
 import { Dga_project_planning_instancesService } from '../generated/services/Dga_project_planning_instancesService'
 import { PowerApps_V2__RetrieveAOPProjectDatafromExcelService } from '../generated/services/PowerApps_V2__RetrieveAOPProjectDatafromExcelService'
@@ -65,6 +67,10 @@ type CreateActivityForm = {
 }
 
 type FieldErrors = Partial<Record<keyof CreateActivityForm | 'submit' | 'context', string>>
+
+type PendingNavigation = {
+  action: () => void
+}
 
 const FIELD_LABELS: Partial<Record<keyof CreateActivityForm, string>> = {
   activityName: 'Activity / Initiative Name',
@@ -232,6 +238,19 @@ const INITIAL_FORM: CreateActivityForm = {
   activityKpi: '',
   activityPlan: '',
   risks: '',
+}
+
+function areCreateActivityFormsEqual(left: CreateActivityForm, right: CreateActivityForm) {
+  return (Object.keys(INITIAL_FORM) as Array<keyof CreateActivityForm>).every((key) => {
+    const leftValue = left[key]
+    const rightValue = right[key]
+
+    if (Array.isArray(leftValue) || Array.isArray(rightValue)) {
+      return JSON.stringify(leftValue ?? []) === JSON.stringify(rightValue ?? [])
+    }
+
+    return String(leftValue ?? '') === String(rightValue ?? '')
+  })
 }
 
 const ACTIVITY_TYPE_OPTIONS = [
@@ -1340,6 +1359,7 @@ function resolveCreationContext({
 
 export function CreateActivity() {
   const navigate = useNavigate()
+  const { confirmNavigation, registerNavigationGuard } = useNavigationGuard()
   const {
     assessmentCycles,
     planningInstances,
@@ -1356,6 +1376,7 @@ export function CreateActivity() {
   } = useAppSelector((state) => state.user)
   const activeTab: TabValue = 'manual'
   const [form, setForm] = useState<CreateActivityForm>(INITIAL_FORM)
+  const [savedForm, setSavedForm] = useState<CreateActivityForm>(INITIAL_FORM)
   const [errors, setErrors] = useState<FieldErrors>({})
   const [context, setContext] = useState<ActivityContext | null>(null)
   const [activityLeadOptions, setActivityLeadOptions] = useState<SelectOption<string>[]>([])
@@ -1373,11 +1394,14 @@ export function CreateActivity() {
   const [aiImportedActivities, setAiImportedActivities] = useState<AiImportedActivityPreview[]>([])
   const [selectedAiActivityIds, setSelectedAiActivityIds] = useState<string[]>([])
   const [expandedAiActivityIds, setExpandedAiActivityIds] = useState<string[]>([])
+  const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation | null>(null)
+  const [isUnsavedDialogSaving, setIsUnsavedDialogSaving] = useState(false)
   const cycle = assessmentCycles.find((item) => item.dga_assessment_cycleid === selectedCycle)
   const isStrategic = form.activityScope === '1'
   const isPaymentOnly = form.activityClassification === '576610002'
   const isBudgetNo = form.budgetRequired === '0'
   const isAdeoVisible = form.adeoReported === '1'
+  const hasUnsavedChanges = !createdProjectId && !areCreateActivityFormsEqual(form, savedForm)
   useEffect(() => {
     let isMounted = true
 
@@ -1423,13 +1447,15 @@ export function CreateActivity() {
             meta: user.internalemailaddress,
           })),
         )
-        setForm({
+        const nextForm = {
           ...INITIAL_FORM,
           divisionId: nextContext.division.dga_divisional_hierarchyid,
           divisionName: nextContext.division.dga_name,
           sectorId: nextContext.sector.dga_divisional_hierarchyid,
           sectorName: nextContext.sector.dga_name,
-        })
+        }
+        setForm(nextForm)
+        setSavedForm(nextForm)
         resetAiImportState()
         setSuccessMessage('')
         setCreationWarning('')
@@ -1919,14 +1945,59 @@ export function CreateActivity() {
     return matches.length === 0
   }
 
-  async function saveDraft() {
-    if (isSaving) {
+  useEffect(() => {
+    return registerNavigationGuard((action) => {
+      if (!hasUnsavedChanges) {
+        action()
+        return true
+      }
+
+      setPendingNavigation({ action })
+      return false
+    })
+  }, [hasUnsavedChanges, registerNavigationGuard])
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return undefined
+
+    function handleBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [hasUnsavedChanges])
+
+  function handleGuardedRouteClick(event: MouseEvent<HTMLAnchorElement>, path: string) {
+    if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
       return
     }
 
+    event.preventDefault()
+    confirmNavigation(() => navigate(path))
+  }
+
+  function discardUnsavedChanges() {
+    setForm(savedForm)
+    setErrors((currentErrors) => ({ ...currentErrors, submit: undefined }))
+    setCreationWarning('')
+    setSuccessMessage('')
+  }
+
+  async function saveDraft({ navigateToCreated = true } = {}) {
+    if (isSaving) {
+      return false
+    }
+
     if (createdProjectId) {
-      navigate(`${APP_ROUTE_PATHS.editActivity}?id=${createdProjectId}`)
-      return
+      if (navigateToCreated) {
+        navigate(`${APP_ROUTE_PATHS.editActivity}?id=${createdProjectId}`)
+      }
+      return true
     }
 
     setSuccessMessage('')
@@ -1940,7 +2011,7 @@ export function CreateActivity() {
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors)
       scrollToFirstInvalidField()
-      return
+      return false
     }
 
     setIsSaving(true)
@@ -1951,7 +2022,7 @@ export function CreateActivity() {
       if (!isUnique) {
         setErrors({ activityName: 'Activity Name must be unique within the selected cycle.' })
         scrollToFirstInvalidField()
-        return
+        return false
       }
 
       const projectPayload = buildProjectPayload(form, context!)
@@ -1969,15 +2040,53 @@ export function CreateActivity() {
       setCreatedProjectId(projectId)
       await assignActivityToDivisionMemberTeam(projectId, context!.planningInstance)
       
+      setSavedForm(form)
       setSuccessMessage('Activity created successfully.')
-      navigate(`${APP_ROUTE_PATHS.editActivity}?id=${projectId}`)
+      if (navigateToCreated) {
+        navigate(`${APP_ROUTE_PATHS.editActivity}?id=${projectId}`)
+      }
+      return true
     } catch (error) {
       setErrors({
         submit: error instanceof Error ? error.message : 'Unable to save activity draft.',
       })
+      return false
     } finally {
       setIsSaving(false)
     }
+  }
+
+  async function handleSaveUnsavedChangesAndContinue() {
+    if (!pendingNavigation || isUnsavedDialogSaving) return
+
+    setIsUnsavedDialogSaving(true)
+    try {
+      const saved = await saveDraft({ navigateToCreated: false })
+      if (!saved) {
+        setPendingNavigation(null)
+        return
+      }
+
+      const nextAction = pendingNavigation.action
+      setPendingNavigation(null)
+      nextAction()
+    } finally {
+      setIsUnsavedDialogSaving(false)
+    }
+  }
+
+  function handleDiscardUnsavedChangesAndContinue() {
+    if (!pendingNavigation || isUnsavedDialogSaving) return
+
+    discardUnsavedChanges()
+    const nextAction = pendingNavigation.action
+    setPendingNavigation(null)
+    nextAction()
+  }
+
+  function handleDismissUnsavedChangesDialog() {
+    if (isUnsavedDialogSaving) return
+    setPendingNavigation(null)
   }
 
   if (isContextLoading) {
@@ -2169,7 +2278,7 @@ export function CreateActivity() {
           <div className="create-activity__hero-grid">
             <div className="create-activity__hero-left">
               <nav aria-label="Breadcrumb" className="create-activity__breadcrumb">
-                <Link to={APP_ROUTE_PATHS.dashboard}>Dashboard</Link>
+                <Link onClick={(event) => handleGuardedRouteClick(event, APP_ROUTE_PATHS.dashboard)} to={APP_ROUTE_PATHS.dashboard}>Dashboard</Link>
                 <ChevronRight aria-hidden="true" size={14} />
                 <span>Create Activity</span>
               </nav>
@@ -2205,7 +2314,7 @@ export function CreateActivity() {
                 </div>
               </dl>
               <div className="create-activity__hero-actions">
-                <Button disabled={isSaving || Boolean(errors.context)} icon={<Save size={16} />} onClick={saveDraft}>
+                <Button disabled={isSaving || Boolean(errors.context)} icon={<Save size={16} />} onClick={() => void saveDraft()}>
                   {isSaving ? 'Saving...' : createdProjectId ? 'Open Created Activity' : 'Save Draft'}
                 </Button>
               </div>
@@ -2230,7 +2339,7 @@ export function CreateActivity() {
       {creationWarning ? (
         <div className="create-activity__notice create-activity__notice--warning">
           <span>{creationWarning}</span>
-          <Button onClick={() => navigate(`${APP_ROUTE_PATHS.editActivity}?id=${createdProjectId}`)} variant="secondary">
+          <Button onClick={() => confirmNavigation(() => navigate(`${APP_ROUTE_PATHS.editActivity}?id=${createdProjectId}`))} variant="secondary">
             Open Created Activity
           </Button>
         </div>
@@ -2359,6 +2468,17 @@ export function CreateActivity() {
           </section>
         </div>
       )}
+
+      <UnsavedChangesDialog
+        description="You have unsaved changes on this activity. Save your draft before leaving, or discard the changes to continue without saving."
+        isOpen={Boolean(pendingNavigation)}
+        isSaving={isUnsavedDialogSaving}
+        onDiscard={handleDiscardUnsavedChangesAndContinue}
+        onDismiss={handleDismissUnsavedChangesDialog}
+        onSave={handleSaveUnsavedChangesAndContinue}
+        saveLabel="Save Draft"
+        title="Unsaved changes"
+      />
     </div>
   )
 }
