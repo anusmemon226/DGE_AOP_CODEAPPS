@@ -75,6 +75,7 @@
   grid-template-areas:
     'back progress'
     'breadcrumb progress'
+    'identity progress'
     'identity activity-card';
   grid-template-columns: minmax(0, 1fr) auto;
   row-gap: 0.45rem;
@@ -103,10 +104,21 @@
   grid-area: capsules;
 }
 
-.create-activity__hero:has(.edit-activity__hero-top) .edit-activity__card-btn {
+.create-activity__hero:has(.edit-activity__hero-top) .edit-activity__hero-actions {
   align-self: end;
   grid-area: activity-card;
   justify-self: end;
+}
+
+.create-activity__hero:has(.edit-activity__hero-top) .edit-activity__organization-context {
+  align-self: start;
+  grid-area: progress;
+  justify-self: end;
+}
+
+.create-activity__hero:has(.edit-activity__hero-top) .edit-activity__hero-top > .edit-activity__header-progress,
+.create-activity__hero:has(.edit-activity__hero-top) .edit-activity__hero-top > .edit-activity__header-progress-group {
+  display: none;
 }
 
 .create-activity__hero:has(.edit-activity__hero-top) .edit-activity__header-progress,
@@ -280,11 +292,15 @@
 }
 
 .edit-activity__hero-title-row {
-  align-items: center;
+  align-items: start;
   display: grid;
   gap: 0.75rem;
   grid-template-columns: auto minmax(0, 1fr);
   min-width: 0;
+}
+
+.edit-activity__hero-title-row .create-activity__hero-icon {
+  margin-top: 0.08rem;
 }
 
 .edit-activity__status-cluster {
@@ -296,7 +312,29 @@
 
 .create-activity__hero-footer.edit-activity__hero-footer {
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
+}
+
+.edit-activity__hero-actions {
+  margin-left: auto;
+}
+
+.edit-activity__mode-chips {
+  flex: 0 1 auto;
+  gap: 0.35rem;
+  margin-top: 0.38rem;
+}
+
+.edit-activity__mode-chip {
+  align-items: center;
+  border: 0;
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.68rem;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+  min-height: 1.4rem;
+  padding: 0.22rem 0.55rem;
 }
 
 .edit-activity__workflow-panel {
@@ -369,8 +407,8 @@
 
 /* Activity Card button — matches stage tab active style */
 .edit-activity__card-btn.button--ghost {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
+  background: var(--color-action);
+  border-color: var(--color-action-border);
   border-radius: 0.5rem;
   box-shadow: none;
   color: var(--color-on-primary);
@@ -379,22 +417,22 @@
 }
 
 .edit-activity__card-btn.button--ghost:hover {
-  background: var(--color-primary-hover);
-  border-color: var(--color-primary-hover);
+  background: var(--color-action-hover);
+  border-color: var(--color-action-hover);
   box-shadow: none;
   color: var(--color-on-primary);
   transform: none;
 }
 
 :root[data-theme='dark'] .edit-activity__card-btn.button--ghost {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
+  background: var(--color-action);
+  border-color: var(--color-action-border);
   color: var(--color-on-primary);
 }
 
 :root[data-theme='dark'] .edit-activity__card-btn.button--ghost:hover {
-  background: var(--color-primary-hover);
-  border-color: var(--color-primary-hover);
+  background: var(--color-action-hover);
+  border-color: var(--color-action-hover);
 }
 
 /* Body — icon + content row */
@@ -573,6 +611,26 @@
 :root[data-theme='dark'] .create-activity__chip {
   background: var(--color-surface);
   border-color: var(--color-border);
+}
+
+.edit-activity__mode-chip--editing {
+  background: #d7f3ff;
+  color: #0070a8;
+}
+
+.edit-activity__mode-chip--unsaved {
+  background: #fff0cf;
+  color: #b45309;
+}
+
+:root[data-theme='dark'] .edit-activity__mode-chip--editing {
+  background: #103a52;
+  color: #38bdf8;
+}
+
+:root[data-theme='dark'] .edit-activity__mode-chip--unsaved {
+  background: #4a3108;
+  color: #fbbf24;
 }
 
 .create-activity__chip-label {
@@ -1921,10 +1979,10 @@
   box-shadow: var(--control-shadow);
   color: var(--color-primary);
   display: inline-flex;
-  height: 2.15rem;
+  height: 1.8rem;
   justify-content: center;
   margin-top: 1.35rem;
-  width: 2.15rem;
+  width: 1.8rem;
   transition:
     border-color 180ms ease,
     box-shadow 180ms ease;

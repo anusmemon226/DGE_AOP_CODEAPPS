@@ -816,6 +816,37 @@ function areActivityFormsEqual(left: ActivityForm, right: ActivityForm) {
 
 // ── Component ──
 
+function clearActivityInfoValidationErrors(currentErrors: FieldErrors) {
+  const nextErrors = { ...currentErrors }
+
+  ;(Object.keys(INITIAL_FORM) as Array<keyof ActivityForm>).forEach((key) => {
+    delete nextErrors[key]
+  })
+  delete nextErrors.submit
+
+  return nextErrors
+}
+
+function scrollToFirstActivityInfoError() {
+  window.setTimeout(() => {
+    window.requestAnimationFrame(() => {
+      const root = document.querySelector<HTMLElement>('.edit-activity__stage-content')
+      const invalidElement = root?.querySelector<HTMLElement>('[aria-invalid="true"], .radio-group--invalid, .field__error')
+      const target = invalidElement?.closest<HTMLElement>('.field, .date-picker, .radio-group, .checkbox-group') ?? invalidElement
+
+      if (!target) return
+
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+
+      const focusTarget = target.matches('input, textarea, button, [tabindex]:not([tabindex="-1"])')
+        ? target
+        : target.querySelector<HTMLElement>('input:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])')
+
+      focusTarget?.focus({ preventScroll: true })
+    })
+  }, 0)
+}
+
 export function EditActivity() {
   const navigate = useNavigate()
   const { confirmNavigation, registerNavigationGuard } = useNavigationGuard()
@@ -829,6 +860,7 @@ export function EditActivity() {
   const [activity, setActivity] = useState<Dga_aop_projectses | null>(null)
   const [form, setForm] = useState<ActivityForm>(INITIAL_FORM)
   const [activityInfoSavedForm, setActivityInfoSavedForm] = useState<ActivityForm>(INITIAL_FORM)
+  const [isActivityInfoEditing, setIsActivityInfoEditing] = useState(false)
   const [errors, setErrors] = useState<FieldErrors>({})
   const [activityLeadOptions, setActivityLeadOptions] = useState<SelectOption<string>[]>([])
   const [isContextLoading, setIsContextLoading] = useState(true)
@@ -1195,6 +1227,12 @@ export function EditActivity() {
     : activeTab === 'budget'
       ? budgetHeaderAction?.label ?? (statusCode === 1 ? 'Save Draft' : 'Save Changes')
       : statusCode === 1 ? 'Save Draft' : 'Save Changes'
+  const canEnterActivityInfoEditing = activeTab === 'activity-info'
+    && canShowHeaderSaveActions
+    && editPermissions.activityInfoCanSave
+    && !errors.context
+  const showActivityInfoEditButton = canEnterActivityInfoEditing && !isActivityInfoEditing
+  const showActivityInfoModeChips = activeTab === 'activity-info' && (isActivityInfoEditing || activityInfoHasUnsavedChanges)
 
   // ── Context loading ──
 
@@ -1248,6 +1286,7 @@ export function EditActivity() {
     if (previousSelectedRoleRef.current === selectedRole) return
 
     previousSelectedRoleRef.current = selectedRole
+    setIsActivityInfoEditing(false)
     setSuccessMessage('')
     setTabOperationAlert(null)
     setExecutionRejectionError('')
@@ -1255,6 +1294,10 @@ export function EditActivity() {
       currentErrors.context ? { context: currentErrors.context } : {}
     ))
   }, [selectedRole])
+
+  useEffect(() => {
+    setIsActivityInfoEditing(false)
+  }, [activeTab])
 
   useEffect(() => {
     if (!successMessage) return
@@ -1417,6 +1460,7 @@ export function EditActivity() {
         )
         setForm(loadedForm)
         setActivityInfoSavedForm(loadedForm)
+        setIsActivityInfoEditing(false)
       } catch (error) {
         if (isMounted) {
           setErrors({ context: error instanceof Error ? error.message : 'Failed to load context.' })
@@ -1506,7 +1550,8 @@ export function EditActivity() {
   const discardActiveTabChanges = useCallback(() => {
     if (activeTab === 'activity-info') {
       setForm(activityInfoSavedForm)
-      setErrors((currentErrors) => ({ ...currentErrors, submit: undefined }))
+      setErrors(clearActivityInfoValidationErrors)
+      setIsActivityInfoEditing(false)
       return
     }
 
@@ -1519,6 +1564,19 @@ export function EditActivity() {
       budgetHeaderAction?.discardChanges?.()
     }
   }, [activeTab, activityInfoSavedForm, budgetHeaderAction, objectiveHeaderAction])
+
+  function handleStartActivityInfoEditing() {
+    if (!canEnterActivityInfoEditing) return
+    setErrors(clearActivityInfoValidationErrors)
+    setIsActivityInfoEditing(true)
+  }
+
+  function handleDiscardActivityInfoChanges() {
+    setForm(activityInfoSavedForm)
+    setErrors(clearActivityInfoValidationErrors)
+    setIsActivityInfoEditing(false)
+    setActiveTab('activity-info')
+  }
 
   const handleNavigationGuardRequest = useCallback((action: () => void) => {
     if (!activeTabHasUnsavedChanges) {
@@ -1621,6 +1679,7 @@ export function EditActivity() {
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors)
       setActiveTab('activity-info')
+      scrollToFirstActivityInfoError()
       return false
     }
 
@@ -1720,6 +1779,7 @@ export function EditActivity() {
       setErrors((currentErrors) => ({ ...currentErrors, submit: undefined }))
       setSuccessMessage('Activity information saved successfully.')
       setActivityInfoSavedForm(form)
+      setIsActivityInfoEditing(false)
       refreshActivityAiSummary('activity-information-save')
       return true
     } catch (error) {
@@ -2890,6 +2950,7 @@ export function EditActivity() {
             form={form}
             hasFullEdit={editPermissions.activityInfoHasFullEdit}
             isAiSummaryLoading={isAiSummaryLoading}
+            isEditing={isActivityInfoEditing}
             isExecutionPhase={isExecutionPhase}
             showExecutionTracking={shouldShowExecutionFields}
             isReadOnly={editPermissions.activityInfoReadOnly}
@@ -2899,6 +2960,7 @@ export function EditActivity() {
             isStrategic={isStrategic}
             projectId={projectId}
             onActivityDataChanged={() => refreshActivityAiSummary('activity-information-related-crud')}
+            onOperationAlert={showTabOperationAlert}
             updateForm={updateForm}
           />
         )
@@ -3041,13 +3103,23 @@ export function EditActivity() {
   function renderWorkflowActions() {
     return (
       <>
-        {activeTab === 'activity-info' && canShowHeaderSaveActions ? (
+        {activeTab === 'activity-info' && isActivityInfoEditing && canShowHeaderSaveActions ? (
           <Button
             disabled={!editPermissions.activityInfoCanSave || isSavingActivityInfo || Boolean(errors.context)}
             icon={<Save size={16} />}
             onClick={handleSaveActivityInfo}
           >
             {isSavingActivityInfo ? 'Saving...' : statusCode === 1 ? 'Save Draft' : 'Save Changes'}
+          </Button>
+        ) : null}
+        {activeTab === 'activity-info' && isActivityInfoEditing && canShowHeaderSaveActions ? (
+          <Button
+            disabled={isSavingActivityInfo}
+            icon={<X size={16} />}
+            onClick={handleDiscardActivityInfoChanges}
+            variant="secondary"
+          >
+            Discard Changes
           </Button>
         ) : null}
         {activeTab === 'objectives' && objectiveHeaderAction && canShowHeaderSaveActions ? (
@@ -3215,6 +3287,71 @@ export function EditActivity() {
     )
   }
 
+  function renderProgressSummary() {
+    if (isExecutionPhase) {
+      return (
+        <div className="edit-activity__rail-progress-list">
+          <div
+            aria-disabled={isMilestoneProgressDisabled}
+            aria-label={isMilestoneProgressDisabled ? 'Planned Progress unavailable' : `Planned Progress ${Math.round(plannedMilestoneProgress)}%`}
+            className={`edit-activity__header-progress${isMilestoneProgressDisabled ? ' edit-activity__header-progress--disabled' : ''}`}
+          >
+            <div className="edit-activity__header-progress-copy">
+              <span>Planned Progress</span>
+              <strong>{isMilestoneProgressDisabled ? 'Unavailable' : `${Math.round(plannedMilestoneProgress)}%`}</strong>
+            </div>
+            <div
+              aria-hidden="true"
+              className="edit-activity__header-progress-ring"
+              style={{ '--progress': `${plannedMilestoneProgress}%` } as CSSProperties}
+            >
+              <span>{isMilestoneProgressDisabled ? '—' : `${Math.round(plannedMilestoneProgress)}%`}</span>
+            </div>
+          </div>
+          <div
+            aria-disabled={isMilestoneProgressDisabled}
+            aria-label={isMilestoneProgressDisabled ? 'Actual Progress unavailable' : `Actual Progress ${Math.round(actualMilestoneProgress)}%`}
+            className={`edit-activity__header-progress${isMilestoneProgressDisabled ? ' edit-activity__header-progress--disabled' : ''}`}
+          >
+            <div className="edit-activity__header-progress-copy">
+              <span>Actual Progress</span>
+              <strong>{isMilestoneProgressDisabled ? 'Unavailable' : `${Math.round(actualMilestoneProgress)}%`}</strong>
+            </div>
+            <div
+              aria-hidden="true"
+              className="edit-activity__header-progress-ring edit-activity__header-progress-ring--actual"
+              style={{ '--progress': `${actualMilestoneProgress}%` } as CSSProperties}
+            >
+              <span>{isMilestoneProgressDisabled ? '—' : `${Math.round(actualMilestoneProgress)}%`}</span>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div className="edit-activity__rail-progress-list">
+        <div
+          aria-disabled={isMilestoneProgressDisabled}
+          aria-label={headerProgressAriaLabel}
+          className={`edit-activity__header-progress${isMilestoneProgressDisabled ? ' edit-activity__header-progress--disabled' : ''}`}
+        >
+          <div className="edit-activity__header-progress-copy">
+            <span>{displayedMilestoneProgressLabel}</span>
+            <strong>{isMilestoneProgressDisabled ? 'Unavailable' : `${Math.round(displayedMilestoneProgress)}%`}</strong>
+          </div>
+          <div
+            aria-hidden="true"
+            className="edit-activity__header-progress-ring"
+            style={{ '--progress': `${displayedMilestoneProgress}%` } as CSSProperties}
+          >
+            <span>{isMilestoneProgressDisabled ? '—' : `${Math.round(displayedMilestoneProgress)}%`}</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   function renderRightRail() {
     return (
       <aside aria-label="Activity side panel" className="edit-activity__right-rail">
@@ -3223,6 +3360,11 @@ export function EditActivity() {
           <div className="edit-activity__workflow-panel-actions">
             {renderWorkflowActions()}
           </div>
+        </section>
+
+        <section className="edit-activity__rail-card edit-activity__rail-card--progress">
+          {renderRailHeader(BarChart3, 'Activity Progress')}
+          {renderProgressSummary()}
         </section>
 
         <section className="edit-activity__rail-card">
@@ -3523,6 +3665,16 @@ export function EditActivity() {
           >
             Back to Activities
           </Button>
+          <dl className="create-activity__organization-context edit-activity__organization-context">
+            <div>
+              <dt>Sector</dt>
+              <dd title={form.sectorName}>{form.sectorName || '—'}</dd>
+            </div>
+            <div>
+              <dt>Division</dt>
+              <dd title={form.divisionName}>{form.divisionName || '—'}</dd>
+            </div>
+          </dl>
           {isExecutionPhase ? (
             <div className="edit-activity__header-progress-group">
               <div
@@ -3600,14 +3752,35 @@ export function EditActivity() {
                 <Sparkles size={14} />
                 {aiSummary}
               </p>
+              {showActivityInfoModeChips ? (
+                <div className="create-activity__hero-chips edit-activity__mode-chips" aria-label="Activity information edit state">
+                  {isActivityInfoEditing ? (
+                    <span className="edit-activity__mode-chip edit-activity__mode-chip--editing">
+                      <span>Editing Mode</span>
+                    </span>
+                  ) : null}
+                  {activityInfoHasUnsavedChanges ? (
+                    <span className="edit-activity__mode-chip edit-activity__mode-chip--unsaved">
+                      <span>Unsaved Changes</span>
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
 
         <div className="create-activity__hero-footer edit-activity__hero-footer">
-          <Button icon={<FileText size={16} />} variant="ghost" className="edit-activity__card-btn">
-            Activity Card
-          </Button>
+          <div className="create-activity__hero-actions edit-activity__hero-actions">
+            {showActivityInfoEditButton ? (
+              <Button icon={<Edit3 size={16} />} onClick={handleStartActivityInfoEditing} variant="ghost" className="edit-activity__card-btn edit-activity__edit-btn">
+                Edit Activity
+              </Button>
+            ) : null}
+            <Button icon={<FileText size={16} />} variant="ghost" className="edit-activity__card-btn">
+              Activity Card
+            </Button>
+          </div>
         </div>
       </header>
 

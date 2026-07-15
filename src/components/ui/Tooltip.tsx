@@ -68,8 +68,8 @@ export function Tooltip({ content, label, tone = 'info' }: TooltipProps) {
       const panelRect = panel.getBoundingClientRect()
       const gap = 8
       const padding = 8
-      const hasRoomBelow = window.innerHeight - triggerRect.bottom >= panelRect.height + gap + padding
-      const placement = hasRoomBelow ? 'below' : 'above'
+      const hasRoomAbove = triggerRect.top >= panelRect.height + gap + padding
+      const placement = hasRoomAbove ? 'above' : 'below'
       const top = placement === 'below' ? triggerRect.bottom + gap : Math.max(padding, triggerRect.top - panelRect.height - gap)
       const left = Math.min(
         Math.max(padding, triggerRect.left + (triggerRect.width / 2) - (panelRect.width / 2)),

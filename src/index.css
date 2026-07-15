@@ -16,6 +16,9 @@
   --color-primary-soft: #EBEFFF;
   --color-primary-border: #CFD7F8;
   --color-primary-wash: rgba(55, 94, 251, 0.05);
+  --color-action: var(--color-primary);
+  --color-action-hover: var(--color-primary-hover);
+  --color-action-border: var(--color-primary);
   --color-on-primary: #ffffff;
   --color-success: #16A34A;
   --color-success-soft: #DCFCE7;
@@ -67,11 +70,14 @@
 }
 
 :root[data-theme='dark'] {
-  --color-primary: #818cf8;
-  --color-primary-hover: #a5b4fc;
-  --color-primary-soft: rgba(129, 140, 248, 0.14);
-  --color-primary-border: rgba(129, 140, 248, 0.34);
-  --color-primary-wash: rgba(129, 140, 248, 0.08);
+  --color-primary: #5f6ee8;
+  --color-primary-hover: #7280f0;
+  --color-primary-soft: rgba(95, 110, 232, 0.16);
+  --color-primary-border: rgba(116, 130, 240, 0.38);
+  --color-primary-wash: rgba(95, 110, 232, 0.1);
+  --color-action: var(--color-primary);
+  --color-action-hover: var(--color-primary-hover);
+  --color-action-border: var(--color-primary-border);
   --color-success: #4ade80;
   --color-success-soft: rgba(74, 222, 128, 0.12);
   --color-warning: #f59e0b;

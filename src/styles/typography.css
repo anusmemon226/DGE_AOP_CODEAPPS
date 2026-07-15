@@ -112,11 +112,7 @@ b {
 
 .badge,
 .status-badge,
-.approval-status-badge,
-[class*='__chip'],
-[class*='__pill'],
-[class*='capsule'],
-[class*='badge']:not(.ai-summary-card__badge):not(.ai-summary-badge) {
+.approval-status-badge {
   font-size: var(--font-size-caption) !important;
   font-weight: var(--font-weight-semibold) !important;
 }

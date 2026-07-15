@@ -5,7 +5,6 @@ import {
   ChevronLeft,
   ChevronRight,
   LayoutList,
-  Mail,
   Rows,
   Search,
   Trash2,
@@ -20,6 +19,7 @@ import type { Systemusers } from '../../generated/models/SystemusersModel'
 import { SystemusersService } from '../../generated/services/SystemusersService'
 import { Dga_aop_projects_systemusersetService } from '../../generated/services/Dga_aop_projects_systemusersetService'
 import { Dga_custom_web_apiService } from '../../generated/services/Dga_custom_web_apiService'
+import type { EditActivityOperationNotifier } from './types/operationAlert'
 
 // ── Types ──
 
@@ -41,7 +41,7 @@ type ActivityMember = MockUser & {
 // ── Mock data removed — ready for dynamic implementation ──
 
 const ITEMS_PER_PAGE = 12
-const EMBEDDED_ITEMS_PER_PAGE = 6
+const EMBEDDED_ITEMS_PER_PAGE = 5
 const LAZY_BATCH = 12
 const ACTIVITY_MEMBER_TARGET_TABLE = 'dga_aop_projects'
 const ACTIVITY_MEMBER_RELATED_TABLE = 'systemuser'
@@ -51,6 +51,7 @@ type MembersTabProps = {
   embedded?: boolean
   isReadOnly?: boolean
   onActivityDataChanged?: () => void
+  onOperationAlert?: EditActivityOperationNotifier
   projectId: string
 }
 
@@ -171,14 +172,13 @@ function mapAssociationsToMembers(
 
 // ── Component ──
 
-export function MembersTab({ embedded = false, isReadOnly = false, onActivityDataChanged, projectId }: MembersTabProps) {
+export function MembersTab({ embedded = false, isReadOnly = false, onActivityDataChanged, onOperationAlert, projectId }: MembersTabProps) {
   const [availableUsers, setAvailableUsers] = useState<MockUser[]>([])
   const [isUsersLoading, setIsUsersLoading] = useState(false)
   const [usersError, setUsersError] = useState('')
   const [members, setMembers] = useState<ActivityMember[]>([])
   const [isMembersLoading, setIsMembersLoading] = useState(false)
   const [membersError, setMembersError] = useState('')
-  const [membersNotice, setMembersNotice] = useState('')
   const [memberToDelete, setMemberToDelete] = useState<ActivityMember | null>(null)
   const [isSavingMembers, setIsSavingMembers] = useState(false)
   const [isRemovingMember, setIsRemovingMember] = useState(false)
@@ -207,7 +207,6 @@ export function MembersTab({ embedded = false, isReadOnly = false, onActivityDat
     setIsMembersLoading(true)
     setUsersError('')
     setMembersError('')
-    setMembersNotice('')
 
     try {
       const [usersResult, associationsResult] = await Promise.all([
@@ -264,16 +263,6 @@ export function MembersTab({ embedded = false, isReadOnly = false, onActivityDat
 
     return () => window.clearTimeout(timeoutId)
   }, [loadMembersContext])
-
-  useEffect(() => {
-    if (!membersNotice) return
-
-    const timeoutId = window.setTimeout(() => {
-      setMembersNotice('')
-    }, 10000)
-
-    return () => window.clearTimeout(timeoutId)
-  }, [membersNotice])
 
   // ── Computed ──
 
@@ -335,7 +324,6 @@ export function MembersTab({ embedded = false, isReadOnly = false, onActivityDat
     setMemberFilter('all')
     setMemberSearchQuery('')
     setMemberSelectionError('')
-    setMembersNotice('')
     setIsAddMembersModalOpen(true)
   }, [isReadOnly])
 
@@ -373,7 +361,10 @@ export function MembersTab({ embedded = false, isReadOnly = false, onActivityDat
 
     setIsSavingMembers(true)
     setMemberSelectionError('')
-    setMembersNotice('')
+    onOperationAlert?.({
+      kind: 'processing',
+      title: selectedUserIds.length === 1 ? 'Adding activity member' : `Adding ${selectedUserIds.length} activity members`,
+    })
 
     const results = await Promise.allSettled(
       selectedUserIds.map((userId) =>
@@ -395,17 +386,25 @@ export function MembersTab({ embedded = false, isReadOnly = false, onActivityDat
         : getOperationErrorMessage(firstFailure.value, 'Unable to add one or more members.')
       const successCount = selectedUserIds.length - failures.length
 
-      setMemberSelectionError(`${successCount} of ${selectedUserIds.length} member${selectedUserIds.length !== 1 ? 's' : ''} added. ${message}`)
+      onOperationAlert?.({
+        kind: 'error',
+        message: `${successCount} of ${selectedUserIds.length} member${selectedUserIds.length !== 1 ? 's' : ''} added. ${message}`,
+        title: 'Activity member update failed',
+      })
       return
     }
 
     await loadMembersContext()
     setSelectedMemberIds(new Set())
     setMemberSelectionError('')
-    setMembersNotice(`${selectedUserIds.length} member${selectedUserIds.length !== 1 ? 's' : ''} added successfully.`)
+    onOperationAlert?.({
+      kind: 'success',
+      message: `${selectedUserIds.length} member${selectedUserIds.length !== 1 ? 's' : ''} added successfully.`,
+      title: selectedUserIds.length === 1 ? 'Activity member added' : 'Activity members added',
+    })
     setIsAddMembersModalOpen(false)
     onActivityDataChanged?.()
-  }, [isReadOnly, isSavingMembers, loadMembersContext, members, onActivityDataChanged, projectId, selectedMemberIds])
+  }, [isReadOnly, isSavingMembers, loadMembersContext, members, onActivityDataChanged, onOperationAlert, projectId, selectedMemberIds])
 
   const handleRemoveMember = useCallback((member: ActivityMember) => {
     if (isReadOnly) return
@@ -424,20 +423,31 @@ export function MembersTab({ embedded = false, isReadOnly = false, onActivityDat
 
     setIsRemovingMember(true)
     setMembersError('')
-    setMembersNotice('')
+    onOperationAlert?.({
+      kind: 'processing',
+      title: 'Removing activity member',
+    })
 
     try {
       await callActivityMemberApi('disassociate', projectId, memberToDelete.id)
       await loadMembersContext()
       setMemberToDelete(null)
-      setMembersNotice('Member removed successfully.')
+      onOperationAlert?.({
+        kind: 'success',
+        message: `${memberToDelete.name} was removed from this activity.`,
+        title: 'Activity member removed',
+      })
       onActivityDataChanged?.()
     } catch (error) {
-      setMembersError(error instanceof Error ? error.message : 'Unable to remove member.')
+      onOperationAlert?.({
+        kind: 'error',
+        message: error instanceof Error ? error.message : 'Unable to remove member.',
+        title: 'Could not remove member',
+      })
     } finally {
       setIsRemovingMember(false)
     }
-  }, [isReadOnly, isRemovingMember, loadMembersContext, memberToDelete, onActivityDataChanged, projectId])
+  }, [isReadOnly, isRemovingMember, loadMembersContext, memberToDelete, onActivityDataChanged, onOperationAlert, projectId])
 
   const handleCancelDeleteMember = useCallback(() => {
     setMemberToDelete(null)
@@ -476,15 +486,72 @@ export function MembersTab({ embedded = false, isReadOnly = false, onActivityDat
   const memberCount = members.length
   const filteredCount = filteredMembers.length
   const hasFilter = memberListSearch.trim().length > 0
-  const showingText = hasFilter
-    ? `${filteredCount} of ${memberCount} Member${memberCount !== 1 ? 's' : ''}`
-    : `${memberCount} Member${memberCount !== 1 ? 's' : ''}`
   const showPagination = embedded
     ? filteredCount > EMBEDDED_ITEMS_PER_PAGE
     : memberViewMode === 'pagination' && filteredCount > ITEMS_PER_PAGE
   const showLoadMore = !embedded && memberViewMode === 'lazy' && lazyVisibleCount < filteredCount
   const rangeStart = filteredCount > 0 ? (currentPage - 1) * memberPageSize + 1 : 0
   const rangeEnd = Math.min(currentPage * memberPageSize, filteredCount)
+
+  function renderMemberAvatar(member: ActivityMember | MockUser, className = 'edit-activity__member-card-avatar') {
+    return (
+      <div className={className}>
+        {member.avatarUrl ? (
+          <img alt={member.name} src={member.avatarUrl} />
+        ) : (
+          <span>{getInitials(member.name)}</span>
+        )}
+      </div>
+    )
+  }
+
+  function renderMemberTypeBadge(member: ActivityMember | MockUser) {
+    return (
+      <span className={`edit-activity__member-type ${member.isDivisionMember ? 'edit-activity__member-type--division' : 'edit-activity__member-type--external'}`}>
+        {member.isDivisionMember ? 'Division Member' : 'Non-Division Member'}
+      </span>
+    )
+  }
+
+  function renderRemoveMemberButton(member: ActivityMember) {
+    if (isReadOnly) return null
+
+    return (
+      <button
+        aria-label={`Remove ${member.name}`}
+        className="edit-activity__member-card-remove"
+        onClick={() => handleRemoveMember(member)}
+        title="Remove member"
+        type="button"
+      >
+        <Trash2 size={15} />
+      </button>
+    )
+  }
+
+  function renderDenseMembersTable() {
+    return (
+      <div className="edit-activity__members-table" role="table" aria-label="Activity members">
+        <div className="edit-activity__members-table-row edit-activity__members-table-row--header" role="row">
+          <span role="columnheader">Member</span>
+          <span role="columnheader">Email</span>
+          <span role="columnheader">Type</span>
+          <span role="columnheader">Action</span>
+        </div>
+        {visibleMembers.map((member) => (
+          <div className="edit-activity__members-table-row" key={member.id} role="row">
+            <div className="edit-activity__members-table-member" role="cell">
+              {renderMemberAvatar(member, 'edit-activity__member-card-avatar edit-activity__member-card-avatar--compact')}
+              <strong>{member.name}</strong>
+            </div>
+            <span className="edit-activity__members-table-email" role="cell">{member.email || 'No email available'}</span>
+            <span className="edit-activity__members-table-type" role="cell">{renderMemberTypeBadge(member)}</span>
+            <span className="edit-activity__members-table-action" role="cell">{renderRemoveMemberButton(member)}</span>
+          </div>
+        ))}
+      </div>
+    )
+  }
 
   // ── Add Members Modal ──
 
@@ -513,6 +580,11 @@ export function MembersTab({ embedded = false, isReadOnly = false, onActivityDat
           title="Add Activity Members"
         >
           <div className="edit-activity__members-modal">
+            <div className="edit-activity__members-modal-intro">
+              <h3>Select activity members</h3>
+              <p>Search and assign users who should contribute to this activity.</p>
+            </div>
+
             {/* Filter tabs */}
             <div className="edit-activity__members-modal-filters">
               {([
@@ -584,7 +656,7 @@ export function MembersTab({ embedded = false, isReadOnly = false, onActivityDat
                       <span>{user.email}</span>
                     </div>
                     <div className="edit-activity__members-modal-user-badge">
-                      <span className={`edit-activity__member-card-badge ${user.isDivisionMember ? 'edit-activity__member-card-badge--division' : 'edit-activity__member-card-badge--external'}`}>
+                      <span className={`edit-activity__member-type ${user.isDivisionMember ? 'edit-activity__member-type--division' : 'edit-activity__member-type--external'}`}>
                         {user.isDivisionMember ? 'Division' : 'External'}
                       </span>
                     </div>
@@ -644,23 +716,22 @@ export function MembersTab({ embedded = false, isReadOnly = false, onActivityDat
               <UsersRound size={18} />
             </span>
             <div>
-              <span>Activity Members</span>
-              <h2>
-                Assigned activity team
-                <span className="edit-activity__members-count-badge">{showingText}</span>
-              </h2>
+              <h2>Activity Members</h2>
+              <p>Manage users assigned to this activity.</p>
             </div>
           </div>
         ) : (
           <div className="edit-activity__members-header-text">
-            <h2>
-              Activity Members
-              <span className="edit-activity__members-count-badge">{showingText}</span>
-            </h2>
+            <h2>Activity Members</h2>
             <p>Manage users assigned to this activity.</p>
           </div>
         )}
-        <Button disabled={isReadOnly || !projectId || isMembersLoading} icon={<UserPlus size={16} />} onClick={handleOpenAddMembersModal}>
+        <Button
+          className="edit-activity__members-add-button"
+          disabled={isReadOnly || !projectId || isMembersLoading}
+          icon={<UserPlus size={16} />}
+          onClick={handleOpenAddMembersModal}
+        >
           Add Activity Member
         </Button>
       </div>
@@ -669,11 +740,6 @@ export function MembersTab({ embedded = false, isReadOnly = false, onActivityDat
         <div className="create-activity__notice create-activity__notice--error edit-activity__members-notice" role="alert">
           <AlertCircle size={13} />
           <span>{membersError}</span>
-        </div>
-      ) : membersNotice ? (
-        <div className="create-activity__notice create-activity__notice--success edit-activity__members-notice" role="status">
-          <Check size={14} />
-          <span>{membersNotice}</span>
         </div>
       ) : null}
 
@@ -745,50 +811,13 @@ export function MembersTab({ embedded = false, isReadOnly = false, onActivityDat
             </>
           )}
         </div>
-      ) : (
-        <div className="edit-activity__members-grid">
-          {visibleMembers.map((member) => (
-            <div className="edit-activity__member-card" key={member.id}>
-              <div className="edit-activity__member-card-avatar">
-                {member.avatarUrl ? (
-                  <img alt={member.name} src={member.avatarUrl} />
-                ) : (
-                  <span>{getInitials(member.name)}</span>
-                )}
-              </div>
-              <div className="edit-activity__member-card-info">
-                <strong>{member.name}</strong>
-                <span className="edit-activity__member-card-email">
-                  <Mail size={12} />
-                  {member.email}
-                </span>
-              </div>
-              <div className="edit-activity__member-card-meta">
-                <span className={`edit-activity__member-card-badge ${member.isDivisionMember ? 'edit-activity__member-card-badge--division' : 'edit-activity__member-card-badge--external'}`}>
-                  {member.isDivisionMember ? 'Division Member' : 'Non-Division Member'}
-                </span>
-              </div>
-              {!isReadOnly ? (
-                <button
-                  aria-label={`Remove ${member.name}`}
-                  className="edit-activity__member-card-remove"
-                  onClick={() => handleRemoveMember(member)}
-                  title="Remove member"
-                  type="button"
-                >
-                  <Trash2 size={15} />
-                </button>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      )}
+      ) : renderDenseMembersTable()}
 
       {/* Pagination */}
       {showPagination ? (
         <div className="edit-activity__members-pagination">
           <span className="edit-activity__members-pagination-info">
-            Showing <strong>{rangeStart}–{rangeEnd}</strong> of <strong>{filteredCount}</strong> member{filteredCount !== 1 ? 's' : ''}
+            Showing {rangeStart}–{rangeEnd} of {filteredCount} member{filteredCount !== 1 ? 's' : ''}
           </span>
           <div className="edit-activity__members-pagination-controls">
             <button

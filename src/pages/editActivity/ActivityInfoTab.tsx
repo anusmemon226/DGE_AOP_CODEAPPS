@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import {
   Bot,
   Check,
@@ -6,7 +6,6 @@ import {
   ClipboardList,
   FileText,
   Lightbulb,
-  LockKeyhole,
 } from 'lucide-react'
 import {
   Card,
@@ -16,6 +15,8 @@ import {
   RadioGroup,
   Select,
   Textarea,
+  Tooltip,
+  TooltipProvider,
   type SelectOption,
 } from '../../components/ui'
 import {
@@ -37,6 +38,7 @@ import { MembersTab } from './MembersTab'
 import { DependenciesTab } from './DependenciesTab'
 import { AiSummaryPanel } from './AiSummaryPanel'
 import type { AiSummaryBlocks, AiSummaryMeta } from './types/aiSummaryTypes'
+import type { EditActivityOperationNotifier } from './types/operationAlert'
 import { formatDateDisplay } from '../../utils/formatting'
 
 // ── Props ──
@@ -51,6 +53,7 @@ interface ActivityInfoTabProps {
   form: ActivityForm
   hasFullEdit?: boolean
   isAiSummaryLoading?: boolean
+  isEditing?: boolean
   isExecutionPhase?: boolean
   showExecutionTracking?: boolean
   isReadOnly?: boolean
@@ -59,11 +62,30 @@ interface ActivityInfoTabProps {
   isPaymentOnly: boolean
   isStrategic: boolean
   onActivityDataChanged?: () => void
+  onOperationAlert?: EditActivityOperationNotifier
   projectId: string
   updateForm: (fields: Partial<ActivityForm>) => void
 }
 
 // ── Strategy toggle helper ──
+
+const EDIT_ACTIVITY_TOOLTIPS = {
+  activityType: <><p>Select the activity type from the below options:</p><ul><li><strong>New Project:</strong> Started in 2026</li><li><strong>Ongoing Project:</strong> Started before 2026</li><li><strong>Contract:</strong> Contract-based or payment-related item</li><li><strong>Internal Operations:</strong> Activity related to internal departmental operations</li></ul></>,
+  activityName: <>Input the name of the project/activity.</>,
+  activityScope: <><p>Select the project type from the below options:</p><ul><li><strong>Strategic:</strong> The project is derived from the Abu Dhabi Digital Strategy</li><li><strong>Operational:</strong> The project is operational in nature</li></ul></>,
+  strategies: <>Select the strategy under which this project is categorized. You can select multiple options.</>,
+  activityClassification: <><p>Select the activity classification from the below options:</p><ul><li><strong>EPM Registered Project:</strong> Project that is or will be registered in the EPM system</li><li><strong>Operational Activity:</strong> Operational activity with defined deliverables and outcomes</li><li><strong>Payment Only:</strong> Non-project item related to contracts or payments</li></ul></>,
+  budgetRequired: <>This project will require budget.</>,
+  paymentOnlyWarning: <>Payment Only activities are considered budget required.</>,
+  procurementRequired: <>This project will require procurement, either through a new tender, contract renewal, etc.</>,
+  budgetNoWarning: <>Procurement is automatically No when budget is not required.</>,
+  adeoReported: <>This project is or will be included with the DGE Execution Plan and reported to ADEO.</>,
+  activityLead: <>Input the name of the Project Manager/Activity Lead that will be responsible for inputting this activity&apos;s progress.</>,
+  plannedStartDate: <>Input the planned start date of the project or activity.</>,
+  plannedEndDate: <>Input the planned end date of the project or activity.</>,
+  scope: <>Input a detailed description of what will be covered in the scope of this project or activity.</>,
+  summary: <>Input a detailed summary of the project mentioning the objective, high-level scope statement, and the expected value or benefit from completion of this project or activity.</>,
+} as const
 
 function toggleStrategy(
   strategy: StrategyValue,
@@ -140,6 +162,7 @@ export function ActivityInfoTab({
   form,
   hasFullEdit = false,
   isAiSummaryLoading = false,
+  isEditing = false,
   isExecutionPhase = false,
   showExecutionTracking = false,
   isReadOnly = false,
@@ -148,6 +171,7 @@ export function ActivityInfoTab({
   isPaymentOnly,
   isStrategic,
   onActivityDataChanged,
+  onOperationAlert,
   projectId,
   updateForm,
 }: ActivityInfoTabProps) {
@@ -156,16 +180,17 @@ export function ActivityInfoTab({
     setDependencyCount(count)
   }, [])
   const canEditField = useCallback((field: keyof ActivityForm) => {
+    if (!isEditing) return false
     if (hasFullEdit) return true
     if (editableFields?.length) {
       return editableFields.includes(field)
     }
     return !isReadOnly
-  }, [editableFields, hasFullEdit, isReadOnly])
+  }, [editableFields, hasFullEdit, isEditing, isReadOnly])
   const requiresActivityStatusJustification = Boolean(
     form.activityStatus && EXECUTION_ACTIVITY_STATUS_REQUIRES_JUSTIFICATION.has(form.activityStatus),
   )
-  const showPlanningReadOnlyView = isExecutionPhase
+  const showPlanningReadOnlyView = !isEditing || isExecutionPhase
   const executionActivityStatusOptions = useMemo(() => (
     EXECUTION_ACTIVITY_STATUS_OPTIONS.map((option) => ({
       ...option,
@@ -383,24 +408,50 @@ export function ActivityInfoTab({
       )
     }
 
+    const renderActivityInfoCard = (
+      icon: ReactNode,
+      title: string,
+      description: string,
+      children: ReactNode,
+    ) => (
+      <Card className="create-activity__section edit-activity__activity-info-card">
+        <div className="create-activity__section-header">
+          <div className="create-activity__section-header-inner">
+            <span className="create-activity__section-header-icon" aria-hidden="true">
+              {icon}
+            </span>
+            <div>
+              <h2>{title}</h2>
+              <p>{description}</p>
+            </div>
+          </div>
+        </div>
+        {children}
+      </Card>
+    )
+
+    const readOnlyPanel = (
+      items: Parameters<typeof renderReadOnlyDetails>[0],
+      columns: 2 | 3 = 2,
+    ) => (
+      <div className="create-activity__readonly-panel edit-activity__activity-info-readonly">
+        {renderReadOnlyDetails(items, columns)}
+      </div>
+    )
+
     return (
       <>
-        {/* Core Activity Information Card */}
-        {showExecutionTracking ? (
-          <Card className="create-activity__section">
-            <div className="create-activity__section-header">
-              <div className="create-activity__section-header-inner">
-                <span className="create-activity__section-header-icon" aria-hidden="true">
-                  <CheckCircle2 size={18} />
-                </span>
-                <div>
-                  <span>Execution Tracking</span>
-                  <h2>Activity status</h2>
-                </div>
-              </div>
-            </div>
-
-            <div className="create-activity__form-stack">
+        <div className="edit-activity__activity-info-card-grid">
+          {showExecutionTracking ? renderActivityInfoCard(
+            <CheckCircle2 size={18} />,
+            'Execution Tracking',
+            'Update the current activity status and required execution justification.',
+            !isEditing ? readOnlyPanel([
+              { label: 'Activity Status', value: getOptionLabel(EXECUTION_ACTIVITY_STATUS_OPTIONS, form.activityStatus), kind: 'requirement', columns: 6 },
+              ...(requiresActivityStatusJustification
+                ? [{ label: 'Justification for Activity Status', value: form.activityStatusJustification, type: 'long' as const, kind: 'narrative' as const, columns: 6 as const }]
+                : []),
+            ], 3) : <div className="create-activity__form-stack">
               <div className="create-activity__form-row">
                 <RadioGroup
                   className="create-activity__radio create-activity__radio--status"
@@ -428,259 +479,283 @@ export function ActivityInfoTab({
                   />
                 </div>
               ) : null}
-            </div>
-          </Card>
-        ) : null}
+            </div>,
+          ) : null}
 
-        <Card className="create-activity__section">
-          <div className="create-activity__section-header">
-            <div className="create-activity__section-header-inner">
-              <span className="create-activity__section-header-icon" aria-hidden="true">
-                <ClipboardList size={18} />
-              </span>
-              <div>
-                <span>Activity Information</span>
-                <h2>Core planning details</h2>
-              </div>
-            </div>
-          </div>
+          {renderActivityInfoCard(
+            <ClipboardList size={18} />,
+            'Overview',
+            'Review the activity identity, organizational context, and strategic alignment.',
+            showPlanningReadOnlyView ? readOnlyPanel([
+              { label: 'Activity Type', value: getOptionLabel(ACTIVITY_TYPE_OPTIONS, form.activityType), kind: 'identity', columns: 6 },
+              { label: 'Activity / Initiative Name', value: form.activityName, kind: 'identity', columns: 6 },
+              { label: 'Activity Scope', value: getOptionLabel(ACTIVITY_SCOPE_OPTIONS, form.activityScope), kind: 'classification', columns: 6 },
+              ...(isStrategic
+                ? [{ label: 'Categorized Strategy', value: form.strategies.map((strategy) => getOptionLabel(STRATEGY_OPTIONS, strategy)).filter(Boolean).join(', '), kind: 'classification' as const, columns: 6 as const }]
+                : []),
+            ], 3) : (
+              <div className="create-activity__form-stack">
+                <div className="create-activity__form-row create-activity__form-row--two">
+                  <Select
+                    disabled={!canEditField('activityType')}
+                    error={errors.activityType}
+                    id="activity-type"
+                    label="Activity Type"
+                    onChange={(value) => updateForm({ activityType: value })}
+                    options={ACTIVITY_TYPE_OPTIONS}
+                    required
+                    tooltip={EDIT_ACTIVITY_TOOLTIPS.activityType}
+                    value={form.activityType}
+                  />
+                  <Input
+                    disabled={!canEditField('activityName')}
+                    error={errors.activityName}
+                    label="Activity / Initiative Name"
+                    onChange={(event) => updateForm({ activityName: event.target.value })}
+                    placeholder="Enter activity name"
+                    required
+                    tooltip={EDIT_ACTIVITY_TOOLTIPS.activityName}
+                    value={form.activityName}
+                  />
+                </div>
 
-          {showPlanningReadOnlyView ? (
-            <div className="create-activity__readonly-panel">
-              {renderReadOnlyDetails([
-                { label: 'Activity Type', value: getOptionLabel(ACTIVITY_TYPE_OPTIONS, form.activityType), kind: 'identity', columns: 3 },
-                { label: 'Activity / Initiative Name', value: form.activityName, kind: 'identity', columns: 9 },
-                { label: 'Sector', value: form.sectorName, kind: 'organization', columns: 6 },
-                { label: 'Division', value: form.divisionName, kind: 'organization', columns: 6 },
-                { label: 'Activity Scope', value: getOptionLabel(ACTIVITY_SCOPE_OPTIONS, form.activityScope), kind: 'classification', columns: 4 },
-                ...(isStrategic
-                  ? [{ label: 'Categorized Strategy', value: form.strategies.map((strategy) => getOptionLabel(STRATEGY_OPTIONS, strategy)).filter(Boolean).join(', '), kind: 'classification' as const, columns: 4 as const }]
-                  : []),
-                { label: 'Activity Classification', value: getOptionLabel(CLASSIFICATION_OPTIONS, form.activityClassification), kind: 'classification', columns: 4 },
-                { label: 'Budget Required', value: isPaymentOnly ? 'Yes' : getOptionLabel(YES_NO_OPTIONS, form.budgetRequired), kind: 'requirement', columns: 4 },
-                { label: 'Procurement Required', value: isBudgetNo ? 'No' : getOptionLabel(YES_NO_OPTIONS, form.procurementRequired), kind: 'requirement', columns: 4 },
-                { label: 'Execution plan project reported in ADEO', value: getOptionLabel(YES_NO_OPTIONS, form.adeoReported), kind: 'requirement', columns: 4 },
-                { label: 'Activity Lead / PM Name', value: activityLeadOptions.find((option) => option.value === form.activityLeadId)?.label ?? form.activityLeadId, kind: 'person', columns: 4 },
-                { label: 'Planned Start Date', value: form.plannedStartDate, type: 'date', kind: 'date', columns: 4 },
-                { label: 'Planned End Date', value: form.plannedEndDate, type: 'date', kind: 'date', columns: 4 },
-                { label: 'Activity Scope Description', value: form.scopeDescription, type: 'long', kind: 'narrative', columns: 6 },
-                { label: 'Summary', value: form.summary, type: 'long', kind: 'narrative', columns: 6 },
-              ], 3)}
-            </div>
-          ) : (
-          <div className="create-activity__form-stack">
-            <div className="create-activity__form-row create-activity__form-row--two">
-              <Select
-                disabled={!canEditField('activityType')}
-                error={errors.activityType}
-                id="activity-type"
-                label="Activity Type"
-                onChange={(value) => updateForm({ activityType: value })}
-                options={ACTIVITY_TYPE_OPTIONS}
-                required
-                value={form.activityType}
-              />
-              <Input
-                disabled={!canEditField('activityName')}
-                error={errors.activityName}
-                label="Activity / Initiative Name"
-                onChange={(event) => updateForm({ activityName: event.target.value })}
-                placeholder="Enter activity name"
-                required
-                value={form.activityName}
-              />
-            </div>
+                <div className="create-activity__form-row">
+                  <RadioGroup
+                    className="create-activity__radio create-activity__radio--scope"
+                    disabled={!canEditField('activityScope')}
+                    error={errors.activityScope}
+                    label="Activity Scope"
+                    name="activity-scope"
+                    onChange={(value) => updateForm({ activityScope: value })}
+                    options={ACTIVITY_SCOPE_OPTIONS.filter((option) => option.value !== '')}
+                    required
+                    tooltip={EDIT_ACTIVITY_TOOLTIPS.activityScope}
+                    value={form.activityScope}
+                  />
+                </div>
 
-            <div className="create-activity__form-row create-activity__form-row--two">
-              <Input disabled error={errors.sectorName} label="Sector" required rightIcon={<LockKeyhole size={15} />} value={form.sectorName} />
-              <Input disabled error={errors.divisionName} label="Division" required rightIcon={<LockKeyhole size={15} />} value={form.divisionName} />
-            </div>
-
-            <div className="create-activity__form-row">
-              <RadioGroup
-                className="create-activity__radio create-activity__radio--scope"
-                disabled={!canEditField('activityScope')}
-                error={errors.activityScope}
-                label="Activity Scope"
-                name="activity-scope"
-                onChange={(value) => updateForm({ activityScope: value })}
-                options={ACTIVITY_SCOPE_OPTIONS.filter((option) => option.value !== '')}
-                required
-                value={form.activityScope}
-              />
-            </div>
-
-            {isStrategic ? (
-              <div className="create-activity__form-row">
-                <fieldset className={`checkbox-group create-activity__strategy-group ${!canEditField('strategies') ? 'checkbox-group--disabled' : ''}`.trim()} disabled={!canEditField('strategies')}>
-                  <legend className="field__label">What strategy is this project/activity categorized under?</legend>
-                  <div className="checkbox-group__options">
-                    {STRATEGY_OPTIONS.map((option) => (
-                      <Checkbox
-                        checked={form.strategies.includes(option.value)}
-                        disabled={!canEditField('strategies')}
-                        key={option.value}
-                        label={option.label}
-                        onChange={() => toggleStrategy(option.value, form.strategies, (s) => updateForm({ strategies: s }))}
-                      />
-                    ))}
+                {isStrategic ? (
+                  <div className="create-activity__form-row">
+                    <fieldset className={`checkbox-group create-activity__strategy-group ${!canEditField('strategies') ? 'checkbox-group--disabled' : ''}`.trim()} disabled={!canEditField('strategies')}>
+                      <legend className="field__label field__label--with-tooltip">
+                        What strategy is this project/activity categorized under?
+                        <Tooltip content={EDIT_ACTIVITY_TOOLTIPS.strategies} label="More information about strategy categorization" />
+                      </legend>
+                      <div className="checkbox-group__options">
+                        {STRATEGY_OPTIONS.map((option) => (
+                          <Checkbox
+                            checked={form.strategies.includes(option.value)}
+                            disabled={!canEditField('strategies')}
+                            key={option.value}
+                            label={option.label}
+                            onChange={() => toggleStrategy(option.value, form.strategies, (s) => updateForm({ strategies: s }))}
+                          />
+                        ))}
+                      </div>
+                      {errors.strategies ? <span className="field__error">{errors.strategies}</span> : null}
+                    </fieldset>
                   </div>
-                  {errors.strategies ? <span className="field__error">{errors.strategies}</span> : null}
-                </fieldset>
+                ) : null}
               </div>
-            ) : null}
-
-            <div className="create-activity__form-row">
-              <RadioGroup
-                className="create-activity__radio create-activity__radio--classification"
-                disabled={!canEditField('activityClassification')}
-                error={errors.activityClassification}
-                label="Activity Classification"
-                name="activity-classification"
-                onChange={(value) => updateForm({ activityClassification: value })}
-                options={CLASSIFICATION_OPTIONS.filter((option) => option.value !== '')}
-                required
-                value={form.activityClassification}
-              />
-            </div>
-
-            <div className="create-activity__form-row create-activity__form-row--three">
-              {!isPaymentOnly ? (
-                <RadioGroup
-                  className="create-activity__radio create-activity__radio--yes-no"
-                  disabled={!canEditField('budgetRequired')}
-                  error={errors.budgetRequired}
-                  label="Does this project require Budget?"
-                  name="budget-required"
-                  onChange={(value) => updateForm({ budgetRequired: value })}
-                  options={YES_NO_OPTIONS.filter((option) => option.value !== '')}
-                  required
-                  value={form.budgetRequired}
-                />
-              ) : (
-                <Input disabled hint="Payment Only activities are considered budget required." label="Budget Required" required rightIcon={<LockKeyhole size={15} />} value="Yes" />
-              )}
-              {isBudgetNo ? (
-                <Input disabled hint="Procurement is automatically No when budget is not required." label="Does this project require procurement?" required rightIcon={<LockKeyhole size={15} />} value="No" />
-              ) : (
-                <RadioGroup
-                  className="create-activity__radio create-activity__radio--yes-no"
-                  disabled={!canEditField('procurementRequired')}
-                  error={errors.procurementRequired}
-                  label="Does this project require procurement?"
-                  name="procurement-required"
-                  onChange={(value) => updateForm({ procurementRequired: value })}
-                  options={YES_NO_OPTIONS.filter((option) => option.value !== '')}
-                  required
-                  value={form.procurementRequired}
-                />
-              )}
-              <RadioGroup
-                className="create-activity__radio create-activity__radio--yes-no"
-                disabled={!canEditField('adeoReported')}
-                error={errors.adeoReported}
-                label="Execution plan project reported in ADEO"
-                name="adeo-reported"
-                onChange={(value) => updateForm({ adeoReported: value })}
-                options={YES_NO_OPTIONS.filter((option) => option.value !== '')}
-                required
-                value={form.adeoReported}
-              />
-            </div>
-
-            <div className="create-activity__form-row">
-              <Select
-                disabled={!canEditField('activityLeadId')}
-                error={errors.activityLeadId}
-                id="activity-lead"
-                label="Activity Lead / PM Name"
-                onChange={(value) => updateForm({ activityLeadId: value })}
-                options={activityLeadOptions.length > 0
-                  ? [{ label: 'Select Activity Lead', value: '' }, ...activityLeadOptions]
-                  : [{ label: 'No users available', value: '' }]}
-                required
-                value={form.activityLeadId || ''}
-              />
-            </div>
-
-            <div className="create-activity__date-range" role="group" aria-label="Activity timeline">
-              <DatePicker
-                disabled={!canEditField('plannedStartDate')}
-                error={errors.plannedStartDate}
-                id="planned-start-date"
-                label="Planned Start Date"
-                onChange={(value) => updateForm({ plannedStartDate: value })}
-                required
-                value={form.plannedStartDate}
-              />
-              <span className="create-activity__date-connector" aria-hidden="true">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M5 12h14M13 5l7 7-7 7"/>
-                </svg>
-              </span>
-              <DatePicker
-                disabled={!canEditField('plannedEndDate')}
-                error={errors.plannedEndDate}
-                id="planned-end-date"
-                label="Planned End Date"
-                min={form.plannedStartDate}
-                onChange={(value) => updateForm({ plannedEndDate: value })}
-                required
-                value={form.plannedEndDate}
-              />
-            </div>
-
-            <div className="create-activity__form-row create-activity__form-row--two">
-              <Textarea
-                disabled={!canEditField('scopeDescription')}
-                error={errors.scopeDescription}
-                label="Activity Scope Description"
-                onChange={(event) => updateForm({ scopeDescription: event.target.value })}
-                placeholder="Describe in-scope and out-of-scope boundaries"
-                required
-                value={form.scopeDescription}
-              />
-              <Textarea
-                disabled={!canEditField('summary')}
-                error={errors.summary}
-                label="Summary"
-                onChange={(event) => updateForm({ summary: event.target.value })}
-                placeholder="Summarize the expected outcome"
-                required
-                value={form.summary}
-              />
-            </div>
-          </div>
+            ),
           )}
-        </Card>
 
-        {/* ADEO Card */}
-        {isAdeoVisible ? (
-          <Card className="create-activity__section">
-            <div className="create-activity__section-header">
-              <div className="create-activity__section-header-inner">
-                <span className="create-activity__section-header-icon" aria-hidden="true">
-                  <FileText size={18} />
-                </span>
-                <div>
-                  <span>ADEO Activity Overview</span>
-                  <h2>Execution plan reporting details</h2>
+          {renderActivityInfoCard(
+            <FileText size={18} />,
+            'Activity Details',
+            'Confirm classification, requirements, ownership, scope, and summary.',
+            showPlanningReadOnlyView ? readOnlyPanel([
+              { label: 'Activity Classification', value: getOptionLabel(CLASSIFICATION_OPTIONS, form.activityClassification), kind: 'classification', columns: 6 },
+              { label: 'Budget Required', value: isPaymentOnly ? 'Yes' : getOptionLabel(YES_NO_OPTIONS, form.budgetRequired), kind: 'requirement', columns: 6 },
+              { label: 'Procurement Required', value: isBudgetNo ? 'No' : getOptionLabel(YES_NO_OPTIONS, form.procurementRequired), kind: 'requirement', columns: 6 },
+              { label: 'Execution plan project reported in ADEO', value: getOptionLabel(YES_NO_OPTIONS, form.adeoReported), kind: 'requirement', columns: 6 },
+              { label: 'Activity Lead / PM Name', value: activityLeadOptions.find((option) => option.value === form.activityLeadId)?.label ?? form.activityLeadId, kind: 'person', columns: 6 },
+              { label: 'Scope', value: form.scopeDescription, type: 'long', kind: 'narrative', columns: 6 },
+              { label: 'Summary', value: form.summary, type: 'long', kind: 'narrative', columns: 6 },
+            ], 3) : (
+              <div className="create-activity__form-stack">
+                <div className="create-activity__form-row">
+                  <RadioGroup
+                    className="create-activity__radio create-activity__radio--classification"
+                    disabled={!canEditField('activityClassification')}
+                    error={errors.activityClassification}
+                    label="Activity Classification"
+                    name="activity-classification"
+                    onChange={(value) => updateForm({ activityClassification: value })}
+                    options={CLASSIFICATION_OPTIONS.filter((option) => option.value !== '')}
+                    required
+                    tooltip={EDIT_ACTIVITY_TOOLTIPS.activityClassification}
+                    value={form.activityClassification}
+                  />
+                </div>
+
+                <div className="create-activity__form-row create-activity__form-row--three">
+                  {!isPaymentOnly ? (
+                    <RadioGroup
+                      className="create-activity__radio create-activity__radio--yes-no"
+                      disabled={!canEditField('budgetRequired')}
+                      error={errors.budgetRequired}
+                      label="Does this project require Budget?"
+                      name="budget-required"
+                      onChange={(value) => updateForm({ budgetRequired: value })}
+                      options={YES_NO_OPTIONS.filter((option) => option.value !== '')}
+                      required
+                      tooltip={EDIT_ACTIVITY_TOOLTIPS.budgetRequired}
+                      value={form.budgetRequired}
+                    />
+                  ) : (
+                    <RadioGroup
+                      className="create-activity__radio create-activity__radio--yes-no"
+                      disabled
+                      label="Does this project require Budget?"
+                      name="budget-required"
+                      onChange={() => undefined}
+                      options={YES_NO_OPTIONS.filter((option) => option.value !== '')}
+                      required
+                      tooltip={EDIT_ACTIVITY_TOOLTIPS.paymentOnlyWarning}
+                      tooltipTone="warning"
+                      value="1"
+                    />
+                  )}
+                  {isBudgetNo ? (
+                    <RadioGroup
+                      className="create-activity__radio create-activity__radio--yes-no"
+                      disabled
+                      label="Does this project require procurement?"
+                      name="procurement-required"
+                      onChange={() => undefined}
+                      options={YES_NO_OPTIONS.filter((option) => option.value !== '')}
+                      required
+                      tooltip={EDIT_ACTIVITY_TOOLTIPS.budgetNoWarning}
+                      tooltipTone="warning"
+                      value="0"
+                    />
+                  ) : (
+                    <RadioGroup
+                      className="create-activity__radio create-activity__radio--yes-no"
+                      disabled={!canEditField('procurementRequired')}
+                      error={errors.procurementRequired}
+                      label="Does this project require procurement?"
+                      name="procurement-required"
+                      onChange={(value) => updateForm({ procurementRequired: value })}
+                      options={YES_NO_OPTIONS.filter((option) => option.value !== '')}
+                      required
+                      tooltip={EDIT_ACTIVITY_TOOLTIPS.procurementRequired}
+                      value={form.procurementRequired}
+                    />
+                  )}
+                  <RadioGroup
+                    className="create-activity__radio create-activity__radio--yes-no"
+                    disabled={!canEditField('adeoReported')}
+                    error={errors.adeoReported}
+                    label="Execution plan project reported in ADEO"
+                    name="adeo-reported"
+                    onChange={(value) => updateForm({ adeoReported: value })}
+                    options={YES_NO_OPTIONS.filter((option) => option.value !== '')}
+                    required
+                    tooltip={EDIT_ACTIVITY_TOOLTIPS.adeoReported}
+                    value={form.adeoReported}
+                  />
+                </div>
+
+                <div className="create-activity__form-row">
+                  <Select
+                    disabled={!canEditField('activityLeadId')}
+                    error={errors.activityLeadId}
+                    id="activity-lead"
+                    label="Activity Lead / PM Name"
+                    onChange={(value) => updateForm({ activityLeadId: value })}
+                    options={activityLeadOptions.length > 0
+                      ? [{ label: 'Select Activity Lead', value: '' }, ...activityLeadOptions]
+                      : [{ label: 'No users available', value: '' }]}
+                    required
+                    tooltip={EDIT_ACTIVITY_TOOLTIPS.activityLead}
+                    value={form.activityLeadId || ''}
+                  />
+                </div>
+
+                <div className="create-activity__form-row create-activity__form-row--two">
+                  <Textarea
+                    disabled={!canEditField('scopeDescription')}
+                    error={errors.scopeDescription}
+                    label="Scope"
+                    onChange={(event) => updateForm({ scopeDescription: event.target.value })}
+                    placeholder="Describe in-scope and out-of-scope boundaries"
+                    required
+                    tooltip={EDIT_ACTIVITY_TOOLTIPS.scope}
+                    value={form.scopeDescription}
+                  />
+                  <Textarea
+                    disabled={!canEditField('summary')}
+                    error={errors.summary}
+                    label="Summary"
+                    onChange={(event) => updateForm({ summary: event.target.value })}
+                    placeholder="Summarize the expected outcome"
+                    required
+                    tooltip={EDIT_ACTIVITY_TOOLTIPS.summary}
+                    value={form.summary}
+                  />
                 </div>
               </div>
-            </div>
-            {showPlanningReadOnlyView ? (
-              <div className="create-activity__readonly-panel create-activity__readonly-panel--adeo">
-                {renderReadOnlyDetails([
-                  { label: 'Project Name', value: form.adeoProjectName, kind: 'identity' },
-                  { label: 'Project Description', value: form.adeoProjectDescription, kind: 'narrative' },
-                  { label: 'Long Term Impact', value: form.longTermImpact, type: 'long', kind: 'narrative' },
-                  { label: 'Overall Long Term Impact', value: form.overallLongTermImpact, type: 'long', kind: 'narrative' },
-                  { label: 'Stakeholder', value: form.stakeholder, kind: 'person' },
-                  { label: 'Activity KPI', value: form.activityKpi, kind: 'classification' },
-                  { label: 'Activity Plan (If any)', value: form.activityPlan, kind: 'narrative' },
-                  { label: 'Risks', value: form.risks, kind: 'narrative' },
-                ], 2)}
+            ),
+          )}
+
+          {renderActivityInfoCard(
+            <ClipboardList size={18} />,
+            'Activity Timeline',
+            'Review the planned start and end dates for the activity.',
+            showPlanningReadOnlyView ? readOnlyPanel([
+              { label: 'Planned Start Date', value: form.plannedStartDate, type: 'date', kind: 'date', columns: 6 },
+              { label: 'Planned End Date', value: form.plannedEndDate, type: 'date', kind: 'date', columns: 6 },
+            ], 3) : (
+              <div className="create-activity__form-stack">
+                <div className="create-activity__date-range" role="group" aria-label="Activity timeline">
+                  <DatePicker
+                    disabled={!canEditField('plannedStartDate')}
+                    error={errors.plannedStartDate}
+                    id="planned-start-date"
+                    label="Planned Start Date"
+                    onChange={(value) => updateForm({ plannedStartDate: value })}
+                    required
+                    tooltip={EDIT_ACTIVITY_TOOLTIPS.plannedStartDate}
+                    value={form.plannedStartDate}
+                  />
+                  <span className="create-activity__date-connector" aria-hidden="true">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M5 12h14M13 5l7 7-7 7"/>
+                    </svg>
+                  </span>
+                  <DatePicker
+                    disabled={!canEditField('plannedEndDate')}
+                    error={errors.plannedEndDate}
+                    id="planned-end-date"
+                    label="Planned End Date"
+                    min={form.plannedStartDate}
+                    onChange={(value) => updateForm({ plannedEndDate: value })}
+                    required
+                    tooltip={EDIT_ACTIVITY_TOOLTIPS.plannedEndDate}
+                    value={form.plannedEndDate}
+                  />
+                </div>
               </div>
+            ),
+          )}
+
+          {isAdeoVisible ? renderActivityInfoCard(
+            <FileText size={18} />,
+            'ADEO Activity Overview',
+            'Capture execution plan reporting details required for ADEO visibility.',
+            showPlanningReadOnlyView ? (
+              readOnlyPanel([
+                { label: 'Project Name', value: form.adeoProjectName, kind: 'identity', columns: 6 },
+                { label: 'Project Description', value: form.adeoProjectDescription, kind: 'narrative', columns: 6 },
+                { label: 'Long Term Impact', value: form.longTermImpact, type: 'long', kind: 'narrative', columns: 6 },
+                { label: 'Overall Long Term Impact', value: form.overallLongTermImpact, type: 'long', kind: 'narrative', columns: 6 },
+                { label: 'Stakeholder', value: form.stakeholder, kind: 'person', columns: 6 },
+                { label: 'Activity KPI', value: form.activityKpi, kind: 'classification', columns: 6 },
+                { label: 'Activity Plan (If any)', value: form.activityPlan, kind: 'narrative', columns: 6 },
+                { label: 'Risks', value: form.risks, kind: 'narrative', columns: 6 },
+              ], 3)
             ) : (
             <div className="create-activity__form-stack">
               <div className="create-activity__form-row create-activity__form-row--two">
@@ -765,17 +840,18 @@ export function ActivityInfoTab({
                 />
               </div>
             </div>
-            )}
-          </Card>
-        ) : null}
+            ),
+          ) : null}
+        </div>
 
-        <MembersTab embedded isReadOnly={isReadOnly} onActivityDataChanged={onActivityDataChanged} projectId={projectId} />
+        <MembersTab embedded isReadOnly={!isEditing || isReadOnly} onActivityDataChanged={onActivityDataChanged} onOperationAlert={onOperationAlert} projectId={projectId} />
         {isAdeoVisible ? (
           <DependenciesTab
             embedded
-            isReadOnly={isReadOnly}
+            isReadOnly={!isEditing || isReadOnly}
             onActivityDataChanged={onActivityDataChanged}
             onDependencyCountChange={handleDependencyCountChange}
+            onOperationAlert={onOperationAlert}
             projectId={projectId}
           />
         ) : null}
@@ -787,6 +863,7 @@ export function ActivityInfoTab({
     updateForm,
     activityLeadOptions,
     showExecutionTracking,
+    isEditing,
     isStrategic,
     isPaymentOnly,
     isBudgetNo,
@@ -798,13 +875,15 @@ export function ActivityInfoTab({
     canEditField,
     executionActivityStatusOptions,
     handleDependencyCountChange,
+    onOperationAlert,
     showPlanningReadOnlyView,
   ])
 
   void guidancePanel
 
   return (
-    <div className="create-activity__manual-layout">
+    <TooltipProvider>
+      <div className="create-activity__manual-layout">
       <div className="create-activity__manual-ai-summary">
         <AiSummaryPanel
           error={aiSummaryError}
@@ -817,6 +896,7 @@ export function ActivityInfoTab({
       <div className="create-activity__manual-form">
         {formCards}
       </div>
-    </div>
+      </div>
+    </TooltipProvider>
   )
 }

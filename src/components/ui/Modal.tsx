@@ -40,6 +40,9 @@ export function Modal({ actions, children, isOpen, onClose, title }: ModalProps)
       return undefined
     }
 
+    const originalOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         onClose()
@@ -49,6 +52,7 @@ export function Modal({ actions, children, isOpen, onClose, title }: ModalProps)
     document.addEventListener('keydown', handleKeyDown)
 
     return () => {
+      document.body.style.overflow = originalOverflow
       document.removeEventListener('keydown', handleKeyDown)
     }
   }, [isOpen, onClose])
