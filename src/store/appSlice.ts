@@ -192,9 +192,12 @@ export const appSlice = createSlice({
     closeNotificationPanel: (state) => {
       state.isNotificationPanelOpen = false
     },
-    markAllNotificationsRead: (state) => {
+    markAllNotificationsRead: (state, action: PayloadAction<string[] | undefined>) => {
+      const visibleIds = action.payload ? new Set(action.payload) : null
       state.notifications.forEach((notification) => {
-        notification.unread = false
+        if (!visibleIds || visibleIds.has(notification.id)) {
+          notification.unread = false
+        }
       })
     },
     markNotificationRead: (state, action: PayloadAction<string>) => {

@@ -48,6 +48,7 @@ import {
   calculateProjectMilestoneProgress,
   type ProjectMilestoneProgress,
 } from './helpers/milestoneProgress'
+import type { EditActivityOperationNotifier } from './types/operationAlert'
 
 // ── Types ──
 
@@ -166,6 +167,7 @@ interface MilestonesTabProps {
   canEditExecutionFieldsOnly?: boolean
   isAdeoVisible: boolean
   onActivityDataChanged?: () => void
+  onOperationAlert?: EditActivityOperationNotifier
   onProgressChange?: (progress: ProjectMilestoneProgress) => void
   onProjectRelatedChangesChange?: (relatedChanges: string) => void
   projectId: string
@@ -455,6 +457,7 @@ export function MilestonesTab({
   canEditExecutionFieldsOnly = false,
   isAdeoVisible,
   onActivityDataChanged,
+  onOperationAlert,
   onProgressChange,
   onProjectRelatedChangesChange,
   projectId,
@@ -466,7 +469,6 @@ export function MilestonesTab({
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
   const [viewMode, setViewMode] = useState<'list' | 'quarter'>('list')
   const [localProjectRelatedChanges, setLocalProjectRelatedChanges] = useState<{ projectId: string; value: string } | null>(null)
 
@@ -652,7 +654,6 @@ export function MilestonesTab({
     setUploadedFile(null)
     setFormErrors({})
     setError('')
-    setNotice('')
     setIsDrawerOpen(true)
   }
 
@@ -663,7 +664,6 @@ export function MilestonesTab({
     setUploadedFile(null)
     setFormErrors({})
     setError('')
-    setNotice('')
     setIsDrawerOpen(true)
   }
 
@@ -792,18 +792,33 @@ export function MilestonesTab({
     if (isReadOnly && !canEditExecutionFieldsOnly) return
     if (canEditExecutionFieldsOnly && !editingMilestone) return
     if (isExecutionPhase && editingMilestone && isFutureQuarter(form.quarter)) {
-      setError('This milestone is scheduled for a future quarter. Execution updates are locked until that quarter starts.')
+      onOperationAlert?.({
+        kind: 'error',
+        message: 'This milestone is scheduled for a future quarter. Execution updates are locked until that quarter starts.',
+        title: 'Milestone update blocked',
+      })
       return
     }
     if (!validate()) return
     if (!projectId) {
-      setError('Activity id is missing from the edit URL.')
+      onOperationAlert?.({
+        kind: 'error',
+        message: 'Activity id is missing from the edit URL.',
+        title: 'Milestone update blocked',
+      })
       return
     }
 
     setIsSaving(true)
     setError('')
-    setNotice('')
+    onOperationAlert?.({
+      kind: 'processing',
+      title: editingMilestone
+        ? isExecutionPhase
+          ? 'Saving milestone execution changes'
+          : 'Updating milestone'
+        : 'Creating milestone',
+    })
 
     try {
       if (editingMilestone && isExecutionPhase) {
@@ -907,25 +922,41 @@ export function MilestonesTab({
           ], { milestoneId: editingMilestone.id })
         } catch (uploadError) {
           const uploadMessage = uploadError instanceof Error ? uploadError.message : 'Unable to upload the milestone file.'
-          setError(`Milestone execution changes were saved, but the file upload failed. ${uploadMessage}`)
+          onOperationAlert?.({
+            kind: 'error',
+            message: `Milestone execution changes were saved, but the file upload failed. ${uploadMessage}`,
+            title: 'Milestone file upload failed',
+          })
           onActivityDataChanged?.()
           return
         }
 
-        setNotice('Milestone execution changes updated successfully.')
+        onOperationAlert?.({
+          kind: 'success',
+          message: 'Milestone execution changes updated successfully.',
+          title: 'Milestone updated',
+        })
       } else if (editingMilestone) {
         const result = await Dga_aop_project_milestone_detailsesService.update(
           editingMilestone.id,
           buildMilestoneUpdatePayload({ ...form, quarter: calculateQuarter(form) }),
         )
         assertOperationSuccess(result, 'Unable to update milestone.')
-        setNotice('Milestone updated successfully.')
+        onOperationAlert?.({
+          kind: 'success',
+          message: 'Milestone updated successfully.',
+          title: 'Milestone updated',
+        })
       } else {
         const result = await Dga_aop_project_milestone_detailsesService.create(
           buildMilestoneCreatePayload({ ...form, quarter: calculateQuarter(form) }, projectId),
         )
         assertOperationSuccess(result, 'Unable to create milestone.')
-        setNotice('Milestone created successfully.')
+        onOperationAlert?.({
+          kind: 'success',
+          message: 'Milestone created successfully.',
+          title: 'Milestone created',
+        })
       }
 
       handleCloseDrawer()
@@ -934,7 +965,11 @@ export function MilestonesTab({
       }
       onActivityDataChanged?.()
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Unable to save milestone.')
+      onOperationAlert?.({
+        kind: 'error',
+        message: saveError instanceof Error ? saveError.message : 'Unable to save milestone.',
+        title: 'Milestone was not saved',
+      })
     } finally {
       setIsSaving(false)
     }
@@ -945,16 +980,24 @@ export function MilestonesTab({
     if (!milestoneToDelete) return
     setIsDeleting(true)
     setError('')
-    setNotice('')
+    onOperationAlert?.({ kind: 'processing', title: 'Deleting milestone' })
 
     try {
       await Dga_aop_project_milestone_detailsesService.delete(milestoneToDelete.id)
       setMilestones((prev) => prev.filter((m) => m.id !== milestoneToDelete.id))
       setMilestoneToDelete(null)
-      setNotice('Milestone deleted successfully.')
+      onOperationAlert?.({
+        kind: 'success',
+        message: 'Milestone deleted successfully.',
+        title: 'Milestone deleted',
+      })
       onActivityDataChanged?.()
     } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : 'Unable to delete milestone.')
+      onOperationAlert?.({
+        kind: 'error',
+        message: deleteError instanceof Error ? deleteError.message : 'Unable to delete milestone.',
+        title: 'Milestone was not deleted',
+      })
     } finally {
       setIsDeleting(false)
     }
@@ -1615,11 +1658,6 @@ export function MilestonesTab({
         <div className="edit-activity__members-modal-error">
           <Flag size={13} />
           {error}
-        </div>
-      ) : notice ? (
-        <div className="edit-activity__members-modal-selected-header">
-          <Flag size={14} />
-          <span>{notice}</span>
         </div>
       ) : null}
 

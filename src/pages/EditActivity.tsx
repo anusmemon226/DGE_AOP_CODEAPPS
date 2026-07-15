@@ -3,6 +3,8 @@ import {
   ArrowLeft,
   BarChart3,
   Briefcase,
+  CheckCircle2,
+  ChevronRight,
   ClipboardList,
   Edit3,
   FileText,
@@ -15,9 +17,10 @@ import {
   Target,
   UserRound,
   Wallet,
+  X,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Badge, Button, ConfirmationDialog, Modal, Textarea, type SelectOption } from '../components/ui'
 import {
   Dga_aop_projectsesdga_project_activity_status,
@@ -56,6 +59,7 @@ import { LogTab } from './editActivity/LogTab'
 import { ReviewChangesPanel } from './editActivity/ReviewChangesPanel'
 import { AiSummaryPanel } from './editActivity/AiSummaryPanel'
 import type { AiSummaryBlocks, AiSummaryMeta } from './editActivity/types/aiSummaryTypes'
+import type { EditActivityOperationAlertPayload, EditActivityOperationNotifier } from './editActivity/types/operationAlert'
 import {
   assertOperationSuccess,
   buildActivityInfoUpdatePayload,
@@ -110,6 +114,10 @@ const TABS: TabConfig[] = [
   { id: 'clarifications', label: 'Clarifications', shortLabel: 'Clarifications', icon: HelpCircle },
   { id: 'logs', label: 'Logs', shortLabel: 'Logs', icon: History },
 ]
+
+function scrollPageToTop(behavior: ScrollBehavior = 'smooth') {
+  window.scrollTo({ top: 0, behavior })
+}
 
 const ACTIVITY_INFO_SELECT_FIELDS = [
   'dga_aop_projectsid',
@@ -176,10 +184,11 @@ function formatActivityStatusLogValue(value: unknown) {
 function getStatusTone(statusCode: number): 'neutral' | 'info' | 'warning' | 'success' {
   switch (statusCode) {
     case 776140001:
-    case 776140002:
-    case 776140003:
     case 776140004:
+    case 776140002:
     case 776140014:
+      return 'warning'
+    case 776140003:
       return 'info'
     case 776140011:
       return 'success'
@@ -784,7 +793,7 @@ export function EditActivity() {
   const [searchParams] = useSearchParams()
   const projectId = searchParams.get('id') ?? ''
   const selectedRole = useAppSelector((state) => state.app.selectedRole)
-  const { currentRole, currentRoleDivisionalHierarchy, divisionalHierarchies: allHierarchies } = useAppSelector((state) => state.user)
+  const { currentRole, currentRoleDivisionalHierarchy, divisionalHierarchies: allHierarchies, systemUser } = useAppSelector((state) => state.user)
   const [activeTab, setActiveTab] = useState<TabId>('activity-info')
   const [activity, setActivity] = useState<Dga_aop_projectses | null>(null)
   const [form, setForm] = useState<ActivityForm>(INITIAL_FORM)
@@ -793,6 +802,8 @@ export function EditActivity() {
   const [isContextLoading, setIsContextLoading] = useState(true)
   const [isSavingActivityInfo, setIsSavingActivityInfo] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
+  const [tabOperationAlert, setTabOperationAlert] = useState<EditActivityOperationAlertPayload | null>(null)
+  const previousSelectedRoleRef = useRef(selectedRole)
   const [pendingWith, setPendingWith] = useState('Loading...')
   const [objectiveHeaderAction, setObjectiveHeaderAction] = useState<ObjectiveHeaderAction | null>(null)
   const [budgetHeaderAction, setBudgetHeaderAction] = useState<BudgetHeaderAction | null>(null)
@@ -976,9 +987,39 @@ export function EditActivity() {
   const isPaymentOnly = form.activityClassification === '576610002'
   const isBudgetNo = form.budgetRequired === '0'
   const isAdeoVisible = form.adeoReported === '1'
-  const displayedMilestoneProgress = isExecutionPhase ? milestoneProjectProgress.actual : milestoneProjectProgress.planned
+  const isMilestoneProgressDisabled = isPaymentOnly
+  const plannedMilestoneProgress = isMilestoneProgressDisabled ? 0 : milestoneProjectProgress.planned
+  const actualMilestoneProgress = isMilestoneProgressDisabled ? 0 : milestoneProjectProgress.actual
+  const displayedMilestoneProgress = isExecutionPhase ? actualMilestoneProgress : plannedMilestoneProgress
   const displayedMilestoneProgressLabel = isExecutionPhase ? 'Actual Progress' : 'Planned Progress'
-  const headerProgressAriaLabel = `${displayedMilestoneProgressLabel} ${Math.round(displayedMilestoneProgress)}%`
+  const headerProgressAriaLabel = isMilestoneProgressDisabled
+    ? 'Milestone progress is unavailable for Payment Only activities'
+    : `${displayedMilestoneProgressLabel} ${Math.round(displayedMilestoneProgress)}%`
+  const operationInProgressLabel = isSavingActivityInfo
+    ? 'Saving activity information'
+    : objectiveHeaderAction?.isSaving
+      ? objectiveHeaderAction.savingLabel
+      : budgetHeaderAction?.isSaving
+        ? budgetHeaderAction.savingLabel
+        : isSubmittingToDirector || isSubmittingToStrategyTeam || isSubmittingToExecutiveDirector || isSubmittingToDirectorGeneral
+          ? 'Submitting activity for review'
+          : isApprovingAsDirectorGeneral || isApprovingExecutionUpdates
+            ? 'Approving activity updates'
+            : isRejectingExecutionUpdates
+              ? 'Rejecting activity updates'
+              : isStartingActivity
+                ? 'Starting activity'
+              : isSubmittingActivityUpdates
+                ? 'Submitting activity updates'
+                : ''
+  const operationAlert = operationInProgressLabel
+    ? { kind: 'processing' as const, title: operationInProgressLabel }
+    : successMessage
+      ? { kind: 'success' as const, message: successMessage, title: 'Changes saved' }
+      : tabOperationAlert
+  const operationAlertKey = operationAlert
+    ? `${operationAlert.kind}:${operationAlert.title}:${operationAlert.message ?? ''}`
+    : ''
 
   // ── Tab lock conditions ──
   const tabLocked: Partial<Record<TabId, boolean>> = {
@@ -994,8 +1035,19 @@ export function EditActivity() {
   const isExecutiveDirector = selectedRole === 'AOP - Executive Director'
   const isDirectorGeneral = selectedRole === 'AOP - Director General'
   const ownerTeamId = normalizeId(activity?._owningteam_value)
+  const ownerUserId = normalizeId(activity?._owninguser_value)
   const currentRoleTeamId = normalizeId(currentRole?.teamId)
+  const currentUserId = normalizeId(systemUser?.systemuserid)
   const isOwnedByCurrentRoleTeam = Boolean(ownerTeamId && currentRoleTeamId && ownerTeamId === currentRoleTeamId)
+  const isOwnedByCurrentUser = Boolean(ownerUserId && currentUserId && ownerUserId === currentUserId)
+  const hasOwnerMismatch = Boolean(
+    activity
+    && !isStrategyTeam
+    && (
+      (ownerUserId && currentUserId && !isOwnedByCurrentUser)
+      || (!ownerUserId && ownerTeamId && currentRoleTeamId && !isOwnedByCurrentRoleTeam)
+    ),
+  )
   const isExecutionApprovalPending = isExecutionPhase && [776140001, 776140003, 776140002].includes(Number(statusCode))
   const canApproveExecutionAsDivisionDirector = isDivisionDirector && isOwnedByCurrentRoleTeam && isExecutionPhase && statusCode === 776140001
   const canApproveExecutionAsStrategyTeam = isStrategyTeam && isOwnedByCurrentRoleTeam && isExecutionPhase && statusCode === 776140003
@@ -1003,14 +1055,21 @@ export function EditActivity() {
   const canReviewExecutionUpdates = canApproveExecutionAsDivisionDirector || canApproveExecutionAsStrategyTeam || canApproveExecutionAsExecutiveDirector
   const hasApprovedExecutionBaseline = hasApprovedProjectRelatedChange(parseProjectRelatedChanges(activity?.dga_project_related_changes))
   const showExecutionPendingNotice = isDivisionMember && isExecutionApprovalPending
-  const showExecutionRejectedNotice = isDivisionMember && Boolean(activity?.dga_is_rejected && activity?.dga_rejection_reason)
+  const showExecutionRejectedNotice = Boolean(activity?.dga_is_rejected && activity?.dga_rejection_reason)
   const showExecutionApprovedNotice = (
-    isDivisionMember
-    && isExecutionPhase
+    isExecutionPhase
     && statusCode === 776140011
     && !showExecutionRejectedNotice
     && hasApprovedExecutionBaseline
   )
+  const showRespondentActionsNotice = showExecutionPendingNotice && !hasOwnerMismatch
+  const persistentAlertKey = [
+    errors.submit ? `submit:${errors.submit}` : '',
+    showExecutionRejectedNotice ? `rejected:${activity?.dga_rejection_reason ?? ''}` : '',
+    hasOwnerMismatch ? 'owner-mismatch' : '',
+    showRespondentActionsNotice ? 'respondent-actions' : '',
+    showExecutionApprovedNotice ? 'execution-approved' : '',
+  ].filter(Boolean).join('|')
   const canShowSubmitActivityUpdates = (
     isDivisionMember
     && isOwnedByCurrentRoleTeam
@@ -1092,7 +1151,33 @@ export function EditActivity() {
   // ── Context loading ──
 
   useEffect(() => {
+    if (!operationAlertKey) return
+
+    scrollPageToTop()
+  }, [operationAlertKey])
+
+  useEffect(() => {
+    if (!persistentAlertKey) return
+
+    scrollPageToTop()
+  }, [persistentAlertKey])
+
+  useEffect(() => {
+    if (previousSelectedRoleRef.current === selectedRole) return
+
+    previousSelectedRoleRef.current = selectedRole
+    setSuccessMessage('')
+    setTabOperationAlert(null)
+    setExecutionRejectionError('')
+    setErrors((currentErrors) => (
+      currentErrors.context ? { context: currentErrors.context } : {}
+    ))
+  }, [selectedRole])
+
+  useEffect(() => {
     if (!successMessage) return
+
+    setTabOperationAlert(null)
 
     const timeoutId = window.setTimeout(() => {
       setSuccessMessage('')
@@ -1100,6 +1185,23 @@ export function EditActivity() {
 
     return () => window.clearTimeout(timeoutId)
   }, [successMessage])
+
+  useEffect(() => {
+    if (!tabOperationAlert || tabOperationAlert.kind === 'processing') return
+
+    const timeoutId = window.setTimeout(() => {
+      setTabOperationAlert(null)
+    }, 10000)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [tabOperationAlert])
+
+  const showTabOperationAlert = useCallback<EditActivityOperationNotifier>((payload) => {
+    if (payload) {
+      setSuccessMessage('')
+    }
+    setTabOperationAlert(payload)
+  }, [])
 
   useEffect(() => {
     let isMounted = true
@@ -1285,10 +1387,11 @@ export function EditActivity() {
     setSuccessMessage('')
 
     if (!editPermissions.activityInfoCanSave) {
-      setErrors((currentErrors) => ({
-        ...currentErrors,
-        submit: 'You do not have permission to edit Activity Information for this activity.',
-      }))
+      setTabOperationAlert({
+        kind: 'error',
+        message: 'You do not have permission to edit Activity Information for this activity.',
+        title: 'Activity information was not saved',
+      })
       return
     }
 
@@ -1408,10 +1511,11 @@ export function EditActivity() {
       setSuccessMessage('Activity information saved successfully.')
       refreshActivityAiSummary('activity-information-save')
     } catch (error) {
-      setErrors((currentErrors) => ({
-        ...currentErrors,
-        submit: error instanceof Error ? error.message : 'Failed to save activity information.',
-      }))
+      setTabOperationAlert({
+        kind: 'error',
+        message: error instanceof Error ? error.message : 'Failed to save activity information.',
+        title: 'Activity information was not saved',
+      })
     } finally {
       setIsSavingActivityInfo(false)
     }
@@ -2536,6 +2640,7 @@ export function EditActivity() {
             isReadOnly={editPermissions.objectivesReadOnly}
             onActivityDataChanged={handleObjectivesActivityDataChanged}
             onHeaderActionChange={setObjectiveHeaderAction}
+            onOperationAlert={showTabOperationAlert}
             projectId={projectId}
             statusCode={statusCode}
           />
@@ -2553,6 +2658,7 @@ export function EditActivity() {
               refreshActivityAiSummary('milestone-crud')
               void loadMilestoneProjectProgress(activity?.dga_project_related_changes)
             }}
+            onOperationAlert={showTabOperationAlert}
             onProgressChange={setMilestoneProjectProgress}
             onProjectRelatedChangesChange={handleProjectRelatedChangesUpdate}
             projectId={projectId}
@@ -2569,6 +2675,7 @@ export function EditActivity() {
             isExecutionPhase={isExecutionPhase}
             isReadOnly={editPermissions.procurementReadOnly}
             onActivityDataChanged={() => refreshActivityAiSummary('procurement-crud')}
+            onOperationAlert={showTabOperationAlert}
             onProjectRelatedChangesChange={handleProjectRelatedChangesUpdate}
             projectId={projectId}
             projectRelatedChanges={activity?.dga_project_related_changes}
@@ -2586,6 +2693,7 @@ export function EditActivity() {
             divisionName={form.divisionName}
             hierarchies={allHierarchies}
             onActivityDataChanged={() => refreshActivityAiSummary('engagement-plan-crud')}
+            onOperationAlert={showTabOperationAlert}
             projectId={projectId}
             selectedRole={selectedRole}
             sectorName={form.sectorName}
@@ -2605,6 +2713,7 @@ export function EditActivity() {
             isReadOnly={editPermissions.budgetReadOnly}
             onHeaderActionChange={setBudgetHeaderAction}
             onActivityDataChanged={handleBudgetActivityDataChanged}
+            onOperationAlert={showTabOperationAlert}
             plannedEndDate={form.plannedEndDate}
             plannedStartDate={form.plannedStartDate}
             onProjectRelatedChangesChange={handleProjectRelatedChangesUpdate}
@@ -2657,13 +2766,148 @@ export function EditActivity() {
     }
   }
 
+  function renderWorkflowActions() {
+    return (
+      <>
+        {activeTab === 'activity-info' && canShowHeaderSaveActions ? (
+          <Button
+            disabled={!editPermissions.activityInfoCanSave || isSavingActivityInfo || Boolean(errors.context)}
+            icon={<Save size={16} />}
+            onClick={handleSaveActivityInfo}
+          >
+            {isSavingActivityInfo ? 'Saving...' : statusCode === 1 ? 'Save Draft' : 'Save Changes'}
+          </Button>
+        ) : null}
+        {activeTab === 'objectives' && objectiveHeaderAction && canShowHeaderSaveActions ? (
+          <Button
+            disabled={editPermissions.objectivesReadOnly || !objectiveHeaderAction.canSave || objectiveHeaderAction.isSaving || Boolean(errors.context)}
+            icon={<Save size={16} />}
+            onClick={objectiveHeaderAction.onSave}
+          >
+            {objectiveHeaderAction.isSaving ? objectiveHeaderAction.savingLabel : objectiveHeaderAction.label}
+          </Button>
+        ) : null}
+        {activeTab === 'budget' && budgetHeaderAction && canShowHeaderSaveActions ? (
+          <Button
+            disabled={editPermissions.budgetReadOnly || !budgetHeaderAction.canSave || budgetHeaderAction.isSaving || Boolean(errors.context)}
+            icon={<Save size={16} />}
+            onClick={budgetHeaderAction.onSave}
+          >
+            {budgetHeaderAction.isSaving ? budgetHeaderAction.savingLabel : budgetHeaderAction.label}
+          </Button>
+        ) : null}
+        {isDivisionMember && editPermissions.canSubmitToDivisionDirector ? (
+          <Button
+            disabled={isSubmittingToDirector || Boolean(errors.context)}
+            icon={<Send size={16} />}
+            onClick={handleSubmitToDivisionDirector}
+          >
+            {isSubmittingToDirector ? 'Submitting...' : 'Submit to Division Director'}
+          </Button>
+        ) : null}
+        {isDivisionDirector && editPermissions.canSubmitToStrategyTeam ? (
+          <Button
+            disabled={isSubmittingToStrategyTeam || Boolean(errors.context)}
+            icon={<Send size={16} />}
+            onClick={handleSubmitToStrategyTeam}
+          >
+            {isSubmittingToStrategyTeam ? 'Submitting...' : 'Submit to Strategy Team'}
+          </Button>
+        ) : null}
+        {isDivisionDirector && editPermissions.canSubmitToStrategyTeam ? (
+          <Button icon={<HelpCircle size={16} />} onClick={handleRequestClarification} variant="secondary">
+            Request Clarification
+          </Button>
+        ) : null}
+        {isStrategyTeam && editPermissions.canSubmitToExecutiveDirector ? (
+          <Button
+            disabled={isSubmittingToExecutiveDirector || Boolean(errors.context)}
+            icon={<Send size={16} />}
+            onClick={handleSubmitToExecutiveDirector}
+          >
+            {isSubmittingToExecutiveDirector ? 'Submitting...' : 'Submit to Executive Director'}
+          </Button>
+        ) : null}
+        {isStrategyTeam && editPermissions.canSubmitToExecutiveDirector ? (
+          <Button icon={<HelpCircle size={16} />} onClick={handleRequestClarification} variant="secondary">
+            Request Clarification
+          </Button>
+        ) : null}
+        {isExecutiveDirector && editPermissions.canSubmitToDirectorGeneral ? (
+          <Button
+            disabled={isSubmittingToDirectorGeneral || Boolean(errors.context)}
+            icon={<Send size={16} />}
+            onClick={handleSubmitToDirectorGeneral}
+          >
+            {isSubmittingToDirectorGeneral ? 'Submitting...' : 'Submit to Director General'}
+          </Button>
+        ) : null}
+        {isExecutiveDirector && editPermissions.canSubmitToDirectorGeneral ? (
+          <Button icon={<HelpCircle size={16} />} onClick={handleRequestClarification} variant="secondary">
+            Request Clarification
+          </Button>
+        ) : null}
+        {isDirectorGeneral && editPermissions.canApproveAsDirectorGeneral ? (
+          <Button
+            disabled={isApprovingAsDirectorGeneral || Boolean(errors.context)}
+            icon={<Send size={16} />}
+            onClick={handleApproveAsDirectorGeneral}
+          >
+            {isApprovingAsDirectorGeneral ? 'Approving...' : 'Approve'}
+          </Button>
+        ) : null}
+        {isDirectorGeneral && editPermissions.canApproveAsDirectorGeneral ? (
+          <Button icon={<HelpCircle size={16} />} onClick={handleRequestClarification} variant="secondary">
+            Request Clarification
+          </Button>
+        ) : null}
+        {canReviewExecutionUpdates ? (
+          <Button
+            disabled={isApprovingExecutionUpdates || Boolean(errors.context)}
+            icon={<Send size={16} />}
+            onClick={handleApproveExecutionUpdates}
+          >
+            {isApprovingExecutionUpdates ? 'Approving...' : 'Approve Activity'}
+          </Button>
+        ) : null}
+        {canReviewExecutionUpdates ? (
+          <Button
+            className="button--danger"
+            disabled={isRejectingExecutionUpdates || Boolean(errors.context)}
+            icon={<AlertTriangle size={16} />}
+            onClick={handleOpenRejectExecutionUpdates}
+            variant="secondary"
+          >
+            {isRejectingExecutionUpdates ? 'Rejecting...' : 'Reject Activity'}
+          </Button>
+        ) : null}
+        {isDivisionMember && editPermissions.canStartActivity ? (
+          <Button disabled={isStartingActivity || Boolean(errors.context)} icon={<Send size={16} />} onClick={handleStartActivity}>
+            {isStartingActivity ? 'Starting...' : 'Start Activity'}
+          </Button>
+        ) : null}
+        {canShowSubmitActivityUpdates ? (
+          <Button
+            disabled={isSubmittingActivityUpdates || Boolean(errors.context)}
+            icon={<Send size={16} />}
+            onClick={handleSubmitActivityUpdates}
+          >
+            {isSubmittingActivityUpdates ? 'Submitting...' : 'Submit Activity Updates'}
+          </Button>
+        ) : null}
+      </>
+    )
+  }
+
   if (isContextLoading) {
     return (
       <div className="create-activity" aria-label="Loading Edit Activity context...">
         {/* Hero header skeleton */}
         <header className="create-activity__hero create-activity__hero--skeleton" aria-hidden="true">
-          <div className="edit-activity__back-row">
+          <div className="skeleton-line skeleton-shimmer" style={{ width: '13rem', height: '0.7rem' }} />
+          <div className="edit-activity__hero-top">
             <div className="skeleton-button skeleton-shimmer" style={{ width: '9rem' }} />
+            <div className="skeleton-button skeleton-shimmer" style={{ width: '11rem' }} />
           </div>
           <div className="create-activity__hero-body">
             <div className="skeleton-icon-box skeleton-shimmer" />
@@ -2679,10 +2923,7 @@ export function EditActivity() {
               <span className="skeleton-chip skeleton-shimmer" />
               <span className="skeleton-chip skeleton-shimmer" />
             </div>
-            <div className="edit-activity__actions">
-              <div className="skeleton-button skeleton-shimmer" style={{ width: '7rem' }} />
-              <div className="skeleton-button skeleton-shimmer" style={{ width: '6rem' }} />
-            </div>
+            <div className="skeleton-button skeleton-shimmer" style={{ width: '7rem' }} />
           </div>
         </header>
 
@@ -2843,60 +3084,138 @@ export function EditActivity() {
 
   return (
     <div className="create-activity">
+      {hasOwnerMismatch || showRespondentActionsNotice || showExecutionRejectedNotice || showExecutionApprovedNotice || errors.submit ? (
+        <div className="edit-activity__persistent-alerts">
+          {errors.submit ? (
+            <div className="edit-activity__persistent-alert edit-activity__persistent-alert--error" role="alert">
+              <AlertTriangle aria-hidden="true" size={16} />
+              <div>
+                <strong>Action could not be completed</strong>
+                {errors.submit.split('\n').map((line, index) => (
+                  <span key={`${line}-${index}`}>{line || '\u00A0'}</span>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {showExecutionRejectedNotice ? (
+            <div className="edit-activity__persistent-alert edit-activity__persistent-alert--error" role="alert">
+              <AlertTriangle aria-hidden="true" size={16} />
+              <div>
+                <strong>Activity updates were rejected</strong>
+                <span>Your submitted activity updates were rejected and have been discarded. You may apply the updates again and resubmit for approval.</span>
+                <span>Rejection Reason: {activity?.dga_rejection_reason}</span>
+              </div>
+            </div>
+          ) : null}
+
+          {hasOwnerMismatch ? (
+            <div className="edit-activity__persistent-alert edit-activity__persistent-alert--warning" role="status">
+              <AlertTriangle aria-hidden="true" size={16} />
+              <div>
+                <strong>Pending response from another user</strong>
+                <span>This project is pending response from another user. You cannot edit it at this stage.</span>
+              </div>
+            </div>
+          ) : null}
+
+          {showRespondentActionsNotice ? (
+            <div className="edit-activity__persistent-alert edit-activity__persistent-alert--info" role="status">
+              <CheckCircle2 aria-hidden="true" size={16} />
+              <div>
+                <strong>Respondent actions available</strong>
+                <span>This project is currently assigned to Respondent. You can edit it and continue the workflow actions from the panel on the right.</span>
+              </div>
+            </div>
+          ) : null}
+
+          {showExecutionApprovedNotice ? (
+            <div className="edit-activity__persistent-alert edit-activity__persistent-alert--success" role="status">
+              <CheckCircle2 aria-hidden="true" size={16} />
+              <div>
+                <strong>Activity updates approved</strong>
+                <span>Your submitted activity updates have been approved. The approved values are now available as the latest execution baseline.</span>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       <header className="create-activity__hero">
-        <div className="edit-activity__back-row">
+        <div className="edit-activity__hero-top">
           <Button
-            icon={<ArrowLeft size={16} />}
+            className="edit-activity__back-link"
+            icon={<ArrowLeft size={14} />}
             onClick={() => navigate(APP_ROUTE_PATHS.activitiesList)}
-            variant="secondary"
+            variant="ghost"
           >
             Back to Activities
           </Button>
           {isExecutionPhase ? (
             <div className="edit-activity__header-progress-group">
-              <div className="edit-activity__header-progress" aria-label={`Planned Progress ${Math.round(milestoneProjectProgress.planned)}%`}>
+              <div
+                aria-disabled={isMilestoneProgressDisabled}
+                aria-label={isMilestoneProgressDisabled ? 'Planned Progress unavailable' : `Planned Progress ${Math.round(plannedMilestoneProgress)}%`}
+                className={`edit-activity__header-progress${isMilestoneProgressDisabled ? ' edit-activity__header-progress--disabled' : ''}`}
+              >
                 <div className="edit-activity__header-progress-copy">
                   <span>Planned Progress</span>
-                  <strong>{Math.round(milestoneProjectProgress.planned)}%</strong>
+                  <strong>{isMilestoneProgressDisabled ? 'Unavailable' : `${Math.round(plannedMilestoneProgress)}%`}</strong>
                 </div>
                 <div
                   aria-hidden="true"
                   className="edit-activity__header-progress-ring"
-                  style={{ '--progress': `${milestoneProjectProgress.planned}%` } as CSSProperties}
+                  style={{ '--progress': `${plannedMilestoneProgress}%` } as CSSProperties}
                 >
-                  <span>{Math.round(milestoneProjectProgress.planned)}%</span>
+                  <span>{isMilestoneProgressDisabled ? '—' : `${Math.round(plannedMilestoneProgress)}%`}</span>
                 </div>
               </div>
-              <div className="edit-activity__header-progress" aria-label={`Actual Progress ${Math.round(milestoneProjectProgress.actual)}%`}>
+              <div
+                aria-disabled={isMilestoneProgressDisabled}
+                aria-label={isMilestoneProgressDisabled ? 'Actual Progress unavailable' : `Actual Progress ${Math.round(actualMilestoneProgress)}%`}
+                className={`edit-activity__header-progress${isMilestoneProgressDisabled ? ' edit-activity__header-progress--disabled' : ''}`}
+              >
                 <div className="edit-activity__header-progress-copy">
                   <span>Actual Progress</span>
-                  <strong>{Math.round(milestoneProjectProgress.actual)}%</strong>
+                  <strong>{isMilestoneProgressDisabled ? 'Unavailable' : `${Math.round(actualMilestoneProgress)}%`}</strong>
                 </div>
                 <div
                   aria-hidden="true"
                   className="edit-activity__header-progress-ring edit-activity__header-progress-ring--actual"
-                  style={{ '--progress': `${milestoneProjectProgress.actual}%` } as CSSProperties}
+                  style={{ '--progress': `${actualMilestoneProgress}%` } as CSSProperties}
                 >
-                  <span>{Math.round(milestoneProjectProgress.actual)}%</span>
+                  <span>{isMilestoneProgressDisabled ? '—' : `${Math.round(actualMilestoneProgress)}%`}</span>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="edit-activity__header-progress" aria-label={headerProgressAriaLabel}>
+            <div
+              aria-disabled={isMilestoneProgressDisabled}
+              aria-label={headerProgressAriaLabel}
+              className={`edit-activity__header-progress${isMilestoneProgressDisabled ? ' edit-activity__header-progress--disabled' : ''}`}
+            >
               <div className="edit-activity__header-progress-copy">
                 <span>{displayedMilestoneProgressLabel}</span>
-                <strong>{Math.round(displayedMilestoneProgress)}%</strong>
+                <strong>{isMilestoneProgressDisabled ? 'Unavailable' : `${Math.round(displayedMilestoneProgress)}%`}</strong>
               </div>
               <div
                 aria-hidden="true"
                 className="edit-activity__header-progress-ring"
                 style={{ '--progress': `${displayedMilestoneProgress}%` } as CSSProperties}
               >
-                <span>{Math.round(displayedMilestoneProgress)}%</span>
+                <span>{isMilestoneProgressDisabled ? '—' : `${Math.round(displayedMilestoneProgress)}%`}</span>
               </div>
             </div>
           )}
         </div>
+
+        <nav aria-label="Breadcrumb" className="create-activity__breadcrumb">
+          <Link to={APP_ROUTE_PATHS.dashboard}>Dashboard</Link>
+          <ChevronRight aria-hidden="true" size={14} />
+          <Link to={APP_ROUTE_PATHS.activitiesList}>Activities</Link>
+          <ChevronRight aria-hidden="true" size={14} />
+          <span title={activityName}>{activityName}</span>
+        </nav>
 
         <div className="edit-activity__hero-main">
           <div className="edit-activity__hero-title-row">
@@ -2904,7 +3223,6 @@ export function EditActivity() {
               <Edit3 size={22} />
             </div>
             <div className="create-activity__hero-content">
-              <span>Edit Activity</span>
               <h1>{activityName}</h1>
               <p className="edit-activity__ai-summary">
                 <Sparkles size={14} />
@@ -2912,6 +3230,9 @@ export function EditActivity() {
               </p>
             </div>
           </div>
+        </div>
+
+        <div className="create-activity__hero-footer edit-activity__hero-footer">
           <div className="create-activity__hero-chips edit-activity__status-cluster">
             <span className="create-activity__chip">
               <span className="create-activity__chip-label">Status</span>
@@ -2921,7 +3242,7 @@ export function EditActivity() {
             </span>
             <span className="create-activity__chip">
               <span className="create-activity__chip-label">Phase</span>
-              <Badge tone="info">
+              <Badge tone={isExecutionPhase ? 'success' : 'info'}>
                 {isExecutionPhase ? 'Execution' : 'Planning'}
               </Badge>
             </span>
@@ -2933,179 +3254,46 @@ export function EditActivity() {
               </strong>
             </span>
           </div>
-        </div>
-
-        <div className="edit-activity__command-bar">
-          <div className="edit-activity__command-label">
-            <span>Workflow Actions</span>
-            <strong>{activeTab.replace(/-/g, ' ')}</strong>
-          </div>
-          <div className="edit-activity__actions">
-            {activeTab === 'activity-info' && canShowHeaderSaveActions ? (
-              <Button
-                disabled={!editPermissions.activityInfoCanSave || isSavingActivityInfo || Boolean(errors.context)}
-                icon={<Save size={16} />}
-                onClick={handleSaveActivityInfo}
-              >
-                {isSavingActivityInfo ? 'Saving...' : statusCode === 1 ? 'Save Draft' : 'Save Changes'}
-              </Button>
-            ) : null}
-            {activeTab === 'objectives' && objectiveHeaderAction && canShowHeaderSaveActions ? (
-              <Button
-                disabled={editPermissions.objectivesReadOnly || !objectiveHeaderAction.canSave || objectiveHeaderAction.isSaving || Boolean(errors.context)}
-                icon={<Save size={16} />}
-                onClick={objectiveHeaderAction.onSave}
-              >
-                {objectiveHeaderAction.isSaving ? objectiveHeaderAction.savingLabel : objectiveHeaderAction.label}
-              </Button>
-            ) : null}
-            {activeTab === 'budget' && budgetHeaderAction && canShowHeaderSaveActions ? (
-              <Button
-                disabled={editPermissions.budgetReadOnly || !budgetHeaderAction.canSave || budgetHeaderAction.isSaving || Boolean(errors.context)}
-                icon={<Save size={16} />}
-                onClick={budgetHeaderAction.onSave}
-              >
-                {budgetHeaderAction.isSaving ? budgetHeaderAction.savingLabel : budgetHeaderAction.label}
-              </Button>
-            ) : null}
-            {isDivisionMember && editPermissions.canSubmitToDivisionDirector ? (
-              <Button
-                disabled={isSubmittingToDirector || Boolean(errors.context)}
-                icon={<Send size={16} />}
-                onClick={handleSubmitToDivisionDirector}
-              >
-                {isSubmittingToDirector ? 'Submitting...' : 'Submit to Division Director'}
-              </Button>
-            ) : null}
-            {isDivisionDirector && editPermissions.canSubmitToStrategyTeam ? (
-              <Button
-                disabled={isSubmittingToStrategyTeam || Boolean(errors.context)}
-                icon={<Send size={16} />}
-                onClick={handleSubmitToStrategyTeam}
-              >
-                {isSubmittingToStrategyTeam ? 'Submitting...' : 'Submit to Strategy Team'}
-              </Button>
-            ) : null}
-            {isDivisionDirector && editPermissions.canSubmitToStrategyTeam ? (
-              <Button icon={<HelpCircle size={16} />} onClick={handleRequestClarification} variant="secondary">
-                Request Clarification
-              </Button>
-            ) : null}
-            {isStrategyTeam && editPermissions.canSubmitToExecutiveDirector ? (
-              <Button
-                disabled={isSubmittingToExecutiveDirector || Boolean(errors.context)}
-                icon={<Send size={16} />}
-                onClick={handleSubmitToExecutiveDirector}
-              >
-                {isSubmittingToExecutiveDirector ? 'Submitting...' : 'Submit to Executive Director'}
-              </Button>
-            ) : null}
-            {isStrategyTeam && editPermissions.canSubmitToExecutiveDirector ? (
-              <Button icon={<HelpCircle size={16} />} onClick={handleRequestClarification} variant="secondary">
-                Request Clarification
-              </Button>
-            ) : null}
-            {isExecutiveDirector && editPermissions.canSubmitToDirectorGeneral ? (
-              <Button
-                disabled={isSubmittingToDirectorGeneral || Boolean(errors.context)}
-                icon={<Send size={16} />}
-                onClick={handleSubmitToDirectorGeneral}
-              >
-                {isSubmittingToDirectorGeneral ? 'Submitting...' : 'Submit to Director General'}
-              </Button>
-            ) : null}
-            {isExecutiveDirector && editPermissions.canSubmitToDirectorGeneral ? (
-              <Button icon={<HelpCircle size={16} />} onClick={handleRequestClarification} variant="secondary">
-                Request Clarification
-              </Button>
-            ) : null}
-            {isDirectorGeneral && editPermissions.canApproveAsDirectorGeneral ? (
-              <Button
-                disabled={isApprovingAsDirectorGeneral || Boolean(errors.context)}
-                icon={<Send size={16} />}
-                onClick={handleApproveAsDirectorGeneral}
-              >
-                {isApprovingAsDirectorGeneral ? 'Approving...' : 'Approve'}
-              </Button>
-            ) : null}
-            {isDirectorGeneral && editPermissions.canApproveAsDirectorGeneral ? (
-              <Button icon={<HelpCircle size={16} />} onClick={handleRequestClarification} variant="secondary">
-                Request Clarification
-              </Button>
-            ) : null}
-            {canReviewExecutionUpdates ? (
-              <Button
-                disabled={isApprovingExecutionUpdates || Boolean(errors.context)}
-                icon={<Send size={16} />}
-                onClick={handleApproveExecutionUpdates}
-              >
-                {isApprovingExecutionUpdates ? 'Approving...' : 'Approve Activity'}
-              </Button>
-            ) : null}
-            {canReviewExecutionUpdates ? (
-              <Button
-                className="button--danger"
-                disabled={isRejectingExecutionUpdates || Boolean(errors.context)}
-                icon={<AlertTriangle size={16} />}
-                onClick={handleOpenRejectExecutionUpdates}
-                variant="secondary"
-              >
-                {isRejectingExecutionUpdates ? 'Rejecting...' : 'Reject Activity'}
-              </Button>
-            ) : null}
-            {isDivisionMember && editPermissions.canStartActivity ? (
-              <Button disabled={isStartingActivity || Boolean(errors.context)} icon={<Send size={16} />} onClick={handleStartActivity}>
-                {isStartingActivity ? 'Starting...' : 'Start Activity'}
-              </Button>
-            ) : null}
-            {canShowSubmitActivityUpdates ? (
-              <Button
-                disabled={isSubmittingActivityUpdates || Boolean(errors.context)}
-                icon={<Send size={16} />}
-                onClick={handleSubmitActivityUpdates}
-              >
-                {isSubmittingActivityUpdates ? 'Submitting...' : 'Submit Activity Updates'}
-              </Button>
-            ) : null}
-            <Button icon={<FileText size={16} />} variant="ghost" className="edit-activity__card-btn">
-              Activity Card
-            </Button>
-          </div>
+          <Button icon={<FileText size={16} />} variant="ghost" className="edit-activity__card-btn">
+            Activity Card
+          </Button>
         </div>
       </header>
 
-      {showExecutionPendingNotice ? (
-        <div className="create-activity__notice create-activity__notice--warning" role="status">
-          There have been updates to this activity that are currently under approval. Please review the latest changes.
-        </div>
-      ) : null}
-
-      {showExecutionRejectedNotice ? (
-        <div className="create-activity__notice create-activity__notice--error create-activity__notice--multiline" role="alert">
-          <div>Your submitted activity updates were rejected and have been discarded. You may apply the updates again and resubmit for approval.</div>
-          <div>Rejection Reason: {activity?.dga_rejection_reason}</div>
-        </div>
-      ) : null}
-
-      {showExecutionApprovedNotice ? (
-        <div className="create-activity__notice create-activity__notice--success" role="status">
-          Your submitted activity updates have been approved. The approved values are now available as the latest execution baseline.
-        </div>
-      ) : null}
-
-      {successMessage ? (
-        <div className="create-activity__notice create-activity__notice--success" role="status">
-          {successMessage}
-        </div>
-      ) : null}
-
-      {errors.submit ? (
-        <div className="create-activity__notice create-activity__notice--error create-activity__notice--multiline" role="alert">
-          {errors.submit.split('\n').map((line, index) => (
-            <div className={line.trim().startsWith('•') ? 'create-activity__notice-list-item' : undefined} key={`${line}-${index}`}>
-              {line || '\u00A0'}
+      {operationAlert ? (
+        <div
+          className={`edit-activity__operation-alert edit-activity__operation-alert--${operationAlert.kind}`}
+          key={`${operationAlert.kind}-${operationAlert.title}-${operationAlert.message ?? ''}`}
+          role={operationAlert.kind === 'error' ? 'alert' : 'status'}
+        >
+          <div className="edit-activity__operation-alert-header">
+            <span aria-hidden="true" className="edit-activity__operation-alert-icon">
+              {operationAlert.kind === 'processing'
+                ? <span />
+                : operationAlert.kind === 'error'
+                  ? <AlertTriangle size={18} />
+                  : <CheckCircle2 size={18} />}
+            </span>
+            <div>
+              <span>{operationAlert.kind === 'processing' ? 'Processing' : operationAlert.kind === 'error' ? 'Failed' : 'Completed'}</span>
+              <strong>{operationAlert.title}</strong>
             </div>
-          ))}
+            {operationAlert.kind !== 'processing' ? (
+              <button
+                aria-label="Dismiss notification"
+                className="edit-activity__operation-alert-close"
+                onClick={() => {
+                  setSuccessMessage('')
+                  setTabOperationAlert(null)
+                }}
+                type="button"
+              >
+                <X size={15} />
+              </button>
+            ) : null}
+          </div>
+          {operationAlert.kind !== 'processing' && operationAlert.message ? <p>{operationAlert.message}</p> : null}
+          <span aria-hidden="true" className="edit-activity__operation-alert-progress" />
         </div>
       ) : null}
 
@@ -3140,16 +3328,31 @@ export function EditActivity() {
       </div>
 
       {/* Stage content */}
-      <div className="edit-activity__stage-content" role="tabpanel">
-        {shouldShowExecutionFields ? (
-          <ReviewChangesPanel
-            key={activeTab}
-            activeTab={activeTab}
-            relatedChanges={activity?.dga_project_related_changes}
-          />
-        ) : null}
-        {renderPostReviewAiSummary()}
-        {renderTabContent()}
+      <div className="edit-activity__workspace">
+        <div className="edit-activity__stage-content" role="tabpanel">
+          {shouldShowExecutionFields ? (
+            <ReviewChangesPanel
+              key={activeTab}
+              activeTab={activeTab}
+              relatedChanges={activity?.dga_project_related_changes}
+            />
+          ) : null}
+          {renderPostReviewAiSummary()}
+          {renderTabContent()}
+        </div>
+
+        <aside aria-label="Activity workflow actions" className="edit-activity__workflow-panel">
+          <div className="edit-activity__workflow-panel-header">
+            <ClipboardList aria-hidden="true" size={17} />
+            <div>
+              <span>Workflow Actions</span>
+              <strong>{TABS.find((tab) => tab.id === activeTab)?.label ?? 'Activity'}</strong>
+            </div>
+          </div>
+          <div className="edit-activity__workflow-panel-actions">
+            {renderWorkflowActions()}
+          </div>
+        </aside>
       </div>
 
       <ConfirmationDialog

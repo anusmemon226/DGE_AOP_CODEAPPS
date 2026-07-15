@@ -9,6 +9,7 @@ import { Dga_objective_dga_objectivesetService } from '../../generated/services/
 import { Dga_objectivesService } from '../../generated/services/Dga_objectivesService'
 import { AiSummaryPanel } from './AiSummaryPanel'
 import type { AiSummaryBlocks, AiSummaryMeta } from './types/aiSummaryTypes'
+import type { EditActivityOperationNotifier } from './types/operationAlert'
 
 type ObjectiveValue = string
 
@@ -35,6 +36,7 @@ type ObjectivesTabProps = {
   isReadOnly?: boolean
   onActivityDataChanged?: () => void
   onHeaderActionChange?: (action: ObjectiveHeaderAction | null) => void
+  onOperationAlert?: EditActivityOperationNotifier
   projectId: string
   statusCode?: number
 }
@@ -172,6 +174,7 @@ export function ObjectivesTab({
   isReadOnly = false,
   onActivityDataChanged,
   onHeaderActionChange,
+  onOperationAlert,
   projectId,
   statusCode = 1,
 }: ObjectivesTabProps) {
@@ -184,7 +187,6 @@ export function ObjectivesTab({
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<ObjectiveErrors>({})
-  const [notice, setNotice] = useState('')
 
   const loadObjectivesContext = useCallback(async () => {
     if (!projectId) {
@@ -200,7 +202,6 @@ export function ObjectivesTab({
     setIsLoading(true)
     setError('')
     setFieldErrors({})
-    setNotice('')
 
     try {
       const [objectivesResult, relationshipsResult, projectResult] = await Promise.all([
@@ -337,26 +338,28 @@ export function ObjectivesTab({
 
     setIsSaving(true)
     setError('')
-    setNotice('')
 
     try {
       const result = await Dga_aop_projectsesService.update(projectId, buildProjectPayload(nextForm))
       assertOperationSuccess(result, 'Unable to save objective links.')
       setSavedForm(nextForm)
-      setNotice(successMessage)
+      onOperationAlert?.({ kind: 'success', message: successMessage, title: 'Objectives saved' })
       onActivityDataChanged?.()
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Unable to save objective links.')
+      onOperationAlert?.({
+        kind: 'error',
+        message: saveError instanceof Error ? saveError.message : 'Unable to save objective links.',
+        title: 'Objectives were not saved',
+      })
     } finally {
       setIsSaving(false)
     }
-  }, [isReadOnly, isSaving, onActivityDataChanged, projectId])
+  }, [isReadOnly, isSaving, onActivityDataChanged, onOperationAlert, projectId])
 
   const applyFormChange = useCallback((updater: (currentForm: ObjectiveForm) => ObjectiveForm) => {
     if (isReadOnly) return
     setForm((currentForm) => {
       const nextForm = updater(currentForm)
-      setNotice('')
       setFieldErrors((currentErrors) => {
         const nextErrors = { ...currentErrors }
 
@@ -392,12 +395,12 @@ export function ObjectivesTab({
     }
 
     if (!hasUnsavedChanges) {
-      setNotice('No objective changes to save.')
+      onOperationAlert?.({ kind: 'success', message: 'No objective changes to save.', title: 'Objectives already current' })
       return
     }
 
     void saveObjectives(form)
-  }, [canSave, form, hasUnsavedChanges, saveObjectives, selectedDigitalObjectiveId, selectedStrategicKpiId])
+  }, [canSave, form, hasUnsavedChanges, onOperationAlert, saveObjectives, selectedDigitalObjectiveId, selectedStrategicKpiId])
 
   useEffect(() => {
     onHeaderActionChange?.(!isLoading ? {
@@ -445,10 +448,6 @@ export function ObjectivesTab({
 
       {error ? (
         <div className="edit-activity__members-modal-error">{error}</div>
-      ) : notice ? (
-        <div className="edit-activity__members-modal-selected-header">
-          <span>{notice}</span>
-        </div>
       ) : null}
 
       {isLoading ? (

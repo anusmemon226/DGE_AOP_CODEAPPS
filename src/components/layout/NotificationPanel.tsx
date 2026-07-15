@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { Bell, CheckCheck, FileText, Info, TriangleAlert } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '../../store/hooks'
 import { closeNotificationPanel, markAllNotificationsRead, markNotificationRead } from '../../store/appSlice'
 import type { NotificationTone } from '../../constants/app'
+import { getVisibleNotifications } from '../../utils/notifications'
 
 const toneIcon: Record<NotificationTone, typeof Info> = {
   info: FileText,
@@ -17,8 +18,12 @@ function notificationReference(id: string, index: number) {
 export function NotificationPanel() {
   const dispatch = useAppDispatch()
   const panelRef = useRef<HTMLDivElement>(null)
-  const { notifications } = useAppSelector((state) => state.app)
-  const unreadCount = notifications.filter((notification) => notification.unread).length
+  const { notifications, selectedCycle, selectedRole } = useAppSelector((state) => state.app)
+  const visibleNotifications = useMemo(
+    () => getVisibleNotifications(notifications, selectedRole, selectedCycle),
+    [notifications, selectedCycle, selectedRole],
+  )
+  const unreadCount = visibleNotifications.filter((notification) => notification.unread).length
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
@@ -59,7 +64,7 @@ export function NotificationPanel() {
         <button
           className="notifications-popover__mark-read"
           disabled={unreadCount === 0}
-          onClick={() => dispatch(markAllNotificationsRead())}
+          onClick={() => dispatch(markAllNotificationsRead(visibleNotifications.map((notification) => notification.id)))}
           type="button"
         >
           Mark All as Read
@@ -67,9 +72,9 @@ export function NotificationPanel() {
       </div>
 
       <div className="notifications-popover__list">
-        {notifications.length === 0 ? (
+        {visibleNotifications.length === 0 ? (
           <div className="notifications-popover__empty">No open notifications.</div>
-        ) : notifications.map((notification, index) => {
+        ) : visibleNotifications.map((notification, index) => {
           const NotificationIcon = toneIcon[notification.tone]
 
           return (

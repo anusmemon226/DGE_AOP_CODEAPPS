@@ -1,4 +1,4 @@
-import { lazy, Suspense, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, type ReactNode } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AppLayout } from './components/layout/AppLayout'
 import { NAVIGATION_ITEMS } from './constants/app'
@@ -38,9 +38,20 @@ function EmptyScreen() {
   return null
 }
 
+function ScrollToTopOnRouteChange() {
+  const { pathname, search } = useLocation()
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' })
+  }, [pathname, search])
+
+  return null
+}
+
 function App() {
   return (
     <AppLayout>
+      <ScrollToTopOnRouteChange />
       <RouteGuard>
         <Suspense fallback={<EmptyScreen />}>
           <Routes>

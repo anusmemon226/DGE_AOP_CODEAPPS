@@ -30,6 +30,7 @@ import {
   PUBLISH_STATUS_TONES,
 } from './data/adgesData'
 import { EngagementVisibilityPicker, type SectorDivision } from './components/EngagementVisibilityPicker'
+import type { EditActivityOperationNotifier } from './types/operationAlert'
 
 // ── Types ──
 
@@ -93,6 +94,7 @@ interface EngagementPlanTabProps {
   divisionName: string
   hierarchies: Dga_divisional_hierarchies[]
   onActivityDataChanged?: () => void
+  onOperationAlert?: EditActivityOperationNotifier
   projectId: string
   selectedRole: string
   sectorName: string
@@ -430,6 +432,7 @@ export function EngagementPlanTab({
   currentHierarchyId,
   hierarchies,
   onActivityDataChanged,
+  onOperationAlert,
   projectId,
   selectedRole,
 }: EngagementPlanTabProps) {
@@ -446,7 +449,6 @@ export function EngagementPlanTab({
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [editingPlan, setEditingPlan] = useState<EngagementPlan | null>(null)
@@ -787,7 +789,6 @@ export function EngagementPlanTab({
       activitySummary,
     })
     setFormErrors({})
-    setNotice('')
     setIsDrawerOpen(true)
   }
 
@@ -819,7 +820,6 @@ export function EngagementPlanTab({
       selectedADGEs: [...plan.selectedADGEs],
     })
     setFormErrors({})
-    setNotice('')
     setIsDrawerOpen(true)
   }
 
@@ -881,7 +881,10 @@ export function EngagementPlanTab({
 
     setIsSaving(true)
     setError('')
-    setNotice('')
+    onOperationAlert?.({
+      kind: 'processing',
+      title: editingPlan ? 'Updating engagement plan' : 'Creating engagement plan',
+    })
 
     try {
       if (editingPlan) {
@@ -890,20 +893,32 @@ export function EngagementPlanTab({
           buildEngagementPayload(form, undefined, sectorDivisions, creatorHierarchyId) as Partial<Omit<Dga_aop_engagement_plansBase, 'dga_aop_engagement_planid'>>,
         )
         assertOperationSuccess(result, 'Unable to update engagement plan.')
-        setNotice('Engagement plan updated successfully.')
+        onOperationAlert?.({
+          kind: 'success',
+          message: 'Engagement plan updated successfully.',
+          title: 'Engagement plan updated',
+        })
       } else {
         const result = await Dga_aop_engagement_plansService.create(
           buildEngagementPayload(form, projectId, sectorDivisions, creatorHierarchyId) as Omit<Dga_aop_engagement_plansBase, 'dga_aop_engagement_planid'>,
         )
         assertOperationSuccess(result, 'Unable to create engagement plan.')
-        setNotice('Engagement plan created successfully.')
+        onOperationAlert?.({
+          kind: 'success',
+          message: 'Engagement plan created successfully.',
+          title: 'Engagement plan created',
+        })
       }
 
       handleCloseDrawer()
       await loadEngagementPlans()
       onActivityDataChanged?.()
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Unable to save engagement plan.')
+      onOperationAlert?.({
+        kind: 'error',
+        message: saveError instanceof Error ? saveError.message : 'Unable to save engagement plan.',
+        title: 'Engagement plan was not saved',
+      })
     } finally {
       setIsSaving(false)
     }
@@ -914,16 +929,24 @@ export function EngagementPlanTab({
 
     setIsDeleting(true)
     setError('')
-    setNotice('')
+    onOperationAlert?.({ kind: 'processing', title: 'Deleting engagement plan' })
 
     try {
       await Dga_aop_engagement_plansService.delete(planToDelete.id)
       setPlanToDelete(null)
-      setNotice('Engagement plan deleted successfully.')
+      onOperationAlert?.({
+        kind: 'success',
+        message: 'Engagement plan deleted successfully.',
+        title: 'Engagement plan deleted',
+      })
       await loadEngagementPlans()
       onActivityDataChanged?.()
     } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : 'Unable to delete engagement plan.')
+      onOperationAlert?.({
+        kind: 'error',
+        message: deleteError instanceof Error ? deleteError.message : 'Unable to delete engagement plan.',
+        title: 'Engagement plan was not deleted',
+      })
     } finally {
       setIsDeleting(false)
     }
@@ -1311,10 +1334,6 @@ export function EngagementPlanTab({
 
       {error ? (
         <div className="edit-activity__members-modal-error">{error}</div>
-      ) : notice ? (
-        <div className="edit-activity__members-modal-selected-header">
-          <span>{notice}</span>
-        </div>
       ) : null}
 
       {isLoading ? (

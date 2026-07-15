@@ -25,6 +25,7 @@ import { formatCurrencyAmount } from '../../utils/formatting'
 import { formatDate, getQuarter } from './helpers/sharedHelpers'
 import { createExecutionFieldLogs, EXECUTION_LOG_TYPES } from './helpers/approvalWorkflowLogs'
 import { RecordLogsGrid } from './RecordLogsGrid'
+import type { EditActivityOperationNotifier } from './types/operationAlert'
 
 // ── Types ──
 
@@ -97,6 +98,7 @@ type ProcurementTabProps = {
   isExecutionPhase?: boolean
   isReadOnly?: boolean
   onActivityDataChanged?: () => void
+  onOperationAlert?: EditActivityOperationNotifier
   onProjectRelatedChangesChange?: (relatedChanges: string) => void
   projectId: string
   projectRelatedChanges?: string | null
@@ -832,6 +834,7 @@ export function ProcurementTab({
   isExecutionPhase = false,
   isReadOnly = false,
   onActivityDataChanged,
+  onOperationAlert,
   onProjectRelatedChangesChange,
   projectId,
   projectRelatedChanges,
@@ -850,7 +853,6 @@ export function ProcurementTab({
   const [isDeletingProcurement, setIsDeletingProcurement] = useState(false)
   const [localProjectRelatedChanges, setLocalProjectRelatedChanges] = useState<{ projectId: string; value: string } | null>(null)
   const [procurementError, setProcurementError] = useState('')
-  const [procurementNotice, setProcurementNotice] = useState('')
 
   // ── CRUD state ──
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
@@ -1363,7 +1365,6 @@ export function ProcurementTab({
       executionFileInputRef.current.value = ''
     }
     setProcurementError('')
-    setProcurementNotice('')
     setIsDrawerOpen(true)
   }
 
@@ -1404,7 +1405,6 @@ export function ProcurementTab({
       executionFileInputRef.current.value = ''
     }
     setProcurementError('')
-    setProcurementNotice('')
     setIsDrawerOpen(true)
   }
 
@@ -1480,12 +1480,20 @@ export function ProcurementTab({
 
   async function handleSave() {
     if (!projectId) {
-      setProcurementError('Activity id is missing from the edit URL.')
+      onOperationAlert?.({
+        kind: 'error',
+        message: 'Activity id is missing from the edit URL.',
+        title: 'Procurement update blocked',
+      })
       return
     }
 
     if (isFutureQuarterLocked) {
-      setProcurementError('This procurement is scheduled for a future quarter. Execution updates are locked until that quarter starts.')
+      onOperationAlert?.({
+        kind: 'error',
+        message: 'This procurement is scheduled for a future quarter. Execution updates are locked until that quarter starts.',
+        title: 'Procurement update blocked',
+      })
       return
     }
 
@@ -1500,7 +1508,14 @@ export function ProcurementTab({
 
     setIsSavingProcurement(true)
     setProcurementError('')
-    setProcurementNotice('')
+    onOperationAlert?.({
+      kind: 'processing',
+      title: isExecutionOnlySave
+        ? 'Saving procurement execution tracking'
+        : editingProcurement
+          ? 'Updating procurement plan'
+          : 'Creating procurement plan',
+    })
 
     try {
       if (isExecutionOnlySave) {
@@ -1595,7 +1610,11 @@ export function ProcurementTab({
           },
         ], { procurementId: editingProcurement?.id })
 
-        setProcurementNotice('Procurement execution tracking updated successfully.')
+        onOperationAlert?.({
+          kind: 'success',
+          message: 'Procurement execution tracking updated successfully.',
+          title: 'Procurement updated',
+        })
         setLocalProjectRelatedChanges({ projectId, value: nextRelatedChanges })
         onProjectRelatedChangesChange?.(nextRelatedChanges)
         handleCloseDrawer()
@@ -1608,20 +1627,32 @@ export function ProcurementTab({
           buildProcurementPayload(form) as Partial<Omit<Dga_procurement_plansBase, 'dga_procurement_planid'>>,
         )
         assertOperationSuccess(result, 'Unable to update procurement plan.')
-        setProcurementNotice('Procurement plan updated successfully.')
+        onOperationAlert?.({
+          kind: 'success',
+          message: 'Procurement plan updated successfully.',
+          title: 'Procurement updated',
+        })
       } else {
         const result = await Dga_procurement_plansService.create(
           buildProcurementPayload(form, projectId) as Omit<Dga_procurement_plansBase, 'dga_procurement_planid'>,
         )
         assertOperationSuccess(result, 'Unable to create procurement plan.')
-        setProcurementNotice('Procurement plan created successfully.')
+        onOperationAlert?.({
+          kind: 'success',
+          message: 'Procurement plan created successfully.',
+          title: 'Procurement created',
+        })
       }
 
       handleCloseDrawer()
       await loadProcurements()
       onActivityDataChanged?.()
     } catch (error) {
-      setProcurementError(error instanceof Error ? error.message : 'Unable to save procurement plan.')
+      onOperationAlert?.({
+        kind: 'error',
+        message: error instanceof Error ? error.message : 'Unable to save procurement plan.',
+        title: 'Procurement was not saved',
+      })
     } finally {
       setIsSavingProcurement(false)
     }
@@ -1634,16 +1665,24 @@ export function ProcurementTab({
 
     setIsDeletingProcurement(true)
     setProcurementError('')
-    setProcurementNotice('')
+    onOperationAlert?.({ kind: 'processing', title: 'Deleting procurement plan' })
 
     try {
       await Dga_procurement_plansService.delete(procurementToDelete.id)
       setProcurementToDelete(null)
-      setProcurementNotice('Procurement plan deleted successfully.')
+      onOperationAlert?.({
+        kind: 'success',
+        message: 'Procurement plan deleted successfully.',
+        title: 'Procurement deleted',
+      })
       await loadProcurements()
       onActivityDataChanged?.()
     } catch (error) {
-      setProcurementError(error instanceof Error ? error.message : 'Unable to delete procurement plan.')
+      onOperationAlert?.({
+        kind: 'error',
+        message: error instanceof Error ? error.message : 'Unable to delete procurement plan.',
+        title: 'Procurement was not deleted',
+      })
     } finally {
       setIsDeletingProcurement(false)
     }
@@ -2326,10 +2365,6 @@ export function ProcurementTab({
       {procurementError ? (
         <div className="edit-activity__members-modal-error">
           {procurementError}
-        </div>
-      ) : procurementNotice ? (
-        <div className="edit-activity__members-modal-selected-header">
-          <span>{procurementNotice}</span>
         </div>
       ) : null}
 

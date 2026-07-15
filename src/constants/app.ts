@@ -106,6 +106,9 @@ export type AppNotification = {
   time: string
   tone: NotificationTone
   unread: boolean
+  roles?: AopRole[]
+  cycleId?: string
+  cycleIds?: string[]
 }
 
 export const MOCK_NOTIFICATIONS: AppNotification[] = [

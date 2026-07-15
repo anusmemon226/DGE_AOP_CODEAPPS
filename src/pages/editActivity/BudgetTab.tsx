@@ -60,6 +60,7 @@ import {
 import { createExecutionFieldLogs, EXECUTION_LOG_TYPES } from './helpers/approvalWorkflowLogs'
 import { AiSummaryPanel } from './AiSummaryPanel'
 import type { AiSummaryBlocks, AiSummaryMeta } from './types/aiSummaryTypes'
+import type { EditActivityOperationNotifier } from './types/operationAlert'
 
 export type BudgetHeaderAction = {
   canSave: boolean
@@ -131,6 +132,7 @@ interface BudgetTabProps {
   isReadOnly?: boolean
   onActivityDataChanged?: () => void
   onHeaderActionChange?: (action: BudgetHeaderAction | null) => void
+  onOperationAlert?: EditActivityOperationNotifier
   onProjectRelatedChangesChange?: (relatedChanges: string) => void
   plannedEndDate: string
   plannedStartDate: string
@@ -512,6 +514,7 @@ export function BudgetTab({
   isReadOnly = false,
   onActivityDataChanged,
   onHeaderActionChange,
+  onOperationAlert,
   onProjectRelatedChangesChange,
   plannedEndDate,
   plannedStartDate,
@@ -528,7 +531,6 @@ export function BudgetTab({
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isSavingExecutionMonth, setIsSavingExecutionMonth] = useState<string | null>(null)
-  const [successMessage, setSuccessMessage] = useState('')
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [drawerMonthId, setDrawerMonthId] = useState<string | null>(null)
   const [drawerRows, setDrawerRows] = useState<BudgetDetailRecord[]>([])
@@ -641,21 +643,10 @@ export function BudgetTab({
   const overallProgress = overallPlannedSpent > 0 ? Math.min(100, Math.round((overallActualSpent / overallPlannedSpent) * 100)) : 0
 
   useEffect(() => {
-    if (!successMessage) return
-
-    const timeoutId = window.setTimeout(() => {
-      setSuccessMessage('')
-    }, 10000)
-
-    return () => window.clearTimeout(timeoutId)
-  }, [successMessage])
-
-  useEffect(() => {
     let isMounted = true
 
     async function loadBudget() {
       setIsLoading(true)
-      setSuccessMessage('')
       setErrors({})
 
       if (!projectId) {
@@ -788,7 +779,6 @@ export function BudgetTab({
 
   function handleFieldChange(fields: Partial<BudgetFormData>) {
     if (isReadOnly) return
-    setSuccessMessage('')
 
     setForm((prev) => {
       const next = { ...prev, ...fields }
@@ -835,8 +825,6 @@ export function BudgetTab({
     if (isReadOnly) return
     if (isSaving) return
 
-    setSuccessMessage('')
-
     if (!projectId) {
       setErrors({ context: 'Activity id is missing from the edit URL.' })
       return
@@ -882,13 +870,18 @@ export function BudgetTab({
 
       setMonthRecords(refreshedMonthRecords)
       setErrors({})
-      setSuccessMessage('Budget information saved successfully.')
+      onOperationAlert?.({
+        kind: 'success',
+        message: 'Budget information saved successfully.',
+        title: 'Budget saved',
+      })
       onActivityDataChanged?.()
     } catch (error) {
-      setErrors((currentErrors) => ({
-        ...currentErrors,
-        submit: error instanceof Error ? error.message : 'Failed to save budget information.',
-      }))
+      onOperationAlert?.({
+        kind: 'error',
+        message: error instanceof Error ? error.message : 'Failed to save budget information.',
+        title: 'Budget was not saved',
+      })
     } finally {
       setIsSaving(false)
     }
@@ -900,6 +893,7 @@ export function BudgetTab({
     monthRecords,
     orderedMonthRecords,
     onActivityDataChanged,
+    onOperationAlert,
     projectId,
     showTotalActivityBudget,
   ])
@@ -1007,6 +1001,7 @@ export function BudgetTab({
 
     try {
       setIsSavingExecutionMonth(monthId)
+      onOperationAlert?.({ kind: 'processing', title: `Saving ${monthRecord.monthName} delivered values` })
       await saveBudgetMonthRelatedChanges(monthRecord, monthRecord.actualBudget, nextDeliveredValue)
       const monthResult = await Dga_aop_project_budgetsService.update(monthId, {
         dga_delivered_amount: nextDeliveredValue,
@@ -1021,9 +1016,18 @@ export function BudgetTab({
         ...current,
         [monthId]: numberToString(nextDeliveredValue),
       }))
-      setSuccessMessage(`${monthRecord.monthName} delivered values saved successfully.`)
+      onOperationAlert?.({
+        kind: 'success',
+        message: `${monthRecord.monthName} delivered values saved successfully.`,
+        title: 'Budget month updated',
+      })
       onActivityDataChanged?.()
     } catch (error) {
+      onOperationAlert?.({
+        kind: 'error',
+        message: error instanceof Error ? error.message : 'Failed to save delivered values.',
+        title: 'Delivered values were not saved',
+      })
       setInlineDeliveredErrors((current) => ({
         ...current,
         [monthId]: error instanceof Error ? error.message : 'Failed to save delivered values.',
@@ -1041,10 +1045,11 @@ export function BudgetTab({
     if (!monthRecord || isFutureMonth(monthRecord.monthName)) return
 
     if (!monthRecord.isZero && monthRecord.details.length > 0) {
-      setErrors((current) => ({
-        ...current,
-        submit: `${monthRecord.monthName} cannot be set to zero because budget details already exist for this month.`,
-      }))
+      onOperationAlert?.({
+        kind: 'error',
+        message: `${monthRecord.monthName} cannot be set to zero because budget details already exist for this month.`,
+        title: 'Budget month was not updated',
+      })
       return
     }
 
@@ -1054,6 +1059,7 @@ export function BudgetTab({
 
     try {
       setIsSavingExecutionMonth(monthId)
+      onOperationAlert?.({ kind: 'processing', title: `Updating ${monthRecord.monthName} zero flag` })
       await saveBudgetMonthRelatedChanges(monthRecord, nextActualAmount, nextDeliveredAmount)
       const monthResult = await Dga_aop_project_budgetsService.update(monthId, {
         dga_actual_budget: nextActualAmount,
@@ -1077,17 +1083,20 @@ export function BudgetTab({
         delete next[monthId]
         return next
       })
-      setSuccessMessage(
-        nextZeroState
+      onOperationAlert?.({
+        kind: 'success',
+        message: nextZeroState
           ? `${monthRecord.monthName} marked as zero successfully.`
           : `${monthRecord.monthName} zero flag removed successfully.`,
-      )
+        title: 'Budget month updated',
+      })
       onActivityDataChanged?.()
     } catch (error) {
-      setErrors((current) => ({
-        ...current,
-        submit: error instanceof Error ? error.message : `Failed to update ${monthRecord.monthName}.`,
-      }))
+      onOperationAlert?.({
+        kind: 'error',
+        message: error instanceof Error ? error.message : `Failed to update ${monthRecord.monthName}.`,
+        title: 'Budget month was not updated',
+      })
     } finally {
       setIsSavingExecutionMonth(null)
     }
@@ -1226,6 +1235,10 @@ export function BudgetTab({
 
     try {
       setIsSavingDrawer(true)
+      onOperationAlert?.({
+        kind: 'processing',
+        title: selectedDrawerMonth ? `Saving ${selectedDrawerMonth.monthName} budget details` : 'Saving budget details',
+      })
 
       const rowsToDelete = originalDrawerRows.filter(
         (originalRow) => !drawerRows.some((currentRow) => currentRow.id && currentRow.id === originalRow.id),
@@ -1305,14 +1318,19 @@ export function BudgetTab({
         ...current,
         [selectedDrawerMonth.id]: numberToString(nextDeliveredAmount),
       }))
-      setSuccessMessage(`${selectedDrawerMonth.monthName} budget details saved successfully.`)
+      onOperationAlert?.({
+        kind: 'success',
+        message: `${selectedDrawerMonth.monthName} budget details saved successfully.`,
+        title: 'Budget details saved',
+      })
       onActivityDataChanged?.()
       closeDrawer()
     } catch (error) {
-      setDetailDraftErrors((current) => ({
-        ...current,
-        submit: error instanceof Error ? error.message : 'Failed to save budget details.',
-      }))
+      onOperationAlert?.({
+        kind: 'error',
+        message: error instanceof Error ? error.message : 'Failed to save budget details.',
+        title: 'Budget details were not saved',
+      })
     } finally {
       setIsSavingDrawer(false)
     }
@@ -1819,18 +1837,6 @@ export function BudgetTab({
       {errors.context ? (
         <div className="create-activity__notice create-activity__notice--error" role="alert">
           {errors.context}
-        </div>
-      ) : null}
-
-      {errors.submit ? (
-        <div className="create-activity__notice create-activity__notice--error" role="alert">
-          {errors.submit}
-        </div>
-      ) : null}
-
-      {successMessage ? (
-        <div className="create-activity__notice create-activity__notice--success" role="status">
-          {successMessage}
         </div>
       ) : null}
 

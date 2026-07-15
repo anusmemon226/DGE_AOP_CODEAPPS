@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bell,
   CalendarDays,
@@ -17,6 +17,7 @@ import {
   type LanguageCode,
   type ThemeMode,
 } from '../../constants/app'
+import { APP_ROUTE_PATHS } from '../../routes/appRoutes'
 import {
   fetchAssessmentCycles,
   fetchCurrentUser,
@@ -33,6 +34,8 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks'
 import { IconButton } from '../ui/IconButton'
 import { NotificationPanel } from './NotificationPanel'
 import type { DivisionalHierarchyRef, UserRole } from '../../store/userSlice'
+import { getVisibleNotifications } from '../../utils/notifications'
+import { useNavigate } from 'react-router-dom'
 
 /** Map new roleName back to old AopRole for backward compat */
 const REVERSE_ROLE_MAP: Record<string, AopRole> = {
@@ -108,6 +111,7 @@ function getInitials(name: string | null | undefined): string {
 
 export function Header() {
   const dispatch = useAppDispatch()
+  const navigate = useNavigate()
   const { assessmentCycles, assessmentCyclesLoading, currentUser, isNotificationPanelOpen, language, notifications, selectedCycle, selectedRole, themeMode } = useAppSelector(
     (state) => state.app,
   )
@@ -118,7 +122,11 @@ export function Header() {
   const [isRoleOpen, setIsRoleOpen] = useState(false)
   const cycleSwitcherRef = useRef<HTMLDivElement>(null)
   const roleSwitcherRef = useRef<HTMLDivElement>(null)
-  const unreadCount = notifications.filter((notification) => notification.unread).length
+  const visibleNotifications = useMemo(
+    () => getVisibleNotifications(notifications, selectedRole, selectedCycle),
+    [notifications, selectedCycle, selectedRole],
+  )
+  const unreadCount = visibleNotifications.filter((notification) => notification.unread).length
   const activeCycle = assessmentCycles.find((c) => c.dga_assessment_cycleid === selectedCycle) ?? assessmentCycles[0]
 
   const showCycleSkeleton = assessmentCyclesLoading && assessmentCycles.length === 0
@@ -231,6 +239,17 @@ export function Header() {
     return themeMode === 'light' ? 'dark' : 'light'
   }
 
+  function handleCycleSelect(cycleId: string) {
+    const isChangingCycle = cycleId !== selectedCycle
+
+    dispatch(setSelectedCycle(cycleId))
+    setIsCycleOpen(false)
+
+    if (isChangingCycle) {
+      navigate(APP_ROUTE_PATHS.dashboard)
+    }
+  }
+
   return (
     <header className="header">
       <div className="header__title-group">
@@ -292,10 +311,7 @@ export function Header() {
                     <button
                       className={`cycle-popover__item ${isSelected ? 'cycle-popover__item--selected' : ''}`}
                       key={cycle.dga_assessment_cycleid}
-                      onClick={() => {
-                        dispatch(setSelectedCycle(cycle.dga_assessment_cycleid))
-                        setIsCycleOpen(false)
-                      }}
+                      onClick={() => handleCycleSelect(cycle.dga_assessment_cycleid)}
                       type="button"
                     >
                       <span className="cycle-popover__check">{isSelected ? <Check size={16} /> : null}</span>

@@ -98,6 +98,14 @@
 }
 
 /* Stage content area */
+.edit-activity__workspace {
+  align-items: start;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) minmax(13.5rem, 16rem);
+  min-width: 0;
+}
+
 .edit-activity__stage-content {
   border-radius: 0.85rem;
   display: grid;
@@ -110,6 +118,21 @@
 .edit-activity__stage-content > * {
   min-width: 0;
   width: 100%;
+}
+
+@media (max-width: 1020px) {
+  .edit-activity__workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .edit-activity__workflow-panel {
+    order: -1;
+    position: static;
+  }
+
+  .edit-activity__workflow-panel-actions {
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  }
 }
 
 /* ── Execution review changes panel ── */
