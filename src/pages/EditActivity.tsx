@@ -3415,182 +3415,136 @@ export function EditActivity() {
 
   if (isContextLoading) {
     return (
-      <div className="create-activity" aria-label="Loading Edit Activity context...">
-        {/* Hero header skeleton */}
+      <div className="create-activity edit-activity" aria-label="Loading Edit Activity context...">
         <header className="create-activity__hero create-activity__hero--skeleton" aria-hidden="true">
-          <div className="skeleton-line skeleton-shimmer" style={{ width: '13rem', height: '0.7rem' }} />
           <div className="edit-activity__hero-top">
-            <div className="skeleton-button skeleton-shimmer" style={{ width: '9rem' }} />
-            <div className="skeleton-button skeleton-shimmer" style={{ width: '11rem' }} />
-          </div>
-          <div className="create-activity__hero-body">
-            <div className="skeleton-icon-box skeleton-shimmer" />
-            <div className="create-activity__hero-content">
-              <div className="skeleton-line skeleton-shimmer" style={{ width: '28%', height: '0.7rem', marginBottom: '0.15rem' }} />
-              <div className="skeleton-line skeleton-shimmer" style={{ width: '45%', height: '1.5rem', marginBottom: '0.15rem' }} />
-              <div className="skeleton-line skeleton-shimmer" style={{ width: '55%', height: '0.85rem' }} />
+            <div className="skeleton-line skeleton-shimmer" style={{ width: '8.5rem', height: '0.8rem' }} />
+            <dl className="create-activity__organization-context edit-activity__organization-context">
+              <div>
+                <dt><span className="skeleton-line skeleton-shimmer" style={{ width: '3.2rem', height: '0.65rem' }} /></dt>
+                <dd><span className="skeleton-line skeleton-shimmer" style={{ width: '14rem', height: '0.78rem' }} /></dd>
+              </div>
+              <div>
+                <dt><span className="skeleton-line skeleton-shimmer" style={{ width: '3.8rem', height: '0.65rem' }} /></dt>
+                <dd><span className="skeleton-line skeleton-shimmer" style={{ width: '13rem', height: '0.78rem' }} /></dd>
+              </div>
+            </dl>
+            <div className="edit-activity__header-progress">
+              <div className="edit-activity__header-progress-copy">
+                <span><span className="skeleton-line skeleton-shimmer" style={{ width: '7rem', height: '0.62rem' }} /></span>
+                <strong><span className="skeleton-line skeleton-shimmer" style={{ width: '2.5rem', height: '0.72rem' }} /></strong>
+              </div>
+              <div className="skeleton-progress-ring skeleton-shimmer" />
             </div>
           </div>
-          <div className="create-activity__hero-footer">
-            <div className="create-activity__hero-chips">
-              <span className="skeleton-chip skeleton-shimmer" />
-              <span className="skeleton-chip skeleton-shimmer" />
-              <span className="skeleton-chip skeleton-shimmer" />
+
+          <div className="create-activity__breadcrumb">
+            <div className="skeleton-line skeleton-shimmer" style={{ width: '16rem', height: '0.75rem' }} />
+          </div>
+
+          <div className="edit-activity__hero-main">
+            <div className="edit-activity__hero-title-row">
+              <div className="skeleton-icon-box skeleton-shimmer" />
+              <div className="create-activity__hero-content">
+                <div className="skeleton-line skeleton-shimmer" style={{ width: '16rem', height: '1.35rem', marginBottom: '0.24rem' }} />
+                <div className="skeleton-line skeleton-shimmer" style={{ width: 'min(24rem, 74%)', height: '0.78rem' }} />
+              </div>
             </div>
-            <div className="skeleton-button skeleton-shimmer" style={{ width: '7rem' }} />
+          </div>
+
+          <div className="create-activity__hero-footer edit-activity__hero-footer">
+            <div className="create-activity__hero-actions edit-activity__hero-actions">
+              <div className="skeleton-button skeleton-shimmer" style={{ width: '8rem' }} />
+              <div className="skeleton-button skeleton-shimmer" style={{ width: '8rem' }} />
+            </div>
           </div>
         </header>
 
-        {/* Stage tabs skeleton */}
         <div className="edit-activity__stages">
-          <nav className="edit-activity__stage-tabs" aria-hidden="true">
-            <div className="skeleton-line skeleton-shimmer" style={{ width: '100%', height: '2.35rem', borderRadius: '0.6rem' }} />
+          <nav className="edit-activity__stage-tabs edit-activity__stage-tabs--skeleton" aria-hidden="true">
+            {Array.from({ length: 8 }).map((_, index) => (
+              <div className="skeleton-line skeleton-shimmer" key={`stage-skeleton-${index}`} style={{ width: index === 0 ? '9rem' : '7rem', height: '1.75rem', borderRadius: '0.55rem' }} />
+            ))}
           </nav>
         </div>
 
-        {/* Two-column layout skeleton */}
-        <div className="create-activity__manual-layout">
-          <div className="create-activity__manual-form">
-            {/* First card skeleton */}
-            <div className="card create-activity__section create-activity__section--skeleton" aria-hidden="true">
-              <div className="create-activity__section-header">
-                <div className="create-activity__section-header-inner">
-                  <div className="skeleton-section-icon skeleton-shimmer" />
-                  <div>
-                    <div className="skeleton-line skeleton-shimmer" style={{ width: '40%', height: '0.65rem', marginBottom: '0.35rem' }} />
-                    <div className="skeleton-line skeleton-shimmer" style={{ width: '55%', height: '0.95rem' }} />
+        <div className="edit-activity__workspace">
+          <div className="edit-activity__stage-content" aria-hidden="true">
+            <div className="ai-summary-card ai-summary-card--skeleton">
+              <div className="ai-summary-card__header">
+                <div className="ai-summary-card__brand">
+                  <div className="ai-summary-card__icon-wrapper skeleton-shimmer" />
+                  <div className="ai-summary-card__titles">
+                    <div className="skeleton-line skeleton-shimmer" style={{ width: '11rem', height: '0.92rem' }} />
+                    <div className="skeleton-line skeleton-shimmer" style={{ width: 'min(25rem, 86%)', height: '0.7rem' }} />
                   </div>
                 </div>
               </div>
-              <div className="create-activity__form-stack">
-                <div className="create-activity__form-row create-activity__form-row--two">
-                  <div className="skeleton-field">
-                    <div className="skeleton-line skeleton-shimmer" style={{ width: '35%', height: '0.7rem', marginBottom: '0.35rem' }} />
-                    <div className="skeleton-input skeleton-shimmer" />
-                  </div>
-                  <div className="skeleton-field">
-                    <div className="skeleton-line skeleton-shimmer" style={{ width: '45%', height: '0.7rem', marginBottom: '0.35rem' }} />
-                    <div className="skeleton-input skeleton-shimmer" />
-                  </div>
-                </div>
-                <div className="create-activity__form-row create-activity__form-row--two">
-                  <div className="skeleton-field">
-                    <div className="skeleton-line skeleton-shimmer" style={{ width: '25%', height: '0.7rem', marginBottom: '0.35rem' }} />
-                    <div className="skeleton-input skeleton-shimmer" />
-                  </div>
-                  <div className="skeleton-field">
-                    <div className="skeleton-line skeleton-shimmer" style={{ width: '30%', height: '0.7rem', marginBottom: '0.35rem' }} />
-                    <div className="skeleton-input skeleton-shimmer" />
-                  </div>
-                </div>
-                <div className="create-activity__form-row">
-                  <div className="skeleton-field">
-                    <div className="skeleton-line skeleton-shimmer" style={{ width: '30%', height: '0.7rem', marginBottom: '0.5rem' }} />
-                    <div className="skeleton-radio-row">
-                      <div className="skeleton-radio skeleton-shimmer" />
-                      <div className="skeleton-radio skeleton-shimmer" />
+              <div className="ai-summary-card__body">
+                <div className="ai-summary-card__grid">
+                  <article className="ai-summary-block">
+                    <header className="ai-summary-block__header">
+                      <span className="ai-summary-badge ai-summary-badge--skeleton skeleton-shimmer" />
+                    </header>
+                    <div className="ai-summary-block__text ai-summary-block__text--skeleton">
+                      <span className="skeleton-line skeleton-shimmer" />
+                      <span className="skeleton-line skeleton-shimmer" />
                     </div>
-                  </div>
-                </div>
-                <div className="create-activity__form-row">
-                  <div className="skeleton-field">
-                    <div className="skeleton-line skeleton-shimmer" style={{ width: '38%', height: '0.7rem', marginBottom: '0.5rem' }} />
-                    <div className="skeleton-radio-row">
-                      <div className="skeleton-radio skeleton-shimmer" />
-                      <div className="skeleton-radio skeleton-shimmer" />
-                      <div className="skeleton-radio skeleton-shimmer" />
-                    </div>
-                  </div>
-                </div>
-                <div className="create-activity__form-row create-activity__form-row--three">
-                  <div className="skeleton-field">
-                    <div className="skeleton-line skeleton-shimmer" style={{ width: '55%', height: '0.7rem', marginBottom: '0.5rem' }} />
-                    <div className="skeleton-radio-row">
-                      <div className="skeleton-radio skeleton-shimmer" />
-                      <div className="skeleton-radio skeleton-shimmer" />
-                    </div>
-                  </div>
-                  <div className="skeleton-field">
-                    <div className="skeleton-line skeleton-shimmer" style={{ width: '60%', height: '0.7rem', marginBottom: '0.5rem' }} />
-                    <div className="skeleton-radio-row">
-                      <div className="skeleton-radio skeleton-shimmer" />
-                      <div className="skeleton-radio skeleton-shimmer" />
-                    </div>
-                  </div>
-                  <div className="skeleton-field">
-                    <div className="skeleton-line skeleton-shimmer" style={{ width: '50%', height: '0.7rem', marginBottom: '0.5rem' }} />
-                    <div className="skeleton-radio-row">
-                      <div className="skeleton-radio skeleton-shimmer" />
-                      <div className="skeleton-radio skeleton-shimmer" />
-                    </div>
-                  </div>
-                </div>
-                <div className="create-activity__form-row">
-                  <div className="skeleton-field">
-                    <div className="skeleton-line skeleton-shimmer" style={{ width: '40%', height: '0.7rem', marginBottom: '0.35rem' }} />
-                    <div className="skeleton-input skeleton-shimmer" />
-                  </div>
-                </div>
-                <div className="create-activity__date-range">
-                  <div className="skeleton-field">
-                    <div className="skeleton-line skeleton-shimmer" style={{ width: '40%', height: '0.7rem', marginBottom: '0.35rem' }} />
-                    <div className="skeleton-input skeleton-shimmer" />
-                  </div>
-                  <div className="skeleton-date-connector skeleton-shimmer" />
-                  <div className="skeleton-field">
-                    <div className="skeleton-line skeleton-shimmer" style={{ width: '38%', height: '0.7rem', marginBottom: '0.35rem' }} />
-                    <div className="skeleton-input skeleton-shimmer" />
-                  </div>
-                </div>
-                <div className="create-activity__form-row create-activity__form-row--two">
-                  <div className="skeleton-field">
-                    <div className="skeleton-line skeleton-shimmer" style={{ width: '50%', height: '0.7rem', marginBottom: '0.35rem' }} />
-                    <div className="skeleton-textarea skeleton-shimmer" />
-                  </div>
-                  <div className="skeleton-field">
-                    <div className="skeleton-line skeleton-shimmer" style={{ width: '30%', height: '0.7rem', marginBottom: '0.35rem' }} />
-                    <div className="skeleton-textarea skeleton-shimmer" />
-                  </div>
+                  </article>
                 </div>
               </div>
             </div>
 
-            {/* Second card skeleton (ADEO) */}
-            <div className="card create-activity__section create-activity__section--skeleton" aria-hidden="true">
-              <div className="create-activity__section-header">
-                <div className="create-activity__section-header-inner">
-                  <div className="skeleton-section-icon skeleton-shimmer" />
-                  <div>
-                    <div className="skeleton-line skeleton-shimmer" style={{ width: '35%', height: '0.65rem', marginBottom: '0.35rem' }} />
-                    <div className="skeleton-line skeleton-shimmer" style={{ width: '48%', height: '0.95rem' }} />
+            <div className="edit-activity__activity-info-card-grid">
+              {Array.from({ length: 4 }).map((_, cardIndex) => (
+                <div className="card create-activity__section create-activity__section--grid-card edit-activity__activity-info-card create-activity__section--skeleton" key={`edit-info-card-skeleton-${cardIndex}`}>
+                  <div className="create-activity__section-header">
+                    <div className="create-activity__section-header-inner">
+                      <div className="skeleton-section-icon skeleton-shimmer" />
+                      <div>
+                        <div className="skeleton-line skeleton-shimmer" style={{ width: `${7 + cardIndex}rem`, height: '0.86rem', marginBottom: '0.28rem' }} />
+                        <div className="skeleton-line skeleton-shimmer" style={{ width: 'min(22rem, 88%)', height: '0.7rem' }} />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="create-activity__form-stack">
+                    {Array.from({ length: cardIndex === 0 ? 2 : 4 }).map((__, fieldIndex) => (
+                      <div className="skeleton-field" key={`edit-field-skeleton-${cardIndex}-${fieldIndex}`}>
+                        <div className="skeleton-line skeleton-shimmer" style={{ width: `${32 + (fieldIndex % 3) * 10}%`, height: '0.66rem', marginBottom: '0.35rem' }} />
+                        {cardIndex === 0 && fieldIndex === 0 ? (
+                          <div className="skeleton-radio-row">
+                            <div className="skeleton-radio skeleton-shimmer" />
+                            <div className="skeleton-radio skeleton-shimmer" />
+                            <div className="skeleton-radio skeleton-shimmer" />
+                          </div>
+                        ) : fieldIndex === 3 ? (
+                          <div className="skeleton-textarea skeleton-shimmer" />
+                        ) : (
+                          <div className="skeleton-input skeleton-shimmer" />
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
-              <div className="create-activity__form-stack">
-                <div className="create-activity__form-row create-activity__form-row--two">
-                  <div className="skeleton-field">
-                    <div className="skeleton-line skeleton-shimmer" style={{ width: '30%', height: '0.7rem', marginBottom: '0.35rem' }} />
-                    <div className="skeleton-input skeleton-shimmer" />
-                  </div>
-                  <div className="skeleton-field">
-                    <div className="skeleton-line skeleton-shimmer" style={{ width: '30%', height: '0.7rem', marginBottom: '0.35rem' }} />
-                    <div className="skeleton-input skeleton-shimmer" />
-                  </div>
-                </div>
-                <div className="create-activity__form-row create-activity__form-row--two">
-                  <div className="skeleton-field">
-                    <div className="skeleton-line skeleton-shimmer" style={{ width: '35%', height: '0.7rem', marginBottom: '0.35rem' }} />
-                    <div className="skeleton-textarea skeleton-shimmer" />
-                  </div>
-                  <div className="skeleton-field">
-                    <div className="skeleton-line skeleton-shimmer" style={{ width: '42%', height: '0.7rem', marginBottom: '0.35rem' }} />
-                    <div className="skeleton-textarea skeleton-shimmer" />
-                  </div>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
+          <aside className="edit-activity__right-rail" aria-hidden="true">
+            {Array.from({ length: 4 }).map((_, cardIndex) => (
+              <section className="edit-activity__rail-card" key={`edit-rail-skeleton-${cardIndex}`}>
+                <div className="edit-activity__rail-card-header">
+                  <div className="skeleton-section-icon skeleton-shimmer" />
+                  <div className="skeleton-line skeleton-shimmer" style={{ width: cardIndex === 0 ? '9rem' : '7rem', height: '0.9rem' }} />
+                </div>
+                <div className="edit-activity__workflow-panel-actions">
+                  {Array.from({ length: cardIndex === 0 ? 2 : 3 }).map((__, actionIndex) => (
+                    <div className="skeleton-button skeleton-shimmer" key={`edit-rail-action-${cardIndex}-${actionIndex}`} style={{ width: '100%' }} />
+                  ))}
+                </div>
+              </section>
+            ))}
+          </aside>
         </div>
       </div>
     )

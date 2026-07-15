@@ -4110,6 +4110,31 @@
   pointer-events: none;
 }
 
+.create-activity__hero--skeleton .create-activity__organization-context dt,
+.create-activity__hero--skeleton .create-activity__organization-context dd {
+  display: flex;
+}
+
+.edit-activity__header-progress .skeleton-progress-ring {
+  height: 2rem;
+  margin: 0;
+  width: 2rem;
+}
+
+.edit-activity__stage-tabs--skeleton {
+  align-items: center;
+  overflow: hidden;
+}
+
+.edit-activity__stage-tabs--skeleton .skeleton-line {
+  flex: 0 0 auto;
+}
+
+.edit-activity__rail-card .skeleton-button {
+  border-radius: 0.7rem;
+  height: 2.15rem;
+}
+
 :root[data-theme='dark'] .skeleton-shimmer {
   background: linear-gradient(
     90deg,

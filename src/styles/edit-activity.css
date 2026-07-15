@@ -8001,6 +8001,36 @@
   padding: 0.85rem 0.95rem 0.95rem;
 }
 
+.ai-summary-card--skeleton .ai-summary-card__header {
+  padding-bottom: 0;
+}
+
+.ai-summary-card--skeleton .ai-summary-card__body {
+  padding-top: 0.72rem;
+}
+
+.ai-summary-badge--skeleton {
+  display: inline-flex;
+  height: 1.35rem;
+  padding: 0;
+  width: 6rem;
+}
+
+.ai-summary-block__text--skeleton {
+  display: grid;
+  gap: 0.42rem;
+}
+
+.ai-summary-block__text--skeleton .skeleton-line {
+  display: block;
+  height: 0.72rem;
+  width: 94%;
+}
+
+.ai-summary-block__text--skeleton .skeleton-line:last-child {
+  width: 76%;
+}
+
 .ai-summary-card__grid {
   display: grid;
   gap: 0.58rem;
