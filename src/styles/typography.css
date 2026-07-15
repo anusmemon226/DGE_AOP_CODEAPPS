@@ -41,8 +41,7 @@ b {
   font-weight: var(--font-weight-semibold);
 }
 
-.button,
-button:not(.icon-button):not(.modal__close):not(.date-picker__grid button) {
+.button {
   font-size: var(--font-size-control) !important;
   font-weight: var(--font-weight-semibold) !important;
   letter-spacing: -0.005em;

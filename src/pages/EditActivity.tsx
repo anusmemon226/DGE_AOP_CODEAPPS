@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   ChevronRight,
   ClipboardList,
+  Clock3,
   Edit3,
   FileText,
   Flag,
@@ -15,6 +16,7 @@ import {
   Send,
   Sparkles,
   Target,
+  UserCheck,
   UserRound,
   Wallet,
   X,
@@ -84,6 +86,7 @@ import {
   calculateProjectMilestoneProgress,
   type ProjectMilestoneProgress,
 } from './editActivity/helpers/milestoneProgress'
+import { formatDate } from './editActivity/helpers/sharedHelpers'
 
 // ── Types ──
 
@@ -117,6 +120,10 @@ const TABS: TabConfig[] = [
 
 function scrollPageToTop(behavior: ScrollBehavior = 'smooth') {
   window.scrollTo({ top: 0, behavior })
+}
+
+function formatActivityRailDate(value?: string | null) {
+  return value ? formatDate(value) || '—' : '—'
 }
 
 const ACTIVITY_INFO_SELECT_FIELDS = [
@@ -159,6 +166,9 @@ const ACTIVITY_INFO_SELECT_FIELDS = [
   'dga_is_rejected',
   'dga_rejection_reason',
   '_dga_project_planning_instance_value',
+  '_createdby_value',
+  'createdon',
+  'modifiedon',
 ]
 
 // ── Status helpers ──
@@ -795,6 +805,8 @@ export function EditActivity() {
   const selectedRole = useAppSelector((state) => state.app.selectedRole)
   const { currentRole, currentRoleDivisionalHierarchy, divisionalHierarchies: allHierarchies, systemUser } = useAppSelector((state) => state.user)
   const [activeTab, setActiveTab] = useState<TabId>('activity-info')
+  const stageTabsRef = useRef<HTMLElement | null>(null)
+  const [isStickyStageTabsVisible, setIsStickyStageTabsVisible] = useState(false)
   const [activity, setActivity] = useState<Dga_aop_projectses | null>(null)
   const [form, setForm] = useState<ActivityForm>(INITIAL_FORM)
   const [errors, setErrors] = useState<FieldErrors>({})
@@ -805,6 +817,7 @@ export function EditActivity() {
   const [tabOperationAlert, setTabOperationAlert] = useState<EditActivityOperationAlertPayload | null>(null)
   const previousSelectedRoleRef = useRef(selectedRole)
   const [pendingWith, setPendingWith] = useState('Loading...')
+  const [createdByName, setCreatedByName] = useState('')
   const [objectiveHeaderAction, setObjectiveHeaderAction] = useState<ObjectiveHeaderAction | null>(null)
   const [budgetHeaderAction, setBudgetHeaderAction] = useState<BudgetHeaderAction | null>(null)
   const [isSubmitConfirmOpen, setIsSubmitConfirmOpen] = useState(false)
@@ -1151,6 +1164,40 @@ export function EditActivity() {
   // ── Context loading ──
 
   useEffect(() => {
+    const tabsElement = stageTabsRef.current
+    if (!tabsElement) return
+
+    const viewport = window as Window & typeof globalThis
+
+    if (!('IntersectionObserver' in window)) {
+      const updateStickyVisibility = () => {
+        const rect = tabsElement.getBoundingClientRect()
+        setIsStickyStageTabsVisible(rect.bottom < 0 || rect.top > viewport.innerHeight)
+      }
+
+      updateStickyVisibility()
+      viewport.addEventListener('scroll', updateStickyVisibility, { passive: true })
+      viewport.addEventListener('resize', updateStickyVisibility)
+
+      return () => {
+        viewport.removeEventListener('scroll', updateStickyVisibility)
+        viewport.removeEventListener('resize', updateStickyVisibility)
+      }
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsStickyStageTabsVisible(!entry.isIntersecting)
+      },
+      { threshold: 0.01 },
+    )
+
+    observer.observe(tabsElement)
+
+    return () => observer.disconnect()
+  }, [isContextLoading])
+
+  useEffect(() => {
     if (!operationAlertKey) return
 
     scrollPageToTop()
@@ -1219,6 +1266,7 @@ export function EditActivity() {
         }))
         setActivity(null)
         setPendingWith('Not assigned')
+        setCreatedByName('')
         setIsContextLoading(false)
         return
       }
@@ -1292,6 +1340,23 @@ export function EditActivity() {
           }
         }
 
+        const createdById = normalizeId(project._createdby_value)
+        let nextCreatedByName = ''
+
+        if (createdById) {
+          const createdByUser = users.find((user) => normalizeId(user.systemuserid) === createdById)
+          nextCreatedByName = createdByUser?.fullname ?? createdByUser?.internalemailaddress ?? ''
+
+          if (!nextCreatedByName) {
+            const createdByResult = await SystemusersService.get(createdById, {
+              select: ['systemuserid', 'fullname', 'internalemailaddress'],
+            })
+            assertOperationSuccess(createdByResult, 'Failed to load activity creator user.')
+            const createdByUserResult = getResultValue<Systemusers>(createdByResult)
+            nextCreatedByName = createdByUserResult?.fullname ?? createdByUserResult?.internalemailaddress ?? ''
+          }
+        }
+
         if (!isMounted) return
 
         const projectSectorId = normalizeId(project._dga_sector_value)
@@ -1304,6 +1369,7 @@ export function EditActivity() {
           : undefined
         setActivityLeadOptions(activityLeadUsers)
         setPendingWith(ownerName || 'Not assigned')
+        setCreatedByName(nextCreatedByName)
         setActivity(project)
         setForm(applyActivityInformationRelatedChanges(
           projectToActivityForm(project, {
@@ -1319,6 +1385,7 @@ export function EditActivity() {
           setErrors({ context: error instanceof Error ? error.message : 'Failed to load context.' })
           setActivity(null)
           setPendingWith('Not assigned')
+          setCreatedByName('')
         }
       } finally {
         if (isMounted) setIsContextLoading(false)
@@ -2604,6 +2671,55 @@ export function EditActivity() {
 
   // ── Tab content ──
 
+  function handleStageTabClick(tabId: TabId, locked: boolean) {
+    if (locked) return
+
+    setActiveTab(tabId)
+    scrollPageToTop()
+  }
+
+  function renderStageTabs({
+    ariaLabel,
+    className = '',
+    isSticky = false,
+  }: {
+    ariaLabel: string
+    className?: string
+    isSticky?: boolean
+  }) {
+    return (
+      <nav
+        aria-label={ariaLabel}
+        className={`edit-activity__stage-tabs ${className}`.trim()}
+        ref={isSticky ? undefined : stageTabsRef}
+        role="tablist"
+      >
+        {TABS.map((tab) => {
+          const Icon = tab.icon
+          const isActive = activeTab === tab.id
+          const locked = tabLocked[tab.id] ?? false
+
+          return (
+            <button
+              key={`${isSticky ? 'sticky-' : ''}${tab.id}`}
+              className={`edit-activity__stage-tab ${isActive ? 'edit-activity__stage-tab--active' : ''} ${locked ? 'edit-activity__stage-tab--locked' : ''}`}
+              onClick={() => handleStageTabClick(tab.id, locked)}
+              role="tab"
+              aria-selected={isActive}
+              aria-disabled={locked}
+              title={locked ? `Locked - ${getTabLockReason(tab.id)}` : tab.label}
+              type="button"
+            >
+              <Icon size={16} />
+              <span className="edit-activity__stage-tab-label">{tab.shortLabel}</span>
+              <span className="edit-activity__stage-tab-full">{tab.label}</span>
+            </button>
+          )
+        })}
+      </nav>
+    )
+  }
+
   function renderTabContent() {
     switch (activeTab) {
       case 'activity-info':
@@ -2899,6 +3015,71 @@ export function EditActivity() {
     )
   }
 
+  function renderRailHeader(Icon: typeof ClipboardList, title: string) {
+    return (
+      <div className="edit-activity__rail-card-header">
+        <Icon aria-hidden="true" size={16} />
+        <h2>{title}</h2>
+      </div>
+    )
+  }
+
+  function renderRightRail() {
+    return (
+      <aside aria-label="Activity side panel" className="edit-activity__right-rail">
+        <section className="edit-activity__rail-card edit-activity__rail-card--actions">
+          {renderRailHeader(ClipboardList, 'Workflow Actions')}
+          <div className="edit-activity__workflow-panel-actions">
+            {renderWorkflowActions()}
+          </div>
+        </section>
+
+        <section className="edit-activity__rail-card">
+          {renderRailHeader(UserCheck, 'Activity Info')}
+          <div className="edit-activity__activity-info-list">
+            <div className="edit-activity__activity-info-row">
+              <span>Status</span>
+              <Badge tone={getStatusTone(statusCode)}>
+                {formatStatusCode(statusCode)}
+              </Badge>
+            </div>
+            <div className="edit-activity__activity-info-row">
+              <span>Phase</span>
+              <Badge tone={isExecutionPhase ? 'success' : 'info'}>
+                {isExecutionPhase ? 'Execution' : 'Planning'}
+              </Badge>
+            </div>
+            <div className="edit-activity__activity-info-row edit-activity__activity-info-row--pending">
+              <span>Pending with</span>
+              <strong>
+                <UserRound size={14} />
+                {pendingWith}
+              </strong>
+            </div>
+          </div>
+        </section>
+
+        <section className="edit-activity__rail-card">
+          {renderRailHeader(Clock3, 'Activity Creation Details')}
+          <dl className="edit-activity__creation-details">
+            <div>
+              <dt>Created By</dt>
+              <dd>{createdByName || '—'}</dd>
+            </div>
+            <div>
+              <dt>Created On</dt>
+              <dd>{formatActivityRailDate(activity?.createdon)}</dd>
+            </div>
+            <div>
+              <dt>Modified On</dt>
+              <dd>{formatActivityRailDate(activity?.modifiedon)}</dd>
+            </div>
+          </dl>
+        </section>
+      </aside>
+    )
+  }
+
   if (isContextLoading) {
     return (
       <div className="create-activity" aria-label="Loading Edit Activity context...">
@@ -3083,7 +3264,7 @@ export function EditActivity() {
   }
 
   return (
-    <div className="create-activity">
+    <div className="create-activity edit-activity">
       {hasOwnerMismatch || showRespondentActionsNotice || showExecutionRejectedNotice || showExecutionApprovedNotice || errors.submit ? (
         <div className="edit-activity__persistent-alerts">
           {errors.submit ? (
@@ -3233,27 +3414,6 @@ export function EditActivity() {
         </div>
 
         <div className="create-activity__hero-footer edit-activity__hero-footer">
-          <div className="create-activity__hero-chips edit-activity__status-cluster">
-            <span className="create-activity__chip">
-              <span className="create-activity__chip-label">Status</span>
-              <Badge tone={getStatusTone(statusCode)}>
-                {formatStatusCode(statusCode)}
-              </Badge>
-            </span>
-            <span className="create-activity__chip">
-              <span className="create-activity__chip-label">Phase</span>
-              <Badge tone={isExecutionPhase ? 'success' : 'info'}>
-                {isExecutionPhase ? 'Execution' : 'Planning'}
-              </Badge>
-            </span>
-            <span className="create-activity__chip create-activity__chip--user">
-              <span className="create-activity__chip-label">Pending with</span>
-              <strong>
-                <UserRound size={14} />
-                {pendingWith}
-              </strong>
-            </span>
-          </div>
           <Button icon={<FileText size={16} />} variant="ghost" className="edit-activity__card-btn">
             Activity Card
           </Button>
@@ -3297,35 +3457,20 @@ export function EditActivity() {
         </div>
       ) : null}
 
-      {/* Premium stage tabs */}
+      {/* Stage tabs */}
       <div className="edit-activity__stages">
-        <nav className="edit-activity__stage-tabs" role="tablist" aria-label="Activity stages">
-          {TABS.map((tab) => {
-            const Icon = tab.icon
-            const isActive = activeTab === tab.id
-            const locked = tabLocked[tab.id] ?? false
-
-            return (
-              <button
-                key={tab.id}
-                className={`edit-activity__stage-tab ${isActive ? 'edit-activity__stage-tab--active' : ''} ${locked ? 'edit-activity__stage-tab--locked' : ''}`}
-                onClick={() => {
-                  if (!locked) setActiveTab(tab.id)
-                }}
-                role="tab"
-                aria-selected={isActive}
-                aria-disabled={locked}
-                title={locked ? `Locked — ${getTabLockReason(tab.id)}` : tab.label}
-                type="button"
-              >
-                <Icon size={16} />
-                <span className="edit-activity__stage-tab-label">{tab.shortLabel}</span>
-                <span className="edit-activity__stage-tab-full">{tab.label}</span>
-              </button>
-            )
-          })}
-        </nav>
+        {renderStageTabs({ ariaLabel: 'Activity stages' })}
       </div>
+
+      {isStickyStageTabsVisible ? (
+        <div className="edit-activity__sticky-tabs-shell edit-activity__sticky-tabs-shell--visible">
+          {renderStageTabs({
+            ariaLabel: 'Sticky activity stages',
+            className: 'edit-activity__stage-tabs--sticky',
+            isSticky: true,
+          })}
+        </div>
+      ) : null}
 
       {/* Stage content */}
       <div className="edit-activity__workspace">
@@ -3341,18 +3486,7 @@ export function EditActivity() {
           {renderTabContent()}
         </div>
 
-        <aside aria-label="Activity workflow actions" className="edit-activity__workflow-panel">
-          <div className="edit-activity__workflow-panel-header">
-            <ClipboardList aria-hidden="true" size={17} />
-            <div>
-              <span>Workflow Actions</span>
-              <strong>{TABS.find((tab) => tab.id === activeTab)?.label ?? 'Activity'}</strong>
-            </div>
-          </div>
-          <div className="edit-activity__workflow-panel-actions">
-            {renderWorkflowActions()}
-          </div>
-        </aside>
+        {renderRightRail()}
       </div>
 
       <ConfirmationDialog

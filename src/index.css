@@ -53,7 +53,7 @@
   --scrollbar-thumb: #CFD7F8;
   --scrollbar-thumb-hover: #B6C2F3;
   --scrollbar-track: transparent;
-  --sidebar-width: 15rem;
+  --sidebar-width: 14rem;
   --sidebar-collapsed-width: 4rem;
   font-family: var(--font-family-base);
   line-height: 1.5;

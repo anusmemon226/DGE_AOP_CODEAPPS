@@ -2166,48 +2166,49 @@ export function CreateActivity() {
     <div className="create-activity">
       {activeTab === 'manual' ? (
         <header className="create-activity__hero">
-          <nav aria-label="Breadcrumb" className="create-activity__breadcrumb">
-            <Link to={APP_ROUTE_PATHS.dashboard}>Dashboard</Link>
-            <ChevronRight aria-hidden="true" size={14} />
-            <span>Create Activity</span>
-          </nav>
-          <div className="create-activity__hero-top">
-            <div className="create-activity__hero-body">
-              <div className="create-activity__hero-icon" aria-hidden="true">
-                <FileText size={22} />
+          <div className="create-activity__hero-grid">
+            <div className="create-activity__hero-left">
+              <nav aria-label="Breadcrumb" className="create-activity__breadcrumb">
+                <Link to={APP_ROUTE_PATHS.dashboard}>Dashboard</Link>
+                <ChevronRight aria-hidden="true" size={14} />
+                <span>Create Activity</span>
+              </nav>
+              <div className="create-activity__hero-body">
+                <div className="create-activity__hero-icon" aria-hidden="true">
+                  <FileText size={22} />
+                </div>
+                <div className="create-activity__hero-content">
+                  <h1>{form.activityName.trim() || 'New Activity'}</h1>
+                  <p>{cycle?.dga_name ?? 'Loading...'} &mdash; Activity planning for the Digital Connect Annual Operating Plan.</p>
+                </div>
               </div>
-              <div className="create-activity__hero-content">
-                <h1>{form.activityName.trim() || 'New Activity'}</h1>
-                <p>{cycle?.dga_name ?? 'Loading...'} &mdash; Activity planning for the Digital Connect Annual Operating Plan.</p>
+              <div className="create-activity__hero-chips">
+                <span className="create-activity__chip">
+                  <span className="create-activity__chip-label">Status</span>
+                  <Badge>Draft</Badge>
+                </span>
+                <span className="create-activity__chip">
+                  <span className="create-activity__chip-label">Phase</span>
+                  <Badge tone="info">Planning</Badge>
+                </span>
               </div>
             </div>
-            <dl className="create-activity__organization-context">
-              <div>
-                <dt>Sector</dt>
-                <dd title={form.sectorName}>{form.sectorName || 'Loading...'}</dd>
+            <div className="create-activity__hero-right">
+              <dl className="create-activity__organization-context">
+                <div>
+                  <dt>Sector</dt>
+                  <dd title={form.sectorName}>{form.sectorName || 'Loading...'}</dd>
+                </div>
+                <div>
+                  <dt>Division</dt>
+                  <dd title={form.divisionName}>{form.divisionName || 'Loading...'}</dd>
+                </div>
+              </dl>
+              <div className="create-activity__hero-actions">
+                <Button disabled={isSaving || Boolean(errors.context)} icon={<Save size={16} />} onClick={saveDraft}>
+                  {isSaving ? 'Saving...' : createdProjectId ? 'Open Created Activity' : 'Save Draft'}
+                </Button>
               </div>
-              <div>
-                <dt>Division</dt>
-                <dd title={form.divisionName}>{form.divisionName || 'Loading...'}</dd>
-              </div>
-            </dl>
-          </div>
-
-          <div className="create-activity__hero-footer">
-            <div className="create-activity__hero-chips">
-              <span className="create-activity__chip">
-                <span className="create-activity__chip-label">Status</span>
-                <Badge>Draft</Badge>
-              </span>
-              <span className="create-activity__chip">
-                <span className="create-activity__chip-label">Phase</span>
-                <Badge tone="info">Planning</Badge>
-              </span>
-            </div>
-            <div className="create-activity__hero-actions">
-              <Button disabled={isSaving || Boolean(errors.context)} icon={<Save size={16} />} onClick={saveDraft}>
-                {isSaving ? 'Saving...' : createdProjectId ? 'Open Created Activity' : 'Save Draft'}
-              </Button>
             </div>
           </div>
         </header>
