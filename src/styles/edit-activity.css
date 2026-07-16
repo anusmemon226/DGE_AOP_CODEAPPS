@@ -3983,43 +3983,212 @@
   gap: 1.1rem;
 }
 
+.edit-activity__objectives .edit-activity__members-header {
+  align-items: center;
+}
+
 .edit-activity__objective-card {
   overflow: hidden;
 }
 
 .edit-activity__objective-card .create-activity__section-header {
-  padding: 1rem 1.2rem;
+  padding: 0.8rem 0.9rem;
+}
+
+.edit-activity__objectives .edit-activity__members-header-text h2 {
+  color: var(--color-text-primary);
+  font-size: 0.98rem !important;
+  font-weight: var(--font-weight-semibold) !important;
+  line-height: 1.2;
+}
+
+.edit-activity__objectives .edit-activity__members-header-text p {
+  color: var(--color-text-secondary);
+  font-size: 0.76rem !important;
+  font-weight: var(--font-weight-regular) !important;
+  line-height: 1.35;
+}
+
+.edit-activity__objective-card.create-activity__section .create-activity__section-header h2 {
+  color: var(--color-text-primary);
+  font-size: 0.9rem !important;
+  font-weight: var(--font-weight-semibold) !important;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.edit-activity__objective-card.create-activity__section .create-activity__section-header p {
+  color: var(--color-text-secondary);
+  font-size: 0.72rem !important;
+  font-weight: var(--font-weight-regular) !important;
+  line-height: 1.35;
+  margin: 0;
 }
 
 .edit-activity__objective-card .create-activity__form-stack {
-  gap: 1.05rem;
-  padding: 1.1rem 1.2rem 1.25rem;
+  gap: 0.75rem;
+  padding: 0.8rem 0.9rem 0.95rem;
+}
+
+.edit-activity__objectives-readonly-grid,
+.edit-activity__objectives-edit-grid {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.edit-activity__objectives-readonly-list {
+  display: grid;
+  gap: 0.62rem;
+  margin: 0;
+  padding: 0.85rem 0.95rem 1rem;
+}
+
+.edit-activity__objectives-readonly-list--trail {
+  gap: 0.45rem;
+  position: relative;
+}
+
+.edit-activity__objective-readonly-item {
+  align-items: flex-start;
+  background: color-mix(in srgb, var(--color-primary) 2%, var(--color-surface));
+  border: 1px solid var(--color-border);
+  border-radius: 0.72rem;
+  display: flex;
+  gap: 0.58rem;
+  min-width: 0;
+  padding: 0.62rem 0.68rem;
+  position: relative;
+}
+
+.edit-activity__objectives-readonly-list--trail .edit-activity__objective-readonly-item:not(:last-child)::after {
+  background: color-mix(in srgb, var(--color-primary) 26%, var(--color-border));
+  bottom: -0.48rem;
+  content: '';
+  height: 0.48rem;
+  left: 1.26rem;
+  position: absolute;
+  width: 1px;
+}
+
+.edit-activity__objective-readonly-marker {
+  align-items: center;
+  background: var(--color-primary-soft);
+  border: 1px solid var(--color-primary-border);
+  border-radius: 999px;
+  color: var(--color-primary);
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.64rem;
+  font-weight: var(--font-weight-semibold);
+  height: 1.22rem;
+  justify-content: center;
+  margin-top: 0.05rem;
+  width: 1.22rem;
+}
+
+.edit-activity__objective-readonly-item > div {
+  display: grid;
+  gap: 0.16rem;
+  min-width: 0;
+}
+
+.edit-activity__objective-readonly-item dt {
+  color: var(--color-text-secondary);
+  font-size: 0.66rem !important;
+  font-weight: var(--font-weight-medium) !important;
+  line-height: 1.2;
+}
+
+.edit-activity__objective-readonly-item dd {
+  color: var(--color-text-primary);
+  font-size: 0.78rem !important;
+  font-weight: var(--font-weight-medium) !important;
+  line-height: 1.35;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.edit-activity__objective-readonly-item p {
+  color: var(--color-text-secondary);
+  font-size: 0.7rem !important;
+  font-weight: var(--font-weight-regular);
+  line-height: 1.4;
+  margin: 0.08rem 0 0;
+}
+
+.edit-activity__objective-readonly-item--empty dd {
+  color: var(--color-text-tertiary);
+  font-weight: var(--font-weight-regular) !important;
 }
 
 .edit-activity__objectives .radio-group__options {
   align-items: flex-start;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.55rem;
-  margin-top: 0.45rem;
+  gap: 0.42rem;
+  margin-top: 0.38rem;
 }
 
-.edit-activity__objectives .radio-group .choice {
+.edit-activity__objectives .create-activity__form-stack .radio-group .choice {
+  --choice-accent: #286cff !important;
+  --choice-accent-border: #b8d2ff !important;
+  --choice-accent-soft: #edf4ff !important;
+  --choice-focus-ring: rgb(40 108 255 / 22%) !important;
+  align-items: center;
+  background: var(--color-surface) !important;
+  border: 1px solid var(--control-border);
+  border-radius: 0.62rem;
+  box-shadow: none !important;
   flex: 0 1 auto;
+  gap: 0.55rem;
   max-width: 100%;
-  min-height: 2.2rem;
-  padding: 0.46rem 0.62rem;
+  min-height: 2.35rem;
+  padding: 0.5rem 0.6rem;
   width: fit-content;
 }
 
-.edit-activity__objectives .radio-group .choice__copy {
+.edit-activity__objectives .create-activity__form-stack .radio-group .choice:not(:has(input:checked)):not(:has(input:disabled)):hover {
+  background: var(--choice-accent-soft) !important;
+  border-color: var(--choice-accent);
+  box-shadow: none !important;
+  transform: none;
+}
+
+.edit-activity__objectives .create-activity__form-stack .radio-group .choice:has(input:checked) {
+  background: var(--choice-accent-soft) !important;
+  border-color: var(--choice-accent);
+  box-shadow: none !important;
+  transform: none;
+}
+
+.edit-activity__objectives .create-activity__form-stack .radio-group .choice__copy {
   max-width: min(32rem, 100%);
   min-width: 0;
   width: max-content;
 }
 
-.edit-activity__objectives .radio-group .choice__copy > span {
-  line-height: 1.2;
+.edit-activity__objectives .create-activity__form-stack .radio-group .choice__copy > span {
+  color: var(--color-text-primary);
+  font-size: 0.74rem !important;
+  font-weight: var(--font-weight-regular) !important;
+  line-height: 1.25;
+}
+
+.edit-activity__objectives .create-activity__form-stack .choice__description {
+  color: var(--color-text-secondary);
+  font-size: 0.68rem !important;
+  font-weight: var(--font-weight-regular) !important;
+  line-height: 1.32;
+}
+
+.edit-activity__objectives .create-activity__form-stack .field__label,
+.edit-activity__objectives .create-activity__form-stack .radio-group > .field__label {
+  color: var(--color-text-secondary);
+  font-size: 0.74rem !important;
+  font-weight: var(--font-weight-regular) !important;
+  letter-spacing: 0 !important;
+  line-height: 1.3;
 }
 
 .edit-activity__objectives .choice__box {
@@ -4061,6 +4230,41 @@
 :root[data-theme='dark'] .edit-activity__objective-empty {
   background: color-mix(in srgb, var(--color-info) 12%, var(--color-surface));
   border-color: color-mix(in srgb, var(--color-info) 38%, var(--color-border));
+}
+
+:root[data-theme='dark'] .edit-activity__objective-readonly-item {
+  background: color-mix(in srgb, var(--color-primary) 5%, var(--color-surface));
+  border-color: var(--color-border);
+}
+
+:root[data-theme='dark'] .edit-activity__objectives .create-activity__form-stack .radio-group .choice {
+  --choice-accent: #5a95ff !important;
+  --choice-accent-border: rgb(90 149 255 / 48%) !important;
+  --choice-accent-soft: rgb(40 108 255 / 18%) !important;
+  --choice-focus-ring: rgb(90 149 255 / 26%) !important;
+  background: var(--color-surface) !important;
+  border-color: var(--control-border);
+}
+
+:root[data-theme='dark'] .edit-activity__objectives .create-activity__form-stack .radio-group .choice:not(:has(input:checked)):not(:has(input:disabled)):hover {
+  background: var(--choice-accent-soft) !important;
+  border-color: var(--choice-accent);
+}
+
+:root[data-theme='dark'] .edit-activity__objectives .create-activity__form-stack .radio-group .choice:has(input:checked) {
+  background: var(--choice-accent-soft) !important;
+  border-color: var(--choice-accent);
+}
+
+@media (max-width: 640px) {
+  .edit-activity__objectives .edit-activity__members-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .edit-activity__objectives-edit-button.button {
+    width: 100%;
+  }
 }
 
 /* â”€â”€ Procurements tab â”€â”€ */

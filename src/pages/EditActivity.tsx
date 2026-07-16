@@ -123,6 +123,12 @@ const TABS: TabConfig[] = [
   { id: 'logs', label: 'Logs', shortLabel: 'Logs', icon: History },
 ]
 
+const REGISTERED_FORM_TABS: TabId[] = ['activity-info', 'objectives', 'budget']
+
+function isRegisteredFormTab(tabId: TabId) {
+  return REGISTERED_FORM_TABS.includes(tabId)
+}
+
 function scrollPageToTop(behavior: ScrollBehavior = 'smooth') {
   window.scrollTo({ top: 0, behavior })
 }
@@ -860,13 +866,14 @@ export function EditActivity() {
   const [activity, setActivity] = useState<Dga_aop_projectses | null>(null)
   const [form, setForm] = useState<ActivityForm>(INITIAL_FORM)
   const [activityInfoSavedForm, setActivityInfoSavedForm] = useState<ActivityForm>(INITIAL_FORM)
-  const [isActivityInfoEditing, setIsActivityInfoEditing] = useState(false)
+  const [isEditActivityEditing, setIsEditActivityEditing] = useState(false)
   const [errors, setErrors] = useState<FieldErrors>({})
   const [activityLeadOptions, setActivityLeadOptions] = useState<SelectOption<string>[]>([])
   const [isContextLoading, setIsContextLoading] = useState(true)
   const [isSavingActivityInfo, setIsSavingActivityInfo] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
   const [tabOperationAlert, setTabOperationAlert] = useState<EditActivityOperationAlertPayload | null>(null)
+  const suppressSectionSuccessAlertRef = useRef(false)
   const previousSelectedRoleRef = useRef(selectedRole)
   const [pendingWith, setPendingWith] = useState('Loading...')
   const [createdByName, setCreatedByName] = useState('')
@@ -1215,24 +1222,25 @@ export function EditActivity() {
   const canShowDirectorGeneralReviewActions = !isDirectorGeneral
   const canShowHeaderSaveActions = canShowDivisionMemberEditActions && canShowDivisionDirectorReviewActions && canShowExecutiveDirectorReviewActions && canShowDirectorGeneralReviewActions
   const activityInfoHasUnsavedChanges = !areActivityFormsEqual(form, activityInfoSavedForm)
-  const activeTabHasUnsavedChanges = activeTab === 'activity-info'
-    ? activityInfoHasUnsavedChanges && editPermissions.activityInfoCanSave
-    : activeTab === 'objectives'
-      ? Boolean(objectiveHeaderAction?.hasUnsavedChanges)
-      : activeTab === 'budget'
-        ? Boolean(budgetHeaderAction?.hasUnsavedChanges)
-        : false
-  const activeSaveLabel = activeTab === 'objectives'
-    ? objectiveHeaderAction?.label ?? (statusCode === 1 ? 'Save Draft' : 'Save Changes')
-    : activeTab === 'budget'
-      ? budgetHeaderAction?.label ?? (statusCode === 1 ? 'Save Draft' : 'Save Changes')
-      : statusCode === 1 ? 'Save Draft' : 'Save Changes'
-  const canEnterActivityInfoEditing = activeTab === 'activity-info'
+  const objectiveHasUnsavedChanges = Boolean(objectiveHeaderAction?.hasUnsavedChanges)
+  const budgetHasUnsavedChanges = Boolean(budgetHeaderAction?.hasUnsavedChanges)
+  const formHasUnsavedChanges = (
+    activityInfoHasUnsavedChanges && editPermissions.activityInfoCanSave
+  ) || objectiveHasUnsavedChanges || budgetHasUnsavedChanges
+  const activeTabHasUnsavedChanges = isEditActivityEditing && formHasUnsavedChanges
+  const activeSaveLabel = statusCode === 1 ? 'Save Draft' : 'Save Changes'
+  const canEditAnyRegisteredSection = editPermissions.activityInfoCanSave
+    || !editPermissions.objectivesReadOnly
+    || !editPermissions.budgetReadOnly
+    || editPermissions.canEditExecutionBudget
+  const showEditActivityButton = isRegisteredFormTab(activeTab)
     && canShowHeaderSaveActions
-    && editPermissions.activityInfoCanSave
+    && canEditAnyRegisteredSection
+    && !isEditActivityEditing
     && !errors.context
-  const showActivityInfoEditButton = canEnterActivityInfoEditing && !isActivityInfoEditing
-  const showActivityInfoModeChips = activeTab === 'activity-info' && (isActivityInfoEditing || activityInfoHasUnsavedChanges)
+  const showEditModeChips = isEditActivityEditing || formHasUnsavedChanges
+  const isUnifiedEditSaving = isSavingActivityInfo || Boolean(objectiveHeaderAction?.isSaving) || Boolean(budgetHeaderAction?.isSaving)
+  const canSaveUnifiedEditActivity = canShowHeaderSaveActions && canEditAnyRegisteredSection && !errors.context
 
   // ── Context loading ──
 
@@ -1286,7 +1294,7 @@ export function EditActivity() {
     if (previousSelectedRoleRef.current === selectedRole) return
 
     previousSelectedRoleRef.current = selectedRole
-    setIsActivityInfoEditing(false)
+    setIsEditActivityEditing(false)
     setSuccessMessage('')
     setTabOperationAlert(null)
     setExecutionRejectionError('')
@@ -1294,10 +1302,6 @@ export function EditActivity() {
       currentErrors.context ? { context: currentErrors.context } : {}
     ))
   }, [selectedRole])
-
-  useEffect(() => {
-    setIsActivityInfoEditing(false)
-  }, [activeTab])
 
   useEffect(() => {
     if (!successMessage) return
@@ -1322,6 +1326,10 @@ export function EditActivity() {
   }, [tabOperationAlert])
 
   const showTabOperationAlert = useCallback<EditActivityOperationNotifier>((payload) => {
+    if (suppressSectionSuccessAlertRef.current && payload?.kind === 'success') {
+      return
+    }
+
     if (payload) {
       setSuccessMessage('')
     }
@@ -1460,7 +1468,7 @@ export function EditActivity() {
         )
         setForm(loadedForm)
         setActivityInfoSavedForm(loadedForm)
-        setIsActivityInfoEditing(false)
+        setIsEditActivityEditing(false)
       } catch (error) {
         if (isMounted) {
           setErrors({ context: error instanceof Error ? error.message : 'Failed to load context.' })
@@ -1529,53 +1537,66 @@ export function EditActivity() {
     })
   }
 
-  async function saveActiveTabForNavigation() {
-    if (activeTab === 'activity-info') {
-      return handleSaveActivityInfo()
-    }
+  async function handleSaveUnifiedEditActivity() {
+    if (!isEditActivityEditing || isUnifiedEditSaving) return false
 
-    if (activeTab === 'objectives' && objectiveHeaderAction) {
-      const result = await objectiveHeaderAction.onSave()
-      return result !== false
-    }
+    const sectionsToSave = [
+      activityInfoHasUnsavedChanges && editPermissions.activityInfoCanSave ? 'Activity Information' : '',
+      objectiveHeaderAction?.hasUnsavedChanges ? 'Objectives' : '',
+      budgetHeaderAction?.hasUnsavedChanges ? 'Budget' : '',
+    ].filter(Boolean)
+    const isMultiSectionSave = sectionsToSave.length > 1
 
-    if (activeTab === 'budget' && budgetHeaderAction) {
-      const result = await budgetHeaderAction.onSave()
-      return result !== false
-    }
+    suppressSectionSuccessAlertRef.current = isMultiSectionSave
 
-    return true
+    try {
+      if (activityInfoHasUnsavedChanges && editPermissions.activityInfoCanSave) {
+        setActiveTab('activity-info')
+        const activityInfoSaved = await handleSaveActivityInfo({ suppressSuccess: isMultiSectionSave })
+        if (!activityInfoSaved) return false
+      }
+
+      if (objectiveHeaderAction?.hasUnsavedChanges) {
+        setActiveTab('objectives')
+        const objectivesSaved = await objectiveHeaderAction.onSave()
+        if (objectivesSaved === false) return false
+      }
+
+      if (budgetHeaderAction?.hasUnsavedChanges) {
+        setActiveTab('budget')
+        const budgetSaved = await budgetHeaderAction.onSave()
+        if (budgetSaved === false) return false
+      }
+
+      setIsEditActivityEditing(false)
+
+      if (isMultiSectionSave) {
+        setSuccessMessage('')
+        setTabOperationAlert({
+          kind: 'success',
+          message: `${sectionsToSave.join(', ')} were saved successfully.`,
+          title: 'Activity changes saved',
+        })
+      }
+
+      return true
+    } finally {
+      suppressSectionSuccessAlertRef.current = false
+    }
   }
 
-  const discardActiveTabChanges = useCallback(() => {
-    if (activeTab === 'activity-info') {
-      setForm(activityInfoSavedForm)
-      setErrors(clearActivityInfoValidationErrors)
-      setIsActivityInfoEditing(false)
-      return
-    }
-
-    if (activeTab === 'objectives') {
-      objectiveHeaderAction?.discardChanges?.()
-      return
-    }
-
-    if (activeTab === 'budget') {
-      budgetHeaderAction?.discardChanges?.()
-    }
-  }, [activeTab, activityInfoSavedForm, budgetHeaderAction, objectiveHeaderAction])
-
-  function handleStartActivityInfoEditing() {
-    if (!canEnterActivityInfoEditing) return
-    setErrors(clearActivityInfoValidationErrors)
-    setIsActivityInfoEditing(true)
-  }
-
-  function handleDiscardActivityInfoChanges() {
+  const handleDiscardUnifiedEditActivity = useCallback(() => {
     setForm(activityInfoSavedForm)
     setErrors(clearActivityInfoValidationErrors)
-    setIsActivityInfoEditing(false)
-    setActiveTab('activity-info')
+    objectiveHeaderAction?.discardChanges?.()
+    budgetHeaderAction?.discardChanges?.()
+    setIsEditActivityEditing(false)
+  }, [activityInfoSavedForm, budgetHeaderAction, objectiveHeaderAction])
+
+  function handleStartEditActivity() {
+    if (!showEditActivityButton) return
+    setErrors(clearActivityInfoValidationErrors)
+    setIsEditActivityEditing(true)
   }
 
   const handleNavigationGuardRequest = useCallback((action: () => void) => {
@@ -1612,7 +1633,7 @@ export function EditActivity() {
 
     setIsUnsavedDialogSaving(true)
     try {
-      const saved = await saveActiveTabForNavigation()
+      const saved = await handleSaveUnifiedEditActivity()
       if (!saved) {
         setPendingNavigation(null)
         return
@@ -1629,7 +1650,7 @@ export function EditActivity() {
   function handleDiscardUnsavedChangesAndContinue() {
     if (!pendingNavigation || isUnsavedDialogSaving) return
 
-    discardActiveTabChanges()
+    handleDiscardUnifiedEditActivity()
     const nextAction = pendingNavigation.action
     setPendingNavigation(null)
     nextAction()
@@ -1651,7 +1672,7 @@ export function EditActivity() {
 
   // ── Action handlers ──
 
-  async function handleSaveActivityInfo() {
+  async function handleSaveActivityInfo({ suppressSuccess = false }: { suppressSuccess?: boolean } = {}) {
     setSuccessMessage('')
 
     if (!editPermissions.activityInfoCanSave) {
@@ -1777,9 +1798,10 @@ export function EditActivity() {
         dga_strategic_vs_operation: payload.dga_strategic_vs_operation ?? currentActivity.dga_strategic_vs_operation,
       } : currentActivity)
       setErrors((currentErrors) => ({ ...currentErrors, submit: undefined }))
-      setSuccessMessage('Activity information saved successfully.')
+      if (!suppressSuccess) {
+        setSuccessMessage('Activity information saved successfully.')
+      }
       setActivityInfoSavedForm(form)
-      setIsActivityInfoEditing(false)
       refreshActivityAiSummary('activity-information-save')
       return true
     } catch (error) {
@@ -2888,10 +2910,8 @@ export function EditActivity() {
     if (locked) return
     if (tabId === activeTab) return
 
-    confirmNavigation(() => {
-      setActiveTab(tabId)
-      scrollPageToTop()
-    })
+    setActiveTab(tabId)
+    scrollPageToTop()
   }
 
   function renderStageTabs({
@@ -2936,8 +2956,8 @@ export function EditActivity() {
     )
   }
 
-  function renderTabContent() {
-    switch (activeTab) {
+  function renderTabContentById(tabId: TabId) {
+    switch (tabId) {
       case 'activity-info':
         return (
           <ActivityInfoTab
@@ -2950,7 +2970,7 @@ export function EditActivity() {
             form={form}
             hasFullEdit={editPermissions.activityInfoHasFullEdit}
             isAiSummaryLoading={isAiSummaryLoading}
-            isEditing={isActivityInfoEditing}
+            isEditing={isEditActivityEditing}
             isExecutionPhase={isExecutionPhase}
             showExecutionTracking={shouldShowExecutionFields}
             isReadOnly={editPermissions.activityInfoReadOnly}
@@ -2971,6 +2991,7 @@ export function EditActivity() {
             aiSummaryError={aiSummaryError}
             aiSummaryMeta={aiSummaryMeta}
             isAiSummaryLoading={isAiSummaryLoading}
+            isEditing={isEditActivityEditing}
             isReadOnly={editPermissions.objectivesReadOnly}
             onActivityDataChanged={handleObjectivesActivityDataChanged}
             onHeaderActionChange={setObjectiveHeaderAction}
@@ -3043,6 +3064,7 @@ export function EditActivity() {
             canEditExecutionBudget={editPermissions.canEditExecutionBudget}
             hierarchyId={form.divisionId}
             isAiSummaryLoading={isAiSummaryLoading}
+            isEditing={isEditActivityEditing}
             isExecutionPhase={isExecutionPhase}
             isReadOnly={editPermissions.budgetReadOnly}
             onHeaderActionChange={setBudgetHeaderAction}
@@ -3061,6 +3083,10 @@ export function EditActivity() {
       case 'logs':
         return <LogTab isExecutionPhase={isExecutionPhase} projectId={projectId} />
     }
+  }
+
+  function renderTabContent() {
+    return renderTabContentById(activeTab)
   }
 
   function renderPostReviewAiSummary() {
@@ -3103,41 +3129,23 @@ export function EditActivity() {
   function renderWorkflowActions() {
     return (
       <>
-        {activeTab === 'activity-info' && isActivityInfoEditing && canShowHeaderSaveActions ? (
+        {isEditActivityEditing && canShowHeaderSaveActions ? (
           <Button
-            disabled={!editPermissions.activityInfoCanSave || isSavingActivityInfo || Boolean(errors.context)}
+            disabled={!canSaveUnifiedEditActivity || isUnifiedEditSaving}
             icon={<Save size={16} />}
-            onClick={handleSaveActivityInfo}
+            onClick={handleSaveUnifiedEditActivity}
           >
-            {isSavingActivityInfo ? 'Saving...' : statusCode === 1 ? 'Save Draft' : 'Save Changes'}
+            {isUnifiedEditSaving ? 'Saving...' : activeSaveLabel}
           </Button>
         ) : null}
-        {activeTab === 'activity-info' && isActivityInfoEditing && canShowHeaderSaveActions ? (
+        {isEditActivityEditing && canShowHeaderSaveActions ? (
           <Button
-            disabled={isSavingActivityInfo}
+            disabled={isUnifiedEditSaving}
             icon={<X size={16} />}
-            onClick={handleDiscardActivityInfoChanges}
+            onClick={handleDiscardUnifiedEditActivity}
             variant="secondary"
           >
             Discard Changes
-          </Button>
-        ) : null}
-        {activeTab === 'objectives' && objectiveHeaderAction && canShowHeaderSaveActions ? (
-          <Button
-            disabled={editPermissions.objectivesReadOnly || !objectiveHeaderAction.canSave || objectiveHeaderAction.isSaving || Boolean(errors.context)}
-            icon={<Save size={16} />}
-            onClick={objectiveHeaderAction.onSave}
-          >
-            {objectiveHeaderAction.isSaving ? objectiveHeaderAction.savingLabel : objectiveHeaderAction.label}
-          </Button>
-        ) : null}
-        {activeTab === 'budget' && budgetHeaderAction && canShowHeaderSaveActions ? (
-          <Button
-            disabled={editPermissions.budgetReadOnly || !budgetHeaderAction.canSave || budgetHeaderAction.isSaving || Boolean(errors.context)}
-            icon={<Save size={16} />}
-            onClick={budgetHeaderAction.onSave}
-          >
-            {budgetHeaderAction.isSaving ? budgetHeaderAction.savingLabel : budgetHeaderAction.label}
           </Button>
         ) : null}
         {isDivisionMember && editPermissions.canSubmitToDivisionDirector ? (
@@ -3706,14 +3714,14 @@ export function EditActivity() {
                 <Sparkles size={14} />
                 {aiSummary}
               </p>
-              {showActivityInfoModeChips ? (
-                <div className="create-activity__hero-chips edit-activity__mode-chips" aria-label="Activity information edit state">
-                  {isActivityInfoEditing ? (
+              {showEditModeChips ? (
+                <div className="create-activity__hero-chips edit-activity__mode-chips" aria-label="Edit activity state">
+                  {isEditActivityEditing ? (
                     <span className="edit-activity__mode-chip edit-activity__mode-chip--editing">
                       <span>Editing Mode</span>
                     </span>
                   ) : null}
-                  {activityInfoHasUnsavedChanges ? (
+                  {formHasUnsavedChanges ? (
                     <span className="edit-activity__mode-chip edit-activity__mode-chip--unsaved">
                       <span>Unsaved Changes</span>
                     </span>
@@ -3726,8 +3734,8 @@ export function EditActivity() {
 
         <div className="create-activity__hero-footer edit-activity__hero-footer">
           <div className="create-activity__hero-actions edit-activity__hero-actions">
-            {showActivityInfoEditButton ? (
-              <Button icon={<Edit3 size={16} />} onClick={handleStartActivityInfoEditing} variant="ghost" className="edit-activity__card-btn edit-activity__edit-btn">
+            {showEditActivityButton ? (
+              <Button icon={<Edit3 size={16} />} onClick={handleStartEditActivity} variant="ghost" className="edit-activity__card-btn edit-activity__edit-btn">
                 Edit Activity
               </Button>
             ) : null}
@@ -3801,7 +3809,16 @@ export function EditActivity() {
             />
           ) : null}
           {renderPostReviewAiSummary()}
-          {renderTabContent()}
+          {REGISTERED_FORM_TABS.map((tabId) => (
+            <div
+              className="edit-activity__registered-tab-panel"
+              hidden={activeTab !== tabId}
+              key={tabId}
+            >
+              {renderTabContentById(tabId)}
+            </div>
+          ))}
+          {!isRegisteredFormTab(activeTab) ? renderTabContent() : null}
         </div>
 
         {renderRightRail()}

@@ -820,7 +820,7 @@
 .edit-activity__persistent-alert strong {
   color: var(--color-primary);
   font-size: 0.8rem;
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-medium);
   line-height: 1.2;
 }
 

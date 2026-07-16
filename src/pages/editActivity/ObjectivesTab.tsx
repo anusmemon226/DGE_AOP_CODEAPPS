@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useId, useMemo, useState } from 'react'
-import { Link2 } from 'lucide-react'
+import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
+import { GitBranch, Link2, Target } from 'lucide-react'
 import { Card, RadioGroup } from '../../components/ui'
 import type { Dga_aop_projectsesBase } from '../../generated/models/Dga_aop_projectsesModel'
 import type { Dga_objective_dga_objectiveset } from '../../generated/models/Dga_objective_dga_objectivesetModel'
@@ -33,6 +33,7 @@ type ObjectivesTabProps = {
   aiSummaryError?: string
   aiSummaryMeta?: AiSummaryMeta
   isAiSummaryLoading?: boolean
+  isEditing?: boolean
   isReadOnly?: boolean
   onActivityDataChanged?: () => void
   onHeaderActionChange?: (action: ObjectiveHeaderAction | null) => void
@@ -130,6 +131,12 @@ function toObjectiveOption(objective: Dga_objectives): ObjectiveOption | null {
   }
 }
 
+function getOptionById(options: readonly ObjectiveOption[], id: string) {
+  const normalizedId = normalizeId(id)
+  if (!normalizedId) return undefined
+  return options.find((option) => normalizeId(option.value) === normalizedId)
+}
+
 function matchesDigitalPillar(option: ObjectiveOption, selectedPillar?: ObjectiveOption) {
   if (!selectedPillar) return false
 
@@ -173,6 +180,7 @@ export function ObjectivesTab({
   aiSummaryError,
   aiSummaryMeta,
   isAiSummaryLoading = false,
+  isEditing = false,
   isReadOnly = false,
   onActivityDataChanged,
   onHeaderActionChange,
@@ -324,14 +332,9 @@ export function ObjectivesTab({
   const legacyTextMatchingFallbackEnabled = false
   void legacyTextMatchingFallbackEnabled
   void matchesDigitalPillar
-  const activeCount = [
-    form.corporateStrategyPillarId,
-    form.digitalPillarId,
-    selectedDigitalObjectiveId,
-    selectedStrategicKpiId,
-  ].filter(Boolean).length
   const hasUnsavedChanges = !isSameForm(form, savedForm)
-  const canSave = !isReadOnly && !isLoading && !isSaving && !error
+  const canEditObjectives = !isReadOnly && !isLoading && !isSaving && !error
+  const canSave = isEditing && canEditObjectives
   const saveLabel = statusCode === 1 ? 'Save Draft' : 'Save Changes'
 
   const saveObjectives = useCallback(async (nextForm: ObjectiveForm, successMessage = 'Objectives saved successfully.') => {
@@ -361,7 +364,7 @@ export function ObjectivesTab({
   }, [isReadOnly, isSaving, onActivityDataChanged, onOperationAlert, projectId])
 
   const applyFormChange = useCallback((updater: (currentForm: ObjectiveForm) => ObjectiveForm) => {
-    if (isReadOnly) return
+    if (!isEditing || isReadOnly) return
     setForm((currentForm) => {
       const nextForm = updater(currentForm)
       setFieldErrors((currentErrors) => {
@@ -381,7 +384,7 @@ export function ObjectivesTab({
 
       return nextForm
     })
-  }, [isReadOnly])
+  }, [isEditing, isReadOnly])
 
   const handleSave = useCallback(async () => {
     if (!canSave) return false
@@ -407,20 +410,41 @@ export function ObjectivesTab({
   }, [canSave, form, hasUnsavedChanges, onOperationAlert, saveObjectives, selectedDigitalObjectiveId, selectedStrategicKpiId])
 
   useEffect(() => {
-    onHeaderActionChange?.(!isLoading ? {
+    onHeaderActionChange?.(!isLoading && canEditObjectives ? {
       canSave,
-      discardChanges: () => setForm(savedForm),
+      discardChanges: () => {
+        setForm(savedForm)
+        setFieldErrors({})
+      },
+      hasUnsavedChanges,
+      isSaving,
+      label: saveLabel,
+      onSave: handleSave,
+      savingLabel: 'Saving...',
+    } : !isLoading ? {
+      canSave: false,
       hasUnsavedChanges,
       isSaving,
       label: saveLabel,
       onSave: handleSave,
       savingLabel: 'Saving...',
     } : null)
-  }, [canSave, handleSave, hasUnsavedChanges, isLoading, isSaving, onHeaderActionChange, saveLabel, savedForm])
+  }, [canEditObjectives, canSave, handleSave, hasUnsavedChanges, isLoading, isSaving, onHeaderActionChange, saveLabel, savedForm])
 
   useEffect(() => {
     return () => onHeaderActionChange?.(null)
   }, [onHeaderActionChange])
+
+  useEffect(() => {
+    if (isReadOnly) {
+      const timeoutId = window.setTimeout(() => {
+        setForm(savedForm)
+        setFieldErrors({})
+      }, 0)
+
+      return () => window.clearTimeout(timeoutId)
+    }
+  }, [isReadOnly, savedForm])
 
   function handleDigitalPillarChange(value: string) {
     applyFormChange((currentForm) => ({
@@ -429,6 +453,50 @@ export function ObjectivesTab({
       digitalObjectiveId: '',
       strategicKpiId: '',
     }))
+  }
+
+  const selectedCorporatePillar = getOptionById(corporatePillarOptions, form.corporateStrategyPillarId)
+  const selectedDigitalPillar = getOptionById(digitalPillarOptions, form.digitalPillarId)
+  const selectedDigitalObjective = getOptionById(allDigitalObjectiveOptions, form.digitalObjectiveId)
+  const selectedStrategicKpi = getOptionById(allKpiOptions, form.strategicKpiId)
+
+  function renderReadOnlyValue(label: string, option?: ObjectiveOption, marker?: string) {
+    return (
+      <div className={`edit-activity__objective-readonly-item${option ? '' : ' edit-activity__objective-readonly-item--empty'}`}>
+        {marker ? <span className="edit-activity__objective-readonly-marker" aria-hidden="true">{marker}</span> : null}
+        <div>
+          <dt>{label}</dt>
+          <dd>{option?.label || 'Not selected'}</dd>
+          {option?.description ? <p>{option.description}</p> : null}
+        </div>
+      </div>
+    )
+  }
+
+  function renderObjectiveSelectionCard(
+    title: string,
+    description: string,
+    children: ReactNode,
+    icon: ReactNode,
+  ) {
+    return (
+      <Card className="create-activity__section edit-activity__objective-card edit-activity__objective-card--guided">
+        <div className="create-activity__section-header">
+          <div className="create-activity__section-header-inner">
+            <span className="create-activity__section-header-icon" aria-hidden="true">
+              {icon}
+            </span>
+            <div>
+              <h2>{title}</h2>
+              <p>{description}</p>
+            </div>
+          </div>
+        </div>
+        <div className="create-activity__form-stack">
+          {children}
+        </div>
+      </Card>
+    )
   }
 
   return (
@@ -442,13 +510,8 @@ export function ObjectivesTab({
       />
       <div className="edit-activity__members-header">
         <div className="edit-activity__members-header-text">
-          <h2>
-            Objectives
-            <span className="edit-activity__members-count-badge">
-              {activeCount} of 4 selected
-            </span>
-          </h2>
-          <p>Link the activity to corporate and digital strategy objectives.</p>
+          <h2>Objectives</h2>
+          <p>Review and manage the strategic alignment for this activity.</p>
         </div>
       </div>
 
@@ -462,29 +525,53 @@ export function ObjectivesTab({
           <h3>Loading objectives...</h3>
           <p>Fetching objectives and existing activity links.</p>
         </div>
-      ) : (
-        <>
-          <Card className="create-activity__section edit-activity__objective-card edit-activity__objective-card--corporate">
+      ) : !isEditing ? (
+        <div className="edit-activity__objectives-readonly-grid">
+          <Card className="create-activity__section edit-activity__objective-card edit-activity__objective-card--readonly">
             <div className="create-activity__section-header">
               <div className="create-activity__section-header-inner">
                 <span className="create-activity__section-header-icon" aria-hidden="true">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <path d="M12 6v6l4 2" />
-                  </svg>
+                  <Target size={17} />
                 </span>
                 <div>
-                  <span>Corporate Strategy Alignment</span>
                   <h2>DGE Corporate Strategy Pillar</h2>
+                  <p>Primary corporate strategy alignment for this activity.</p>
                 </div>
               </div>
             </div>
+            <dl className="edit-activity__objectives-readonly-list">
+              {renderReadOnlyValue('Corporate Strategy Pillar', selectedCorporatePillar)}
+            </dl>
+          </Card>
 
-            <div className="create-activity__form-stack">
+          <Card className="create-activity__section edit-activity__objective-card edit-activity__objective-card--readonly">
+            <div className="create-activity__section-header">
+              <div className="create-activity__section-header-inner">
+                <span className="create-activity__section-header-icon" aria-hidden="true">
+                  <GitBranch size={17} />
+                </span>
+                <div>
+                  <h2>Digital Strategy Alignment</h2>
+                  <p>Hierarchy path from digital pillar through objective and KPI.</p>
+                </div>
+              </div>
+            </div>
+            <dl className="edit-activity__objectives-readonly-list edit-activity__objectives-readonly-list--trail">
+              {renderReadOnlyValue('Digital Strategy Pillar', selectedDigitalPillar, '1')}
+              {renderReadOnlyValue('Digital Strategy Objective', selectedDigitalObjective, '2')}
+              {renderReadOnlyValue('Strategic KPI', selectedStrategicKpi, '3')}
+            </dl>
+          </Card>
+        </div>
+      ) : (
+        <>
+          <div className="edit-activity__objectives-edit-grid">
+            {renderObjectiveSelectionCard(
+              'DGE Corporate Strategy Pillar',
+              'Select the corporate strategy pillar this activity supports.',
               <RadioGroup
                 className="radio-group--corporate-strategy"
-                disabled={isReadOnly}
+                disabled={!isEditing || isReadOnly}
                 error={fieldErrors.corporateStrategyPillarId}
                 label="Select the DGE Corporate Strategy Pillar this activity aligns to"
                 name={`${uid}-dge-pillar`}
@@ -494,32 +581,16 @@ export function ObjectivesTab({
                 options={corporatePillarOptions}
                 required
                 value={form.corporateStrategyPillarId}
-              />
-            </div>
-          </Card>
+              />,
+              <Target size={17} />,
+            )}
 
-          <Card className="create-activity__section edit-activity__objective-card edit-activity__objective-card--digital">
-            <div className="create-activity__section-header">
-              <div className="create-activity__section-header-inner">
-                <span className="create-activity__section-header-icon" aria-hidden="true">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-                    <line x1="8" y1="21" x2="16" y2="21" />
-                    <line x1="12" y1="17" x2="12" y2="21" />
-                  </svg>
-                </span>
-                <div>
-                  <span>Digital Transformation</span>
-                  <h2>Digital Strategy Pillar</h2>
-                </div>
-              </div>
-            </div>
-
-            <div className="create-activity__form-stack">
+            {renderObjectiveSelectionCard(
+              'Digital Strategy Pillar',
+              'Choose the digital strategy pillar that drives downstream objectives and KPIs.',
               <RadioGroup
                 className="radio-group--digital-pillar"
-                disabled={isReadOnly}
+                disabled={!isEditing || isReadOnly}
                 error={fieldErrors.digitalPillarId}
                 label="Select the Digital Strategy Pillar this activity falls under"
                 name={`${uid}-digital-pillar`}
@@ -527,12 +598,17 @@ export function ObjectivesTab({
                 options={digitalPillarOptions}
                 required
                 value={form.digitalPillarId}
-              />
+              />,
+              <GitBranch size={17} />,
+            )}
 
-              {form.digitalPillarId && digitalObjectiveOptions.length > 0 ? (
+            {renderObjectiveSelectionCard(
+              'Digital Strategy Objective',
+              'Select the objective mapped to the selected Digital Strategy Pillar.',
+              form.digitalPillarId && digitalObjectiveOptions.length > 0 ? (
                 <RadioGroup
                   className="radio-group--link-objective"
-                  disabled={isReadOnly}
+                  disabled={!isEditing || isReadOnly}
                   error={fieldErrors.digitalObjectiveId}
                   label="Link to Digital Strategy Objectives"
                   name={`${uid}-link-objective`}
@@ -551,12 +627,25 @@ export function ObjectivesTab({
                     <span>No objectives are currently mapped to the selected Digital Strategy Pillar.</span>
                   </div>
                 </div>
-              ) : null}
+              ) : (
+                <div className="edit-activity__objective-empty" role="status">
+                  <Link2 size={18} />
+                  <div>
+                    <strong>Select a Digital Strategy Pillar first</strong>
+                    <span>Digital objectives will appear after a pillar is selected.</span>
+                  </div>
+                </div>
+              ),
+              <Link2 size={17} />,
+            )}
 
-              {form.digitalPillarId && kpiOptions.length > 0 ? (
+            {renderObjectiveSelectionCard(
+              'Strategic KPI',
+              'Select the KPI mapped to the selected Digital Strategy Pillar.',
+              form.digitalPillarId && kpiOptions.length > 0 ? (
                 <RadioGroup
                   className="radio-group--link-kpi"
-                  disabled={isReadOnly}
+                  disabled={!isEditing || isReadOnly}
                   error={fieldErrors.strategicKpiId}
                   label="Link to Strategic KPIs"
                   name={`${uid}-link-kpi`}
@@ -575,9 +664,18 @@ export function ObjectivesTab({
                     <span>No KPIs are currently mapped to the selected Digital Strategy Pillar.</span>
                   </div>
                 </div>
-              ) : null}
-            </div>
-          </Card>
+              ) : (
+                <div className="edit-activity__objective-empty" role="status">
+                  <Link2 size={18} />
+                  <div>
+                    <strong>Select a Digital Strategy Pillar first</strong>
+                    <span>Strategic KPIs will appear after a pillar is selected.</span>
+                  </div>
+                </div>
+              ),
+              <Target size={17} />,
+            )}
+          </div>
         </>
       )}
     </div>

@@ -130,6 +130,7 @@ interface BudgetTabProps {
   canEditExecutionBudget?: boolean
   hierarchyId?: string
   isAiSummaryLoading?: boolean
+  isEditing?: boolean
   isExecutionPhase?: boolean
   isReadOnly?: boolean
   onActivityDataChanged?: () => void
@@ -516,6 +517,7 @@ export function BudgetTab({
   canEditExecutionBudget = false,
   hierarchyId = '',
   isAiSummaryLoading = false,
+  isEditing = false,
   isExecutionPhase = false,
   isReadOnly = false,
   onActivityDataChanged,
@@ -569,6 +571,7 @@ export function BudgetTab({
   const hasAllMonthlyRows = missingMonths.length === 0
   const saveLabel = statusCode === 1 ? 'Save Draft' : 'Save Changes'
   const hasUnsavedChanges = !isSameBudgetForm(form, savedForm)
+  const isFormReadOnly = !isEditing || isReadOnly
   const actualBudgetSpent = monthRecords.reduce((sum, record) => sum + record.actualBudget, 0)
   const remainingBudget = parseNum(form.allocatedBudget) - actualBudgetSpent
   const accountCodeOptionMap = useMemo(
@@ -586,7 +589,7 @@ export function BudgetTab({
     ],
     [accountCodeOptions],
   )
-  const executionMonthlyEditAllowed = isExecutionPhase && canEditExecutionBudget
+  const executionMonthlyEditAllowed = isEditing && isExecutionPhase && canEditExecutionBudget
   const selectedDrawerMonth = useMemo<BudgetDrawerMonth | null>(() => {
     if (!drawerMonthId) return null
     const month = monthRecords.find((record) => normalizeId(record.id) === normalizeId(drawerMonthId))
@@ -789,7 +792,7 @@ export function BudgetTab({
   }, [activityScope, hierarchyId, isExecutionPhase, projectId, projectRelatedChanges])
 
   function handleFieldChange(fields: Partial<BudgetFormData>) {
-    if (isReadOnly) return
+    if (isFormReadOnly) return
 
     setForm((prev) => {
       const next = { ...prev, ...fields }
@@ -833,7 +836,7 @@ export function BudgetTab({
   }
 
   const handleSave = useCallback(async () => {
-    if (isReadOnly) return false
+    if (isFormReadOnly) return false
     if (isSaving) return false
 
     if (!projectId) {
@@ -902,7 +905,7 @@ export function BudgetTab({
   }, [
     form,
     hasAllMonthlyRows,
-    isReadOnly,
+    isFormReadOnly,
     isSaving,
     monthRecords,
     orderedMonthRecords,
@@ -913,16 +916,12 @@ export function BudgetTab({
   ])
 
   useEffect(() => {
-    const shouldHideHeaderAction = executionMonthlyEditAllowed && isReadOnly
-
-    if (shouldHideHeaderAction) {
-      onHeaderActionChange?.(null)
-      return
-    }
-
     onHeaderActionChange?.({
-      canSave: !isReadOnly && !isLoading && !isSaving && !errors.context,
-      discardChanges: () => setForm(savedForm),
+      canSave: !isFormReadOnly && !isLoading && !isSaving && !errors.context,
+      discardChanges: () => {
+        setForm(savedForm)
+        setErrors({})
+      },
       hasUnsavedChanges,
       isSaving,
       label: saveLabel,
@@ -931,7 +930,7 @@ export function BudgetTab({
     })
 
     return () => onHeaderActionChange?.(null)
-  }, [errors.context, executionMonthlyEditAllowed, handleSave, hasUnsavedChanges, isLoading, isReadOnly, isSaving, onHeaderActionChange, saveLabel, savedForm])
+  }, [errors.context, handleSave, hasUnsavedChanges, isFormReadOnly, isLoading, isSaving, onHeaderActionChange, saveLabel, savedForm])
 
   function updateMonthRecord(monthId: string, updater: (current: BudgetMonthRecord) => BudgetMonthRecord) {
     setMonthRecords((current) =>
@@ -1385,7 +1384,7 @@ export function BudgetTab({
               return (
                 <CurrencyInput
                   className="edit-activity__monthly-field"
-                  disabled={isReadOnly}
+                  disabled={isFormReadOnly}
                   error={errors.monthlyBudgets && isInvalidCurrency(form.monthlyBudgets[monthIndex]) ? errors.monthlyBudgets : undefined}
                   key={label}
                   label={label}
@@ -1901,7 +1900,7 @@ export function BudgetTab({
 
           <div className="create-activity__form-row">
             <Textarea
-              disabled={isReadOnly}
+              disabled={isFormReadOnly}
               error={errors.budgetReviewComment}
               label="Budget Review Comment"
               onChange={(event) => handleFieldChange({ budgetReviewComment: event.target.value })}
@@ -1969,7 +1968,7 @@ export function BudgetTab({
             <div className="create-activity__form-row">
               <RadioGroup
                 className="edit-activity__budget-source"
-                disabled={isReadOnly}
+                disabled={isFormReadOnly}
                 error={errors.budgetSource}
                 label="Budget Source"
                 name="budget-source"
@@ -1983,7 +1982,7 @@ export function BudgetTab({
             <div className="create-activity__form-row">
               <RadioGroup
                 className="edit-activity__budget-type"
-                disabled={isReadOnly}
+                disabled={isFormReadOnly}
                 error={errors.budgetType}
                 label="Budget Type"
                 name="budget-type"
@@ -1997,7 +1996,7 @@ export function BudgetTab({
             <div className="create-activity__form-row create-activity__form-row--three">
               {showTotalActivityBudget ? (
                 <CurrencyInput
-                  disabled={isReadOnly}
+                  disabled={isFormReadOnly}
                   error={errors.totalActivityBudget}
                   label="Total Activity Budget (Across Multiple Years)"
                   onChange={(event) => handleFieldChange({ totalActivityBudget: stripCommas(event.target.value) })}
@@ -2030,7 +2029,7 @@ export function BudgetTab({
               </label>
 
               <CurrencyInput
-                disabled={isReadOnly}
+                disabled={isFormReadOnly}
                 error={errors.allocatedBudget}
                 label="Allocated Budget"
                 onChange={(event) => handleFieldChange({ allocatedBudget: stripCommas(event.target.value) })}
