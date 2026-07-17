@@ -1414,7 +1414,7 @@
 
 .create-activity__form-stack .choice__copy span {
   font-size: 0.74rem;
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-regular);
   line-height: 1.25;
 }
 

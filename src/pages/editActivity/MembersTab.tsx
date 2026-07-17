@@ -519,12 +519,12 @@ export function MembersTab({ embedded = false, isReadOnly = false, onActivityDat
     return (
       <button
         aria-label={`Remove ${member.name}`}
-        className="edit-activity__member-card-remove"
+        className="edit-activity__milestone-action-btn edit-activity__milestone-action-btn--danger"
         onClick={() => handleRemoveMember(member)}
         title="Remove member"
         type="button"
       >
-        <Trash2 size={15} />
+        <Trash2 size={14} />
       </button>
     )
   }
@@ -546,7 +546,11 @@ export function MembersTab({ embedded = false, isReadOnly = false, onActivityDat
             </div>
             <span className="edit-activity__members-table-email" role="cell">{member.email || 'No email available'}</span>
             <span className="edit-activity__members-table-type" role="cell">{renderMemberTypeBadge(member)}</span>
-            <span className="edit-activity__members-table-action" role="cell">{renderRemoveMemberButton(member)}</span>
+            <span className="edit-activity__members-table-action" role="cell">
+              <div className="edit-activity__milestone-list-actions">
+                {renderRemoveMemberButton(member)}
+              </div>
+            </span>
           </div>
         ))}
       </div>

@@ -660,9 +660,10 @@ export function DependenciesTab({
                   </div>
                   <div className="edit-activity__deps-table-cell edit-activity__deps-table-cell--actions">
                     {!isReadOnly ? (
-                      <>
+                      <div className="edit-activity__milestone-list-actions">
                         <button
-                          className="edit-activity__deps-action-btn"
+                          aria-label="Edit dependency"
+                          className="edit-activity__milestone-action-btn"
                           onClick={() => handleOpenDepModal(dep)}
                           title="Edit dependency"
                           type="button"
@@ -670,14 +671,15 @@ export function DependenciesTab({
                           <Edit3 size={14} />
                         </button>
                         <button
-                          className="edit-activity__deps-action-btn edit-activity__deps-action-btn--delete"
+                          aria-label="Delete dependency"
+                          className="edit-activity__milestone-action-btn edit-activity__milestone-action-btn--danger"
                           onClick={() => setDepToDelete(dep)}
                           title="Delete dependency"
                           type="button"
                         >
                           <Trash2 size={14} />
                         </button>
-                      </>
+                      </div>
                     ) : null}
                   </div>
                 </div>

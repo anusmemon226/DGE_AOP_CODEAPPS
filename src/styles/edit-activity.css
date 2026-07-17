@@ -1738,7 +1738,7 @@
   align-items: center;
   display: grid;
   gap: 0.7rem;
-  grid-template-columns: minmax(13rem, 1.15fr) minmax(14rem, 1.1fr) minmax(8rem, 0.55fr) 2.25rem;
+  grid-template-columns: minmax(13rem, 1.15fr) minmax(14rem, 1.1fr) minmax(8rem, 0.55fr) 5.1rem;
   justify-items: start;
   min-width: 0;
   padding: 0.55rem 0.7rem;
@@ -2114,7 +2114,7 @@
   align-items: center;
   display: grid;
   gap: 0.7rem;
-  grid-template-columns: 2rem minmax(13rem, 1.15fr) minmax(8rem, 0.75fr) minmax(12rem, 1.1fr) minmax(7rem, 0.55fr) 3.25rem;
+  grid-template-columns: 2rem minmax(13rem, 1.15fr) minmax(8rem, 0.75fr) minmax(12rem, 1.1fr) minmax(7rem, 0.55fr) 5.1rem;
   justify-items: start;
   padding: 0.55rem 0.7rem;
   transition: background-color 160ms ease, border-color 160ms ease;
@@ -2205,7 +2205,7 @@
 
 .edit-activity__dependencies--embedded .edit-activity__deps-table-row {
   gap: 0.45rem;
-  grid-template-columns: 1.7rem minmax(8rem, 1.35fr) minmax(5.65rem, 0.75fr) minmax(6.7rem, 1fr) minmax(4.7rem, 0.65fr) 2.7rem;
+  grid-template-columns: 1.7rem minmax(8rem, 1.35fr) minmax(5.65rem, 0.75fr) minmax(6.7rem, 1fr) minmax(4.7rem, 0.65fr) 5.1rem;
   padding: 0.5rem 0.55rem;
 }
 
@@ -3552,7 +3552,7 @@
   align-items: center;
   display: inline-flex;
   gap: 0.35rem;
-  justify-content: flex-end;
+  justify-content: flex-start;
   min-width: 5.1rem;
 }
 
