@@ -7,7 +7,6 @@ import { DEFAULT_APP_ROUTE, APP_ROUTE_PATHS, UI_SHOWCASE_ROUTE } from './routes/
 import { useAppSelector } from './store/hooks'
 import { canViewNavigationItem } from './utils/permissions'
 import './App.css'
-import './styles/typography.css'
 
 const ActivitiesList = lazy(() => import('./pages/ActivitiesList').then((module) => ({ default: module.ActivitiesList })))
 const Approvals = lazy(() => import('./pages/Approvals').then((module) => ({ default: module.Approvals })))
