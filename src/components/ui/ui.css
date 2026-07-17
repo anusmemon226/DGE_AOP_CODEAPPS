@@ -151,7 +151,6 @@
   padding: 0 0.6rem;
   text-align: left;
   width: 100%;
-  box-shadow: var(--control-shadow);
 }
 
 :root[data-theme='dark'] .select-field__control {
@@ -552,7 +551,6 @@
   background: var(--control-bg);
   border: 1px solid var(--control-border);
   border-radius: var(--radius-sm);
-  box-shadow: var(--control-shadow);
   color: var(--color-text-primary);
   min-height: 2.55rem;
   outline: none;

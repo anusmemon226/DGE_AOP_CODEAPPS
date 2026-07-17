@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  AlertTriangle,
+  CalendarDays,
+  ChevronDown,
+  ChevronUp,
   Edit3,
   Flag,
   LayoutGrid,
@@ -469,7 +473,8 @@ export function MilestonesTab({
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [error, setError] = useState('')
-  const [viewMode, setViewMode] = useState<'list' | 'quarter'>('list')
+  const [viewMode, setViewMode] = useState<'quarter' | 'list'>('quarter')
+  const [expandedQuarter, setExpandedQuarter] = useState<string | null>(null)
   const [localProjectRelatedChanges, setLocalProjectRelatedChanges] = useState<{ projectId: string; value: string } | null>(null)
 
   // ── CRUD state ──
@@ -597,6 +602,46 @@ export function MilestonesTab({
     })
   }, [milestones])
 
+  const quarterSummaries = useMemo(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const dueSoonLimit = new Date(today)
+    dueSoonLimit.setDate(dueSoonLimit.getDate() + 15)
+
+    return QUARTERS.reduce<Record<(typeof QUARTERS)[number], {
+      actualProgress: number
+      dueSoonCount: number
+      milestoneCount: number
+      plannedProgress: number
+      totalWeightage: number
+    }>>((map, quarter) => {
+      const quarterMilestones = milestonesByQuarter[quarter]
+      const progressValues = quarterMilestones.map((milestone) => milestoneProgress.resultsById[milestone.id])
+      const plannedTotal = progressValues.reduce((sum, result) => sum + (result?.plannedProgress ?? 0), 0)
+      const actualTotal = progressValues.reduce((sum, result) => sum + (result?.actualProgress ?? 0), 0)
+      const dueSoonCount = quarterMilestones.filter((milestone) => {
+        if (!milestone.plannedEndDate) return false
+        const endDate = new Date(`${milestone.plannedEndDate}T00:00:00`)
+        return endDate >= today && endDate <= dueSoonLimit
+      }).length
+
+      map[quarter] = {
+        actualProgress: quarterMilestones.length > 0 ? actualTotal / quarterMilestones.length : 0,
+        dueSoonCount,
+        milestoneCount: quarterMilestones.length,
+        plannedProgress: quarterMilestones.length > 0 ? plannedTotal / quarterMilestones.length : 0,
+        totalWeightage: quarterMilestones.reduce((sum, milestone) => sum + Number(milestone.weightage || 0), 0),
+      }
+
+      return map
+    }, {
+      'Quarter 1': { actualProgress: 0, dueSoonCount: 0, milestoneCount: 0, plannedProgress: 0, totalWeightage: 0 },
+      'Quarter 2': { actualProgress: 0, dueSoonCount: 0, milestoneCount: 0, plannedProgress: 0, totalWeightage: 0 },
+      'Quarter 3': { actualProgress: 0, dueSoonCount: 0, milestoneCount: 0, plannedProgress: 0, totalWeightage: 0 },
+      'Quarter 4': { actualProgress: 0, dueSoonCount: 0, milestoneCount: 0, plannedProgress: 0, totalWeightage: 0 },
+    })
+  }, [milestoneProgress.resultsById, milestonesByQuarter])
+
   // ── Weightage calculation ──
   const sumOtherMilestones = editingMilestone
     ? milestones.filter((m) => m.id !== editingMilestone.id).reduce((s, m) => s + m.weightage, 0)
@@ -612,6 +657,10 @@ export function MilestonesTab({
     : remainingWeightage
 
   // ── Helpers ──
+
+  function toggleQuarter(quarter: string) {
+    setExpandedQuarter((current) => (current === quarter ? null : quarter))
+  }
 
   function calculateQuarter(formData: MilestoneFormData): string {
     return getQuarter(formData.plannedEndDate)
@@ -1005,28 +1054,6 @@ export function MilestonesTab({
 
   // ── Render helpers ──
 
-  function renderProgressBar() {
-    const displayedProgress = isExecutionPhase ? milestoneProgress.actual : milestoneProgress.planned
-    const progressLabel = isExecutionPhase ? 'Actual Progress' : 'Planned Progress'
-
-    return (
-      <div className="edit-activity__milestones-progress">
-        <div className="edit-activity__milestones-progress-header">
-          <span className="edit-activity__milestones-progress-label">
-            {progressLabel} across {milestoneProgress.eligibleCount} eligible milestone{milestoneProgress.eligibleCount === 1 ? '' : 's'}
-          </span>
-          <span className="edit-activity__milestones-progress-pct">{Math.round(displayedProgress)}%</span>
-        </div>
-        <div className="edit-activity__milestones-progress-track">
-          <div
-            className="edit-activity__milestones-progress-fill"
-            style={{ width: `${displayedProgress}%` }}
-          />
-        </div>
-      </div>
-    )
-  }
-
   function renderMilestoneProgress(milestone: Milestone, compact = false) {
     const result = milestoneProgress.resultsById[milestone.id]
     const value = isExecutionPhase ? result?.actualProgress ?? 0 : result?.plannedProgress ?? 0
@@ -1052,26 +1079,13 @@ export function MilestonesTab({
     )
   }
 
-  function renderTimelineCard(milestone: Milestone) {
-    const statusCfg = STATUS_CONFIG[milestone.status]
+  function renderQuarterMilestoneRow(milestone: Milestone) {
     return (
       <div key={milestone.id} className="edit-activity__milestone-item">
-        <div className="edit-activity__milestone-line-connector">
-          <span
-            className={`edit-activity__milestone-dot edit-activity__milestone-dot--${milestone.status}`}
-          >
-            {getStatusIcon(milestone.status)}
-          </span>
-          <div className="edit-activity__milestone-line" />
-        </div>
         <div className="edit-activity__milestone-card">
           <div className="edit-activity__milestone-card-top">
             <div className="edit-activity__milestone-card-date">
               {formatDateDisplay(milestone.plannedStartDate)} → {formatDateDisplay(milestone.plannedEndDate)}
-            </div>
-            <div className="edit-activity__milestone-card-badges">
-              <Badge tone="neutral">{milestone.quarter}</Badge>
-              <Badge tone={statusCfg.tone}>{statusCfg.label}</Badge>
             </div>
           </div>
           <h3 className="edit-activity__milestone-card-title">
@@ -1083,11 +1097,11 @@ export function MilestonesTab({
               {milestone.name}
             </button>
           </h3>
-          {isAdeoVisible && milestone.weightage > 0 && (
+          {isAdeoVisible ? (
             <div className="edit-activity__milestone-card-weightage">
-              Weightage: {milestone.weightage}%
+              {milestone.weightage}%
             </div>
-          )}
+          ) : null}
           {renderMilestoneProgress(milestone, true)}
           <div className="edit-activity__milestone-card-bottom">
             <p className="edit-activity__milestone-card-desc">{milestone.description}</p>
@@ -1119,35 +1133,90 @@ export function MilestonesTab({
 
   function renderQuarterCard(quarter: (typeof QUARTERS)[number], index: number) {
     const quarterMilestones = milestonesByQuarter[quarter]
+    const summary = quarterSummaries[quarter]
+    const isExpanded = expandedQuarter === quarter
+    const quarterRange = index === 0
+      ? 'Jan - Mar'
+      : index === 1
+        ? 'Apr - Jun'
+        : index === 2
+          ? 'Jul - Sep'
+          : 'Oct - Dec'
 
     return (
-      <section className="edit-activity__milestone-quarter" key={quarter}>
-        <div className="edit-activity__milestone-quarter-header">
-          <div>
+      <section className={`edit-activity__milestone-quarter${isExpanded ? ' edit-activity__milestone-quarter--expanded' : ''}`} key={quarter}>
+        <button
+          aria-expanded={isExpanded}
+          className="edit-activity__milestone-quarter-summary"
+          onClick={() => toggleQuarter(quarter)}
+          type="button"
+        >
+          <div className="edit-activity__milestone-quarter-heading">
             <span className="edit-activity__milestone-quarter-number">Q{index + 1}</span>
             <div>
               <h3>{quarter}</h3>
               <span className="edit-activity__milestone-quarter-range">
-                {quarterMilestones.length} milestone{quarterMilestones.length === 1 ? '' : 's'}
+                {quarterRange}
               </span>
             </div>
           </div>
-          <Badge tone={quarterMilestones.length > 0 ? 'info' : 'neutral'}>
-            {quarterMilestones.length}
-          </Badge>
-        </div>
-
-        <div className="edit-activity__milestone-quarter-body">
-          {quarterMilestones.length > 0 ? (
-            quarterMilestones.map(renderTimelineCard)
-          ) : (
-            <div className="edit-activity__milestone-quarter-empty">
-              <Flag size={22} strokeWidth={1.5} />
-              <strong>No milestones yet</strong>
-              <span>Add a milestone with a planned end date in this quarter.</span>
+          <div className="edit-activity__milestone-quarter-metrics">
+            <span className="edit-activity__milestone-quarter-metric edit-activity__milestone-quarter-metric--primary">
+              <strong>{summary.milestoneCount}</strong>
+              Milestones
+            </span>
+            <span className="edit-activity__milestone-quarter-metric edit-activity__milestone-quarter-metric--warning">
+              <strong>{summary.dueSoonCount}</strong>
+              Due in 15 days
+            </span>
+            {isAdeoVisible ? (
+              <span className="edit-activity__milestone-quarter-metric edit-activity__milestone-quarter-metric--success">
+                <strong>{summary.totalWeightage}%</strong>
+                Weightage
+              </span>
+            ) : null}
+          </div>
+          <div className="edit-activity__milestone-quarter-progress-group">
+            <div className="edit-activity__milestone-quarter-progress">
+              <span>Planned</span>
+              <strong>{Math.round(summary.plannedProgress)}%</strong>
+              <div aria-hidden="true"><i style={{ width: `${summary.plannedProgress}%` }} /></div>
             </div>
-          )}
-        </div>
+            {isExecutionPhase ? (
+              <div className="edit-activity__milestone-quarter-progress edit-activity__milestone-quarter-progress--actual">
+                <span>Actual</span>
+                <strong>{Math.round(summary.actualProgress)}%</strong>
+                <div aria-hidden="true"><i style={{ width: `${summary.actualProgress}%` }} /></div>
+              </div>
+            ) : null}
+          </div>
+          <span className="edit-activity__milestone-quarter-toggle" aria-hidden="true">
+            {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </span>
+        </button>
+
+        {isExpanded ? (
+          <div className="edit-activity__milestone-quarter-body">
+            {quarterMilestones.length > 0 ? (
+              <div className={`edit-activity__milestone-quarter-table${isAdeoVisible ? '' : ' edit-activity__milestone-quarter-table--no-weightage'}`}>
+                <div className="edit-activity__milestone-quarter-row edit-activity__milestone-quarter-row--head">
+                  <div>Milestone</div>
+                  <div>Timeline</div>
+                  {isAdeoVisible ? <div>Weightage</div> : null}
+                  <div>{isExecutionPhase ? 'Actual Progress' : 'Planned Progress'}</div>
+                  <div>Actions</div>
+                </div>
+                {quarterMilestones.map(renderQuarterMilestoneRow)}
+              </div>
+            ) : (
+              <div className="edit-activity__milestone-quarter-empty">
+                <Flag size={22} strokeWidth={1.5} />
+                <strong>No milestones yet</strong>
+                <span>Add a milestone with a planned end date in this quarter.</span>
+              </div>
+            )}
+          </div>
+        ) : null}
       </section>
     )
   }
@@ -1184,7 +1253,7 @@ export function MilestonesTab({
 
               return (
                 <tr key={milestone.id}>
-                  <td>
+                  <td data-label="Milestone">
                     <button
                       className="edit-activity__milestone-list-name-btn"
                       onClick={() => handleOpenEdit(milestone)}
@@ -1193,19 +1262,22 @@ export function MilestonesTab({
                       <span className="edit-activity__milestone-list-name">{milestone.name}</span>
                     </button>
                   </td>
-                  <td>
+                  <td data-label="Quarter">
                     <span className={`badge ${getQuarterBadgeClass(milestone.quarter)}`}>
                       {milestone.quarter}
                     </span>
                   </td>
-                  <td>{formatDateDisplay(milestone.plannedStartDate)}</td>
-                  <td>{formatDateDisplay(milestone.plannedEndDate)}</td>
-                  {isAdeoVisible ? <td>{milestone.weightage}%</td> : null}
-                  <td>{renderMilestoneProgress(milestone)}</td>
-                  <td>
-                    <Badge tone={statusCfg.tone}>{statusCfg.label}</Badge>
+                  <td data-label="Start Date">{formatDateDisplay(milestone.plannedStartDate)}</td>
+                  <td data-label="End Date">{formatDateDisplay(milestone.plannedEndDate)}</td>
+                  {isAdeoVisible ? <td data-label="Weightage">{milestone.weightage}%</td> : null}
+                  <td data-label={isExecutionPhase ? 'Actual Progress' : 'Planned Progress'}>{renderMilestoneProgress(milestone)}</td>
+                  <td data-label="Status">
+                    <Badge tone={statusCfg.tone}>
+                      <span className="edit-activity__milestone-status-icon" aria-hidden="true">{getStatusIcon(milestone.status)}</span>
+                      {statusCfg.label}
+                    </Badge>
                   </td>
-                  <td>
+                  <td data-label="Action">
                     <div className="edit-activity__procurement-actions">
                       <button
                         aria-label="Edit milestone"
@@ -1275,8 +1347,14 @@ export function MilestonesTab({
       >
         <div className="edit-activity__milestones-drawer">
           {isFutureQuarterLocked ? (
-            <div className="create-activity__notice create-activity__notice--warning">
-              This milestone is scheduled for a future quarter. You can review the details now, but execution updates will be enabled when that quarter starts.
+            <div className="edit-activity__milestone-warning" role="status">
+              <span className="edit-activity__milestone-warning-icon" aria-hidden="true">
+                <AlertTriangle size={15} />
+              </span>
+              <div>
+                <strong>Future quarter milestone</strong>
+                <p>This milestone is scheduled for a future quarter. You can review the details now, but execution updates will be enabled when that quarter starts.</p>
+              </div>
             </div>
           ) : null}
 
@@ -1317,15 +1395,15 @@ export function MilestonesTab({
             <div className="edit-activity__procurement-section">
               <div className="create-activity__section-header">
                 <div className="create-activity__section-header-inner">
-                  <span className="create-activity__section-header-icon" aria-hidden="true">
-                    <Flag size={16} />
-                  </span>
-                  <div>
-                    <span>Execution Details</span>
-                    <h2>Actual timeline, progress & status</h2>
-                  </div>
+                <span className="create-activity__section-header-icon" aria-hidden="true">
+                  <Flag size={16} />
+                </span>
+                <div>
+                    <h2>Execution Update</h2>
+                    <p>Capture actual delivery dates, progress, status, and supporting evidence.</p>
                 </div>
               </div>
+            </div>
 
               <div className="edit-activity__procurement-drawer-section">
                 <div className="create-activity__date-range">
@@ -1466,8 +1544,8 @@ export function MilestonesTab({
                   <Flag size={16} />
                 </span>
                 <div>
-                  <span>Milestone Information</span>
-                  <h2>Name, Timeline & Details</h2>
+                  <h2>Milestone Details</h2>
+                  <p>Define the milestone name, quarter, and delivery description.</p>
                 </div>
               </div>
             </div>
@@ -1492,6 +1570,11 @@ export function MilestonesTab({
                   required
                   value={form.name}
                 />
+
+                <div className="edit-activity__milestone-drawer-subhead">
+                  <h3>Timeline</h3>
+                  <p>Set the planned start and end dates for this milestone.</p>
+                </div>
 
                 <div className="create-activity__date-range">
                   <DatePicker
@@ -1544,14 +1627,14 @@ export function MilestonesTab({
             <div className="edit-activity__procurement-section">
               <div className="create-activity__section-header">
                 <div className="create-activity__section-header-inner">
-                  <span className="create-activity__section-header-icon" aria-hidden="true">
-                    <Flag size={16} />
-                  </span>
-                  <div>
-                    <span>ADEO Dependent Fields</span>
-                    <h2>Weightage & Project Details</h2>
-                  </div>
+                <span className="create-activity__section-header-icon" aria-hidden="true">
+                    <CalendarDays size={16} />
+                </span>
+                <div>
+                    <h2>ADEO Details</h2>
+                    <p>Maintain weightage and ADEO-required milestone fields.</p>
                 </div>
+              </div>
               </div>
 
               {showPlanningReadOnlyView ? (
@@ -1623,10 +1706,7 @@ export function MilestonesTab({
       {/* Header */}
       <div className="edit-activity__members-header">
         <div className="edit-activity__members-header-text">
-          <h2>
-            Milestones
-            <span className="edit-activity__members-count-badge">{milestones.length} Milestones</span>
-          </h2>
+          <h2>Milestones</h2>
           <p>Track project milestones and key deliverables.</p>
         </div>
         <div className="edit-activity__milestone-header-actions">
@@ -1635,20 +1715,22 @@ export function MilestonesTab({
           </Button>
           <div className="edit-activity__milestone-view-switch" aria-label="Milestone view switch">
             <button
-              className={`edit-activity__milestone-view-switch-btn ${viewMode === 'list' ? 'edit-activity__milestone-view-switch-btn--active' : ''}`}
-              onClick={() => setViewMode('list')}
-              type="button"
-            >
-              <List size={15} />
-              List View
-            </button>
-            <button
+              aria-label="Quarter view"
               className={`edit-activity__milestone-view-switch-btn ${viewMode === 'quarter' ? 'edit-activity__milestone-view-switch-btn--active' : ''}`}
               onClick={() => setViewMode('quarter')}
+              title="Quarter view"
               type="button"
             >
               <LayoutGrid size={15} />
-              Quarter View
+            </button>
+            <button
+              aria-label="List view"
+              className={`edit-activity__milestone-view-switch-btn ${viewMode === 'list' ? 'edit-activity__milestone-view-switch-btn--active' : ''}`}
+              onClick={() => setViewMode('list')}
+              title="List view"
+              type="button"
+            >
+              <List size={15} />
             </button>
           </div>
         </div>
@@ -1660,9 +1742,6 @@ export function MilestonesTab({
           {error}
         </div>
       ) : null}
-
-      {/* Progress bar */}
-      {renderProgressBar()}
 
       {/* Milestone content */}
       {isLoading ? (
