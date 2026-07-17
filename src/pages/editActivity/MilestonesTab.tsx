@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronUp,
   Edit3,
+  FileText,
   Flag,
   LayoutGrid,
   List,
@@ -14,7 +15,6 @@ import {
   X,
 } from 'lucide-react'
 import {
-  Badge,
   Button,
   ConfirmationDialog,
   DatePicker,
@@ -91,14 +91,6 @@ type MilestoneFormData = Omit<Milestone, 'id'>
 
 // ── Constants ──
 
-const STATUS_CONFIG: Record<MilestoneStatus, { label: string; tone: 'neutral' | 'info' | 'success' | 'warning' }> = {
-  'not-started': { label: 'Not Started', tone: 'neutral' },
-  'in-progress': { label: 'In Progress', tone: 'info' },
-  completed: { label: 'Completed', tone: 'success' },
-  delayed: { label: 'Delayed', tone: 'warning' },
-  cancelled: { label: 'Cancelled', tone: 'warning' },
-}
-
 const QUARTERS = ['Quarter 1', 'Quarter 2', 'Quarter 3', 'Quarter 4'] as const
 const EXECUTION_STATUS_VALUES = ['1', '776140001', '776140002', '776140003', '576610001'] as const satisfies readonly ExecutionMilestoneStatusValue[]
 const EXECUTION_STATUS_REQUIRES_JUSTIFICATION = new Set<ExecutionMilestoneStatusValue>(['1', '776140002'])
@@ -123,6 +115,14 @@ const EXECUTION_STATUS_OPTIONS: SelectOption<ExecutionMilestoneStatusValue | ''>
   })),
 ]
 
+const MILESTONE_STATUS_LABELS: Record<MilestoneStatus, string> = {
+  'not-started': 'Not Started',
+  'in-progress': 'In Progress',
+  completed: 'Completed',
+  delayed: 'Delayed',
+  cancelled: 'Cancelled',
+}
+
 function formatMilestoneStatusLogValue(value: unknown) {
   const numericValue = Number(value)
   const generatedLabel = Number.isFinite(numericValue)
@@ -130,15 +130,6 @@ function formatMilestoneStatusLogValue(value: unknown) {
     : ''
 
   return generatedLabel ? formatGeneratedStatusLabel(generatedLabel) : value
-}
-
-function getStatusIcon(status: MilestoneStatus): string {
-  switch (status) {
-    case 'completed': return '●'
-    case 'in-progress': return '◉'
-    case 'delayed': return '◎'
-    default: return '○'
-  }
 }
 
 const EMPTY_FORM: MilestoneFormData = {
@@ -292,17 +283,20 @@ function sortMilestonesByEndDate(a: Milestone, b: Milestone) {
   return a.plannedEndDate.localeCompare(b.plannedEndDate) || a.name.localeCompare(b.name)
 }
 
-function getQuarterBadgeClass(quarter: string) {
-  const quarterKey = quarter.replace(/\s+/g, '-').toLowerCase()
-
-  return `edit-activity__milestone-quarter-badge edit-activity__milestone-quarter-badge--${quarterKey}`
-}
-
 type MilestoneReadOnlyKind = 'identity' | 'date' | 'classification' | 'requirement' | 'narrative'
 
 function renderReadOnlyValue(value?: string | number | null) {
   const text = String(value ?? '').trim()
   return text || '—'
+}
+
+function formatFileSize(size: number) {
+  if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`
+  return `${Math.max(1, Math.round(size / 1024))} KB`
+}
+
+function getUploadedFileKey(uploadedFile: UploadedFile) {
+  return `${uploadedFile.name}-${uploadedFile.size}-${uploadedFile.file.lastModified}`
 }
 
 function renderMilestoneReadOnlyDetails(items: Array<{
@@ -436,8 +430,10 @@ function buildMilestoneFormFromRelatedChanges(
 function buildMilestoneRelatedChanges(
   milestone: Milestone,
   form: MilestoneFormData,
-  uploadedFile: UploadedFile | null,
+  uploadedFiles: UploadedFile[],
 ): ProjectRelatedChanges {
+  const uploadedFileNames = uploadedFiles.map((file) => file.name).join(', ')
+
   return {
     milestones: [{
       id: cleanRecordId(milestone.id),
@@ -448,7 +444,7 @@ function buildMilestoneRelatedChanges(
       dga_actual_progress: relatedOldValue(form.actualProgress ? Number(form.actualProgress) : ''),
       dga_cancellation_reason: relatedOldValue(form.cancellationReason),
       dga_justification: relatedOldValue(form.executionJustification),
-      uploaded_file: relatedOldValue(uploadedFile?.name ?? ''),
+      uploaded_file: relatedOldValue(uploadedFileNames),
     }],
   }
 }
@@ -484,7 +480,7 @@ export function MilestonesTab({
   const [form, setForm] = useState<MilestoneFormData>(EMPTY_FORM)
   const [formErrors, setFormErrors] = useState<Partial<Record<MilestoneFormErrorKey, string>>>({})
   const [milestoneToDelete, setMilestoneToDelete] = useState<Milestone | null>(null)
-  const [uploadedFile, setUploadedFile] = useState<UploadedFile | null>(null)
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const effectiveProjectRelatedChanges = localProjectRelatedChanges?.projectId === projectId
     ? localProjectRelatedChanges.value
@@ -700,7 +696,7 @@ export function MilestonesTab({
     setDrawerActiveTab('form')
     setEditingMilestone(null)
     setForm(EMPTY_FORM)
-    setUploadedFile(null)
+    setUploadedFiles([])
     setFormErrors({})
     setError('')
     setIsDrawerOpen(true)
@@ -710,7 +706,7 @@ export function MilestonesTab({
     setDrawerActiveTab('form')
     setEditingMilestone(milestone)
     setForm(buildMilestoneFormFromRelatedChanges(effectiveProjectRelatedChanges, milestone))
-    setUploadedFile(null)
+    setUploadedFiles([])
     setFormErrors({})
     setError('')
     setIsDrawerOpen(true)
@@ -721,7 +717,7 @@ export function MilestonesTab({
     setDrawerActiveTab('form')
     setEditingMilestone(null)
     setForm(EMPTY_FORM)
-    setUploadedFile(null)
+    setUploadedFiles([])
     setFormErrors({})
   }
 
@@ -764,13 +760,30 @@ export function MilestonesTab({
     })
   }
 
-  function handleFileChange(file?: File | null) {
+  function handleFileChange(files?: FileList | null) {
     if (isReadOnly && !canEditExecutionFieldsOnly) return
-    setUploadedFile(file ? {
-      file,
-      name: file.name,
-      size: file.size,
-    } : null)
+    const selectedFiles = Array.from(files ?? [])
+    if (selectedFiles.length === 0) return
+    setUploadedFiles((current) => {
+      const existingKeys = new Set(current.map(getUploadedFileKey))
+      const nextFiles = selectedFiles
+        .map((file) => ({
+          file,
+          name: file.name,
+          size: file.size,
+        }))
+        .filter((file) => {
+          const key = getUploadedFileKey(file)
+          if (existingKeys.has(key)) return false
+          existingKeys.add(key)
+          return true
+        })
+
+      return [...current, ...nextFiles]
+    })
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
     setFormErrors((prev) => {
       const next = { ...prev }
       delete next.uploadedFile
@@ -778,9 +791,17 @@ export function MilestonesTab({
     })
   }
 
-  function handleRemoveFile() {
+  function handleRemoveFile(fileKey: string) {
     if (isReadOnly && !canEditExecutionFieldsOnly) return
-    setUploadedFile(null)
+    setUploadedFiles((current) => current.filter((file) => getUploadedFileKey(file) !== fileKey))
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  function handleRemoveAllFiles() {
+    if (isReadOnly && !canEditExecutionFieldsOnly) return
+    setUploadedFiles([])
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -821,8 +842,8 @@ export function MilestonesTab({
         errors.executionJustification = 'Justification is required.'
       }
 
-      if (!uploadedFile) {
-        errors.uploadedFile = 'Upload File is required.'
+      if (uploadedFiles.length === 0) {
+        errors.uploadedFile = 'At least one upload file is required.'
       }
     }
 
@@ -878,7 +899,7 @@ export function MilestonesTab({
 
         const nextRelatedChanges = stringifyMergedProjectRelatedChanges(
           projectResult.data?.dga_project_related_changes,
-          buildMilestoneRelatedChanges(editingMilestone, form, uploadedFile),
+          buildMilestoneRelatedChanges(editingMilestone, form, uploadedFiles),
         )
         const result = await Dga_aop_projectsesService.update(projectId, {
           dga_project_related_changes: nextRelatedChanges,
@@ -949,24 +970,26 @@ export function MilestonesTab({
         )
 
         try {
-          const fileContentBytes = await readFileAsBase64(uploadedFile!.file)
-          const uploadResult = await UploadFileinAOPProjectService.Run({
-            text: 'dga_aop_project_milestone_detailses',
-            text_2: editingMilestone.id,
-            text_1: projectId,
-            file: {
-              name: uploadedFile!.name,
-              contentBytes: fileContentBytes,
-            },
-          })
-          assertOperationSuccess(uploadResult, 'Unable to upload the milestone file.')
+          await Promise.all(uploadedFiles.map(async (uploadedFile) => {
+            const fileContentBytes = await readFileAsBase64(uploadedFile.file)
+            const uploadResult = await UploadFileinAOPProjectService.Run({
+              text: 'dga_aop_project_milestone_detailses',
+              text_2: editingMilestone.id,
+              text_1: projectId,
+              file: {
+                name: uploadedFile.name,
+                contentBytes: fileContentBytes,
+              },
+            })
+            assertOperationSuccess(uploadResult, `Unable to upload ${uploadedFile.name}.`)
+          }))
 
           void createExecutionFieldLogs(projectId, [
             {
               logType: EXECUTION_LOG_TYPES.milestone,
               name: `${editingMilestone.name} - Upload File`,
               oldValue: previousExecutionValue('uploaded_file'),
-              newValue: uploadedFile!.name,
+              newValue: uploadedFiles.map((file) => file.name).join(', '),
             },
           ], { milestoneId: editingMilestone.id })
         } catch (uploadError) {
@@ -1060,7 +1083,7 @@ export function MilestonesTab({
     const progressLabel = isExecutionPhase ? 'Actual' : 'Planned'
 
     return (
-      <div className={`edit-activity__milestone-progress${compact ? ' edit-activity__milestone-progress--compact' : ''}`}>
+      <div className={`edit-activity__milestone-progress${compact ? ' edit-activity__milestone-progress--compact' : ''}${isExecutionPhase ? ' edit-activity__milestone-progress--actual' : ' edit-activity__milestone-progress--planned'}`}>
         <div className="edit-activity__milestone-progress-meta">
           <span>{progressLabel}</span>
           <strong>{Math.round(value)}%</strong>
@@ -1167,7 +1190,7 @@ export function MilestonesTab({
             </span>
             <span className="edit-activity__milestone-quarter-metric edit-activity__milestone-quarter-metric--warning">
               <strong>{summary.dueSoonCount}</strong>
-              Due in 15 days
+              Due Soon
             </span>
             {isAdeoVisible ? (
               <span className="edit-activity__milestone-quarter-metric edit-activity__milestone-quarter-metric--success">
@@ -1221,6 +1244,14 @@ export function MilestonesTab({
     )
   }
 
+  function renderMilestoneStatusCapsule(milestone: Milestone) {
+    return (
+      <span className={`edit-activity__milestone-status-capsule edit-activity__milestone-status-capsule--${milestone.status}`}>
+        {MILESTONE_STATUS_LABELS[milestone.status]}
+      </span>
+    )
+  }
+
   function renderMilestonesListView() {
     if (milestones.length === 0) {
       return (
@@ -1233,83 +1264,69 @@ export function MilestonesTab({
     }
 
     return (
-      <div className="data-grid edit-activity__milestone-list-grid">
-        <table>
-          <thead>
-            <tr>
-              <th>Milestone Name</th>
-              <th>Quarter</th>
-              <th>Start Date</th>
-              <th>End Date</th>
-              {isAdeoVisible ? <th>Weightage</th> : null}
-              <th>{isExecutionPhase ? 'Actual Progress' : 'Planned Progress'}</th>
-              <th>Milestone Status</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {milestones.map((milestone) => {
-              const statusCfg = STATUS_CONFIG[milestone.status]
+      <div className={`edit-activity__milestone-list-grid${isAdeoVisible ? '' : ' edit-activity__milestone-list-grid--no-weightage'}`}>
+        <div className="edit-activity__milestone-list-row edit-activity__milestone-list-row--header">
+          <div className="edit-activity__milestone-list-cell">Name</div>
+          <div className="edit-activity__milestone-list-cell">Timeline</div>
+          {isAdeoVisible ? <div className="edit-activity__milestone-list-cell">Weightage</div> : null}
+          <div className="edit-activity__milestone-list-cell">{isExecutionPhase ? 'Actual Progress' : 'Planned Progress'}</div>
+          <div className="edit-activity__milestone-list-cell">Status</div>
+          <div className="edit-activity__milestone-list-cell edit-activity__milestone-list-cell--actions">Actions</div>
+        </div>
 
-              return (
-                <tr key={milestone.id}>
-                  <td data-label="Milestone">
-                    <button
-                      className="edit-activity__milestone-list-name-btn"
-                      onClick={() => handleOpenEdit(milestone)}
-                      type="button"
-                    >
-                      <span className="edit-activity__milestone-list-name">{milestone.name}</span>
-                    </button>
-                  </td>
-                  <td data-label="Quarter">
-                    <span className={`badge ${getQuarterBadgeClass(milestone.quarter)}`}>
-                      {milestone.quarter}
-                    </span>
-                  </td>
-                  <td data-label="Start Date">{formatDateDisplay(milestone.plannedStartDate)}</td>
-                  <td data-label="End Date">{formatDateDisplay(milestone.plannedEndDate)}</td>
-                  {isAdeoVisible ? <td data-label="Weightage">{milestone.weightage}%</td> : null}
-                  <td data-label={isExecutionPhase ? 'Actual Progress' : 'Planned Progress'}>{renderMilestoneProgress(milestone)}</td>
-                  <td data-label="Status">
-                    <Badge tone={statusCfg.tone}>
-                      <span className="edit-activity__milestone-status-icon" aria-hidden="true">{getStatusIcon(milestone.status)}</span>
-                      {statusCfg.label}
-                    </Badge>
-                  </td>
-                  <td data-label="Action">
-                    <div className="edit-activity__procurement-actions">
-                      <button
-                        aria-label="Edit milestone"
-                        className="edit-activity__procurement-action-btn"
-                        onClick={() => handleOpenEdit(milestone)}
-                        type="button"
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                        </svg>
-                      </button>
-                      {!(isReadOnly || canEditExecutionFieldsOnly) ? (
-                        <button
-                          aria-label="Delete milestone"
-                          className="edit-activity__procurement-action-btn edit-activity__procurement-action-btn--danger"
-                          onClick={() => setMilestoneToDelete(milestone)}
-                          type="button"
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="3 6 5 6 21 6" />
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                          </svg>
-                        </button>
-                      ) : null}
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+        {milestones.map((milestone) => (
+          <div className="edit-activity__milestone-list-row" key={milestone.id}>
+            <div className="edit-activity__milestone-list-cell edit-activity__milestone-list-cell--name" data-label="Name">
+              <button
+                className="edit-activity__milestone-list-name-btn"
+                onClick={() => handleOpenEdit(milestone)}
+                title={`Edit milestone: ${milestone.name}`}
+                type="button"
+              >
+                {milestone.name || 'Untitled milestone'}
+              </button>
+            </div>
+            <div className="edit-activity__milestone-list-cell edit-activity__milestone-list-cell--timeline" data-label="Timeline">
+              {formatDateDisplay(milestone.plannedStartDate)} → {formatDateDisplay(milestone.plannedEndDate)}
+            </div>
+            {isAdeoVisible ? (
+              <div className="edit-activity__milestone-list-cell edit-activity__milestone-list-cell--weightage" data-label="Weightage">
+                {milestone.weightage}%
+              </div>
+            ) : null}
+            <div
+              className="edit-activity__milestone-list-cell edit-activity__milestone-list-cell--progress"
+              data-label={isExecutionPhase ? 'Actual Progress' : 'Planned Progress'}
+            >
+              {renderMilestoneProgress(milestone)}
+            </div>
+            <div className="edit-activity__milestone-list-cell edit-activity__milestone-list-cell--status" data-label="Status">
+              {renderMilestoneStatusCapsule(milestone)}
+            </div>
+            <div className="edit-activity__milestone-list-cell edit-activity__milestone-list-cell--actions" data-label="Actions">
+              <div className="edit-activity__milestone-list-actions">
+                <button
+                  aria-label="Edit milestone"
+                  className="edit-activity__milestone-action-btn"
+                  onClick={() => handleOpenEdit(milestone)}
+                  type="button"
+                >
+                  <Edit3 size={14} />
+                </button>
+                {!(isReadOnly || canEditExecutionFieldsOnly) ? (
+                  <button
+                    aria-label="Delete milestone"
+                    className="edit-activity__milestone-action-btn edit-activity__milestone-action-btn--danger"
+                    onClick={() => setMilestoneToDelete(milestone)}
+                    type="button"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     )
   }
@@ -1331,11 +1348,11 @@ export function MilestonesTab({
       <SideDrawer
         actions={
           <div className="edit-activity__milestones-drawer-actions">
-            <Button onClick={handleCloseDrawer} variant="secondary">
+            <Button className="edit-activity__milestones-drawer-button" onClick={handleCloseDrawer} variant="secondary">
               Cancel
             </Button>
             {!isDrawerLogsTab ? (
-              <Button disabled={!canEditExecutionSection || isSaving} onClick={handleSave}>
+              <Button className="edit-activity__milestones-drawer-button" disabled={!canEditExecutionSection || isSaving} onClick={handleSave}>
                 {isSaving ? 'Saving...' : editingMilestone ? 'Update Milestone' : 'Create Milestone'}
               </Button>
             ) : null}
@@ -1388,12 +1405,13 @@ export function MilestonesTab({
               projectId={projectId}
               recordId={editingMilestone.id}
               recordName={editingMilestone.name}
+              variant="compact"
             />
           ) : (
             <>
           {showExecutionFields ? (
-            <div className="edit-activity__procurement-section">
-              <div className="create-activity__section-header">
+            <div className="edit-activity__milestones-drawer-card">
+              <div className="create-activity__section-header edit-activity__milestones-drawer-header">
                 <div className="create-activity__section-header-inner">
                 <span className="create-activity__section-header-icon" aria-hidden="true">
                   <Flag size={16} />
@@ -1405,7 +1423,7 @@ export function MilestonesTab({
               </div>
             </div>
 
-              <div className="edit-activity__procurement-drawer-section">
+              <div className="edit-activity__milestones-drawer-section">
                 <div className="create-activity__date-range">
                   <DatePicker
                     disabled={!canEditExecutionSection}
@@ -1489,13 +1507,14 @@ export function MilestonesTab({
                   <input
                     className="edit-activity__file-upload-input"
                     disabled={!canEditExecutionSection}
-                    onChange={(event) => handleFileChange(event.target.files?.[0] ?? null)}
+                    multiple
+                    onChange={(event) => handleFileChange(event.target.files)}
                     ref={fileInputRef}
                     type="file"
                   />
 
                   <button
-                    className={`edit-activity__file-upload ${uploadedFile ? 'edit-activity__file-upload--has-file' : ''}`}
+                    className={`edit-activity__file-upload ${uploadedFiles.length > 0 ? 'edit-activity__file-upload--has-file' : ''}`}
                     disabled={!canEditExecutionSection}
                     onClick={() => fileInputRef.current?.click()}
                     type="button"
@@ -1504,30 +1523,59 @@ export function MilestonesTab({
                       <Upload size={18} />
                     </span>
                     <span className="edit-activity__file-upload-copy">
-                      <strong>{uploadedFile ? 'File selected' : 'Upload supporting file'}</strong>
-                      <span>{uploadedFile ? 'You can replace it before saving.' : 'Choose one file to support this execution update.'}</span>
+                      <strong>{uploadedFiles.length > 0 ? `${uploadedFiles.length} file${uploadedFiles.length === 1 ? '' : 's'} selected` : 'Upload supporting files'}</strong>
+                      <span>{uploadedFiles.length > 0 ? 'Add more files or remove selected files before saving.' : 'Choose one or more files to support this execution update.'}</span>
                     </span>
                     <span className="edit-activity__file-upload-action">
-                      {uploadedFile ? 'Replace file' : 'Choose file'}
+                      {uploadedFiles.length > 0 ? 'Add files' : 'Choose files'}
                     </span>
                   </button>
 
-                  {uploadedFile ? (
-                    <div className="edit-activity__file-upload-meta">
-                      <span className="edit-activity__file-upload-file">
-                        <strong>{uploadedFile.name}</strong>
-                        <span>{Math.max(1, Math.round(uploadedFile.size / 1024))} KB</span>
-                      </span>
-                      {canEditExecutionSection ? (
-                        <button
-                          aria-label="Remove selected file"
-                          className="edit-activity__file-upload-remove"
-                          onClick={handleRemoveFile}
-                          type="button"
-                        >
-                          <X size={14} />
-                        </button>
-                      ) : null}
+                  {uploadedFiles.length > 0 ? (
+                    <div className="edit-activity__file-upload-list">
+                      <div className="edit-activity__file-upload-list-header">
+                        <span>
+                          <strong>Selected files</strong>
+                          <small>{uploadedFiles.length} file{uploadedFiles.length === 1 ? '' : 's'} · {formatFileSize(uploadedFiles.reduce((total, file) => total + file.size, 0))}</small>
+                        </span>
+                        {canEditExecutionSection ? (
+                          <button
+                            className="edit-activity__file-upload-clear"
+                            onClick={handleRemoveAllFiles}
+                            type="button"
+                          >
+                            Clear all
+                          </button>
+                        ) : null}
+                      </div>
+
+                      <div className="edit-activity__file-upload-items">
+                        {uploadedFiles.map((uploadedFile) => {
+                          const uploadedFileKey = getUploadedFileKey(uploadedFile)
+
+                          return (
+                          <div className="edit-activity__file-upload-meta" key={uploadedFileKey}>
+                            <span className="edit-activity__file-upload-file-icon" aria-hidden="true">
+                              <FileText size={14} />
+                            </span>
+                            <span className="edit-activity__file-upload-file">
+                              <strong>{uploadedFile.name}</strong>
+                              <span>{formatFileSize(uploadedFile.size)}</span>
+                            </span>
+                            {canEditExecutionSection ? (
+                              <button
+                                aria-label={`Remove ${uploadedFile.name}`}
+                                className="edit-activity__file-upload-remove"
+                                onClick={() => handleRemoveFile(uploadedFileKey)}
+                                type="button"
+                              >
+                                <X size={14} />
+                              </button>
+                            ) : null}
+                          </div>
+                          )
+                        })}
+                      </div>
                     </div>
                   ) : null}
 
@@ -1537,8 +1585,8 @@ export function MilestonesTab({
             </div>
           ) : null}
 
-          <div className="edit-activity__procurement-section">
-            <div className="create-activity__section-header">
+          <div className="edit-activity__milestones-drawer-card">
+            <div className="create-activity__section-header edit-activity__milestones-drawer-header">
               <div className="create-activity__section-header-inner">
                 <span className="create-activity__section-header-icon" aria-hidden="true">
                   <Flag size={16} />
@@ -1551,7 +1599,7 @@ export function MilestonesTab({
             </div>
 
             {showPlanningReadOnlyView ? (
-              <div className="create-activity__readonly-panel">
+              <div className="create-activity__readonly-panel edit-activity__milestones-drawer-readonly">
                 {renderMilestoneReadOnlyDetails([
                   { label: 'Name of Milestone', value: form.name, kind: 'identity', columns: 6 },
                   { label: 'Quarter', value: form.quarter, kind: 'classification', columns: 6 },
@@ -1561,7 +1609,7 @@ export function MilestonesTab({
                 ])}
               </div>
             ) : (
-              <div className="edit-activity__procurement-drawer-section">
+              <div className="edit-activity__milestones-drawer-section">
                 <Input
                   disabled={isBaseSectionReadOnly}
                   error={formErrors.name}
@@ -1589,7 +1637,7 @@ export function MilestonesTab({
                     value={form.plannedStartDate}
                   />
                   <span className="create-activity__date-connector" aria-hidden="true">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M5 12h14M13 5l7 7-7 7"/>
                     </svg>
                   </span>
@@ -1624,8 +1672,8 @@ export function MilestonesTab({
           </div>
 
           {isAdeoVisible ? (
-            <div className="edit-activity__procurement-section">
-              <div className="create-activity__section-header">
+            <div className="edit-activity__milestones-drawer-card">
+              <div className="create-activity__section-header edit-activity__milestones-drawer-header">
                 <div className="create-activity__section-header-inner">
                 <span className="create-activity__section-header-icon" aria-hidden="true">
                     <CalendarDays size={16} />
@@ -1638,7 +1686,7 @@ export function MilestonesTab({
               </div>
 
               {showPlanningReadOnlyView ? (
-                <div className="create-activity__readonly-panel">
+                <div className="create-activity__readonly-panel edit-activity__milestones-drawer-readonly">
                   {renderMilestoneReadOnlyDetails([
                     { label: 'Weightage (%)', value: `${form.weightage || 0}%`, kind: 'requirement', columns: 6 },
                     { label: 'Remaining Weightage', value: `${remainingWeightage}%`, kind: 'requirement', columns: 6 },
@@ -1648,7 +1696,7 @@ export function MilestonesTab({
                 </div>
               ) : (
 
-              <div className="edit-activity__procurement-drawer-section">
+              <div className="edit-activity__milestones-drawer-section">
                 <Input
                   disabled={isBaseSectionReadOnly}
                   error={formErrors.weightage}

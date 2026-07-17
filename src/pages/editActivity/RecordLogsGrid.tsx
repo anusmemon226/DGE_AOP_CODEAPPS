@@ -25,6 +25,7 @@ type RecordLogsGridProps = {
   projectId: string
   recordId: string
   recordName: string
+  variant?: 'default' | 'compact'
 }
 
 function normalizeId(id?: string | null) {
@@ -98,6 +99,7 @@ export function RecordLogsGrid({
   projectId,
   recordId,
   recordName,
+  variant = 'default',
 }: RecordLogsGridProps) {
   const [logs, setLogs] = useState<RecordLogRow[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -154,6 +156,82 @@ export function RecordLogsGrid({
     void Promise.resolve().then(loadLogs)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, logType, recordId, recordName])
+
+  if (variant === 'compact') {
+    return (
+      <div className="edit-activity__record-logs edit-activity__record-logs--compact">
+        <div className="edit-activity__record-logs-tabs-action">
+          <button
+            aria-label="Refresh logs"
+            className="edit-activity__record-logs-refresh"
+            disabled={isLoading}
+            onClick={() => void loadLogs()}
+            type="button"
+          >
+            <RefreshCw className={isLoading ? 'edit-activity__record-logs-refresh-icon--loading' : undefined} size={14} />
+          </button>
+        </div>
+
+        {error ? <div className="edit-activity__members-error">{error}</div> : null}
+
+        {isLoading ? (
+          <div className="edit-activity__record-logs-grid edit-activity__record-logs-grid--compact">
+            <div className="edit-activity__record-logs-row edit-activity__record-logs-row--header">
+              <div className="edit-activity__record-logs-cell">Name</div>
+              <div className="edit-activity__record-logs-cell">Old Value</div>
+              <div className="edit-activity__record-logs-cell">New Value</div>
+              <div className="edit-activity__record-logs-cell">Created On</div>
+              <div className="edit-activity__record-logs-cell">Created By</div>
+            </div>
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div className="edit-activity__record-logs-row" key={`record-log-compact-skeleton-${index}`}>
+                <div className="edit-activity__record-logs-cell edit-activity__record-logs-cell--skeleton" data-label="Name">
+                  <span className="edit-activity__logs-loading-row" />
+                </div>
+                <div className="edit-activity__record-logs-cell edit-activity__record-logs-cell--skeleton" data-label="Old Value">
+                  <span className="edit-activity__logs-loading-row" />
+                </div>
+                <div className="edit-activity__record-logs-cell edit-activity__record-logs-cell--skeleton" data-label="New Value">
+                  <span className="edit-activity__logs-loading-row" />
+                </div>
+                <div className="edit-activity__record-logs-cell edit-activity__record-logs-cell--skeleton" data-label="Created On">
+                  <span className="edit-activity__logs-loading-row" />
+                </div>
+                <div className="edit-activity__record-logs-cell edit-activity__record-logs-cell--skeleton" data-label="Created By">
+                  <span className="edit-activity__logs-loading-row" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : logs.length > 0 ? (
+          <div className="edit-activity__record-logs-grid edit-activity__record-logs-grid--compact">
+            <div className="edit-activity__record-logs-row edit-activity__record-logs-row--header">
+              <div className="edit-activity__record-logs-cell">Name</div>
+              <div className="edit-activity__record-logs-cell">Old Value</div>
+              <div className="edit-activity__record-logs-cell">New Value</div>
+              <div className="edit-activity__record-logs-cell">Created On</div>
+              <div className="edit-activity__record-logs-cell">Created By</div>
+            </div>
+            {logs.map((log) => (
+              <div className="edit-activity__record-logs-row" key={log.id}>
+                <div className="edit-activity__record-logs-cell edit-activity__record-logs-cell--name" data-label="Name" title={log.name}>{log.name}</div>
+                <div className="edit-activity__record-logs-cell edit-activity__record-logs-cell--value" data-label="Old Value" title={log.oldValue}>{log.oldValue}</div>
+                <div className="edit-activity__record-logs-cell edit-activity__record-logs-cell--value" data-label="New Value" title={log.newValue}>{log.newValue}</div>
+                <div className="edit-activity__record-logs-cell edit-activity__record-logs-cell--date" data-label="Created On">{log.createdOn}</div>
+                <div className="edit-activity__record-logs-cell edit-activity__record-logs-cell--user" data-label="Created By" title={log.createdBy}>{log.createdBy}</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="edit-activity__members-empty edit-activity__record-logs-empty edit-activity__record-logs-empty--compact">
+            <History size={28} strokeWidth={1.4} />
+            <h3>No logs found</h3>
+            <p>{emptyMessage}</p>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="edit-activity__record-logs">

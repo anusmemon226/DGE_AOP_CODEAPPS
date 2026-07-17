@@ -2007,7 +2007,6 @@
 .create-activity__date-range .date-picker__trigger:hover {
   background: var(--control-bg-hover);
   border-color: var(--control-border-hover);
-  box-shadow: var(--control-shadow-hover);
 }
 
 .create-activity__date-range .date-picker__trigger:disabled,

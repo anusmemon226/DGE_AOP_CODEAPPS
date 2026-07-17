@@ -160,8 +160,6 @@
 .select-field__control:hover {
   background: var(--control-bg-hover);
   border-color: var(--control-border-hover);
-  box-shadow: var(--control-shadow-hover);
-  transform: translateY(-1px);
 }
 
 .select-field--disabled {
@@ -193,8 +191,6 @@
 .select-field__value {
   align-items: center;
   display: flex;
-  font-size: 0.8rem;
-  font-weight: 600;
   gap: 0.4rem;
   min-width: 0;
   overflow: hidden;
@@ -846,6 +842,7 @@
   min-height: 1.5rem;
   padding: 0.22rem 0.5rem;
   transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+  font-size: 0.75rem;
 }
 
 .date-picker__header-select:hover {
@@ -897,10 +894,10 @@
 
 .date-picker__grid button.date-picker__day--selected {
   background: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-soft);
   color: var(--color-on-primary);
-  font-weight: 800;
+  font-weight: 400;
   opacity: 1;
+  width: 2rem;
 }
 
 .date-picker__month-grid,
@@ -975,6 +972,7 @@
   cursor: pointer;
   min-height: 1.75rem;
   padding: 0.22rem 0.45rem;
+  font-size: 0.75rem
 }
 
 .date-picker__quick-actions button:hover:not(:disabled) {
