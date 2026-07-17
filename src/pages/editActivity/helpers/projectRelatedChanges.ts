@@ -4,22 +4,25 @@ export type ProjectRelatedChange = {
   planned_value?: unknown
 }
 
-export type ProjectRelatedRecord = ProjectRelatedChanges & {
+export type ProjectRelatedValue =
+  | ProjectRelatedChange
+  | ProjectRelatedChanges
+  | ProjectRelatedRecord[]
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+
+export type ProjectRelatedRecord = {
+  [key: string]: ProjectRelatedValue
   id?: string
   month_name?: string
   name?: string
 }
 
 export type ProjectRelatedChanges = {
-  [key: string]:
-    | ProjectRelatedChange
-    | ProjectRelatedChanges
-    | ProjectRelatedRecord[]
-    | string
-    | number
-    | boolean
-    | null
-    | undefined
+  [key: string]: ProjectRelatedValue
 }
 
 export function isPlainObject(value: unknown): value is Record<string, unknown> {
