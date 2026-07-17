@@ -395,7 +395,7 @@
 
 .edit-activity__activity-info-row .badge {
   font-size: 0.68rem !important;
-  font-weight: var(--font-weight-semibold) !important;
+  font-weight: var(--font-weight-medium) !important;
   line-height: 1.2;
   min-height: 1.25rem;
   padding: 0.1rem 0.45rem;
@@ -3379,7 +3379,7 @@
   align-items: center;
   display: grid;
   gap: 0.45rem;
-  grid-template-columns: minmax(9rem, 1.05fr) minmax(10rem, 0.95fr) minmax(4.8rem, 0.42fr) minmax(8.2rem, 0.78fr) minmax(6rem, 0.55fr) 5.4rem;
+  grid-template-columns: minmax(8.2rem, 1fr) minmax(5.8rem, 0.52fr) minmax(9.4rem, 0.9fr) minmax(4.4rem, 0.38fr) minmax(7.8rem, 0.72fr) minmax(5.6rem, 0.5fr) 5.4rem;
   justify-items: start;
   min-width: 0;
   padding: 0.55rem 0.7rem;
@@ -3387,7 +3387,7 @@
 }
 
 .edit-activity__milestone-list-grid--no-weightage .edit-activity__milestone-list-row {
-  grid-template-columns: minmax(10rem, 1.08fr) minmax(11rem, 0.95fr) minmax(8.4rem, 0.78fr) minmax(6rem, 0.55fr) 5.4rem;
+  grid-template-columns: minmax(9rem, 1.05fr) minmax(5.8rem, 0.5fr) minmax(10rem, 0.92fr) minmax(8rem, 0.72fr) minmax(5.6rem, 0.5fr) 5.4rem;
 }
 
 .edit-activity__milestone-list-row + .edit-activity__milestone-list-row {
@@ -3431,9 +3431,18 @@
 }
 
 .edit-activity__milestone-list-cell--timeline,
+.edit-activity__milestone-list-cell--quarter,
 .edit-activity__milestone-list-cell--weightage {
   color: var(--color-text-secondary);
   white-space: nowrap;
+}
+
+.edit-activity__milestone-list-cell--quarter .edit-activity__milestone-quarter-badge {
+  font-size: 0.68rem !important;
+  font-weight: var(--font-weight-medium) !important;
+  line-height: 1.2;
+  padding: 0.24rem 0.62rem;
+  border-radius: 999px;
 }
 
 .edit-activity__milestone-list-cell--actions {
@@ -4865,6 +4874,448 @@
   width: 100%;
 }
 
+.edit-activity__procurement-quarter-grid {
+  display: grid;
+  gap: 0.72rem;
+  grid-template-columns: 1fr;
+}
+
+.edit-activity__procurement-quarter {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 0.95rem;
+  overflow: hidden;
+}
+
+.edit-activity__procurement-quarter-summary {
+  align-items: center;
+  background: var(--color-surface);
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: minmax(10rem, 1fr) minmax(30rem, 2.4fr) auto;
+  padding: 0.8rem 0.9rem;
+  text-align: left;
+  width: 100%;
+}
+
+.edit-activity__procurement-quarter-summary:hover {
+  background: color-mix(in srgb, var(--color-primary) 4%, var(--color-surface));
+}
+
+.edit-activity__procurement-quarter--expanded .edit-activity__procurement-quarter-summary {
+  border-radius: 0.95rem 0.95rem 0 0;
+}
+
+.edit-activity__procurement-quarter-metrics {
+  display: grid;
+  gap: 0.42rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  min-width: 0;
+}
+
+.edit-activity__procurement-quarter-metric {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-primary) 4%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 12%, var(--color-border));
+  border-radius: 0.65rem;
+  color: var(--color-text-secondary);
+  display: grid;
+  font-size: 0.66rem;
+  font-weight: var(--font-weight-regular);
+  gap: 0.12rem;
+  justify-items: center;
+  min-height: 3.05rem;
+  min-width: 0;
+  padding: 0.42rem 0.5rem;
+  text-align: center;
+}
+
+.edit-activity__procurement-quarter-metric strong {
+  align-items: center;
+  color: var(--color-text-primary);
+  display: inline-flex;
+  font-size: 0.8rem;
+  font-weight: var(--font-weight-semibold);
+  gap: 0.35rem;
+  justify-content: center;
+  min-width: 0;
+}
+
+.edit-activity__procurement-quarter-metric strong i {
+  background: currentColor;
+  display: inline-block;
+  height: 0.85rem;
+  opacity: 0.35;
+  width: 1px;
+}
+
+.edit-activity__procurement-quarter-metric .currency-display {
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.edit-activity__procurement-quarter-metric .currency-display svg {
+  height: 0.78rem;
+  width: 0.78rem;
+}
+
+.edit-activity__procurement-quarter-metric--tender {
+  background: color-mix(in srgb, var(--color-primary-light) 72%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-primary) 22%, var(--color-border));
+  color: var(--color-primary);
+}
+
+.edit-activity__procurement-quarter-metric--tender strong {
+  color: var(--color-primary);
+}
+
+.edit-activity__procurement-quarter-metric--estimated {
+  background: color-mix(in srgb, var(--color-success-light) 72%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-success) 22%, var(--color-border));
+  color: var(--color-success);
+}
+
+.edit-activity__procurement-quarter-metric--estimated strong {
+  color: var(--color-success);
+}
+
+.edit-activity__procurement-quarter-metric--expected {
+  background: color-mix(in srgb, var(--color-info-light) 72%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-info) 22%, var(--color-border));
+  color: var(--color-info);
+}
+
+.edit-activity__procurement-quarter-metric--expected strong {
+  color: var(--color-info);
+}
+
+.edit-activity__procurement-quarter-body {
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  border-radius: 0 0 0.95rem 0.95rem;
+  padding: 0.75rem;
+}
+
+.edit-activity__procurement-quarter-scroll,
+.edit-activity__procurement-list-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  padding-bottom: 0.18rem;
+  scrollbar-color: color-mix(in srgb, var(--color-primary) 20%, var(--color-border)) transparent;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.edit-activity__procurement-quarter-scroll::-webkit-scrollbar,
+.edit-activity__procurement-list-scroll::-webkit-scrollbar {
+  height: 0.38rem;
+}
+
+.edit-activity__procurement-quarter-scroll::-webkit-scrollbar-track,
+.edit-activity__procurement-list-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.edit-activity__procurement-quarter-scroll::-webkit-scrollbar-thumb,
+.edit-activity__procurement-list-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-primary) 18%, var(--color-border));
+  border-radius: 999px;
+}
+
+.edit-activity__procurement-quarter-table {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 0.85rem;
+  min-width: 112rem;
+  overflow: hidden;
+}
+
+.edit-activity__procurement-quarter-row {
+  align-items: center;
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns:
+    minmax(12rem, 1.15fr)
+    minmax(7.2rem, 0.72fr)
+    minmax(7rem, 0.7fr)
+    minmax(9rem, 0.82fr)
+    minmax(8.2rem, 0.78fr)
+    minmax(9.2rem, 0.88fr)
+    minmax(11rem, 0.95fr)
+    minmax(10.5rem, 0.92fr)
+    minmax(9.5rem, 0.82fr)
+    minmax(9.5rem, 0.82fr)
+    minmax(4.8rem, 0.42fr);
+  padding: 0.72rem 0.75rem;
+}
+
+.edit-activity__procurement-quarter-row:not(.edit-activity__procurement-quarter-row--head) {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.edit-activity__procurement-quarter-row:not(.edit-activity__procurement-quarter-row--head):last-child {
+  border-bottom: 0;
+}
+
+.edit-activity__procurement-quarter-row:not(.edit-activity__procurement-quarter-row--head):hover {
+  background: color-mix(in srgb, var(--color-primary) 3%, var(--color-surface));
+}
+
+.edit-activity__procurement-quarter-row--head {
+  background: color-mix(in srgb, var(--color-primary) 3%, var(--color-surface));
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 0.7rem !important;
+  font-weight: var(--font-weight-medium) !important;
+  letter-spacing: 0 !important;
+  line-height: 1.25;
+  padding: 0.62rem 0.75rem;
+}
+
+.edit-activity__procurement-quarter-cell {
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  line-height: 1.3;
+  min-width: 0;
+}
+
+.edit-activity__procurement-quarter-cell--name {
+  color: var(--color-primary);
+}
+
+.edit-activity__procurement-quarter-cell--currency .currency-display {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-regular);
+  white-space: nowrap;
+}
+
+.edit-activity__procurement-quarter-cell--currency .currency-display svg {
+  height: 0.78rem;
+  width: 0.78rem;
+}
+
+.edit-activity__procurement-quarter-cell--actions {
+  justify-self: start;
+}
+
+.edit-activity__procurement-list-grid {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 0.85rem;
+  display: grid;
+  min-width: 120rem;
+  overflow: hidden;
+}
+
+.edit-activity__procurement-list-row {
+  align-items: center;
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns:
+    minmax(12rem, 1.12fr)
+    minmax(6.2rem, 0.48fr)
+    minmax(7.2rem, 0.62fr)
+    minmax(7rem, 0.6fr)
+    minmax(9rem, 0.76fr)
+    minmax(8.2rem, 0.7fr)
+    minmax(9.2rem, 0.78fr)
+    minmax(11rem, 0.9fr)
+    minmax(10.5rem, 0.86fr)
+    minmax(9.5rem, 0.76fr)
+    minmax(9.5rem, 0.76fr)
+    5.4rem;
+  justify-items: start;
+  min-width: 0;
+  padding: 0.55rem 0.7rem;
+  transition: background-color 160ms ease;
+}
+
+.edit-activity__procurement-list-row + .edit-activity__procurement-list-row {
+  border-top: 1px solid var(--color-border);
+}
+
+.edit-activity__procurement-list-row--header {
+  background: var(--color-surface-secondary);
+  color: var(--color-text-secondary);
+  font-size: 0.66rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0;
+  line-height: 1.2;
+  user-select: none;
+}
+
+.edit-activity__procurement-list-row:not(.edit-activity__procurement-list-row--header):hover {
+  background: color-mix(in srgb, var(--color-primary) 5%, transparent);
+}
+
+.edit-activity__procurement-list-cell {
+  align-items: center;
+  color: var(--color-text-secondary);
+  display: flex;
+  font-size: 0.76rem;
+  font-weight: var(--font-weight-regular);
+  line-height: 1.35;
+  min-width: 0;
+  width: 100%;
+}
+
+.edit-activity__procurement-list-row--header .edit-activity__procurement-list-cell {
+  color: var(--color-text-secondary);
+  font-size: 0.66rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.edit-activity__procurement-list-cell--name {
+  min-width: 0;
+}
+
+.edit-activity__procurement-list-cell--quarter,
+.edit-activity__procurement-list-cell--currency {
+  white-space: nowrap;
+}
+
+.edit-activity__procurement-list-cell--currency .currency-display {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-regular);
+  white-space: nowrap;
+}
+
+.edit-activity__procurement-list-cell--currency .currency-display svg {
+  height: 0.78rem;
+  width: 0.78rem;
+}
+
+.edit-activity__procurement-list-cell--actions {
+  justify-content: flex-end;
+  justify-self: end;
+}
+
+.edit-activity__procurement-list-name-btn {
+  background: transparent;
+  border: 0;
+  color: var(--color-primary);
+  cursor: pointer;
+  display: block;
+  font: inherit;
+  font-size: 0.76rem !important;
+  font-weight: var(--font-weight-medium) !important;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  text-align: left;
+  transition: color 160ms ease;
+}
+
+.edit-activity__procurement-list-name-btn:hover {
+  color: var(--color-primary-hover);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.12rem;
+}
+
+.edit-activity__procurement-list-name-btn:focus-visible {
+  border-radius: 0.35rem;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent);
+  outline: none;
+}
+
+.edit-activity__procurement-capsule {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.68rem;
+  font-weight: var(--font-weight-medium);
+  line-height: 1.15;
+  min-height: 1.35rem;
+  padding: 0.18rem 0.55rem;
+  white-space: nowrap;
+}
+
+.edit-activity__procurement-capsule--neutral {
+  background: var(--color-neutral-soft);
+  color: var(--color-text-secondary);
+}
+
+.edit-activity__procurement-capsule--info {
+  background: var(--color-info-soft);
+  color: var(--color-info);
+}
+
+.edit-activity__procurement-capsule--warning {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
+.edit-activity__procurement-capsule--success {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.edit-activity__procurement-capsule--error {
+  background: var(--color-error-soft);
+  color: var(--color-error);
+}
+
+@media (max-width: 1120px) {
+  .edit-activity__procurement-quarter-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .edit-activity__procurement-quarter-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .edit-activity__procurement-quarter-metrics {
+    grid-template-columns: 1fr;
+  }
+}
+
+.edit-activity__procurement-quarter-empty,
+.edit-activity__procurement-list-placeholder {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 0.32rem;
+  min-height: 7rem;
+  padding: 1rem;
+  text-align: center;
+}
+
+.edit-activity__procurement-list-placeholder {
+  border: 1px solid var(--color-border);
+  border-radius: 0.95rem;
+}
+
+.edit-activity__procurement-quarter-empty strong,
+.edit-activity__procurement-list-placeholder h3 {
+  color: var(--color-text-primary);
+  font-size: 0.8rem !important;
+  font-weight: var(--font-weight-medium) !important;
+  line-height: 1.25;
+  margin: 0;
+}
+
+.edit-activity__procurement-quarter-empty span,
+.edit-activity__procurement-list-placeholder p {
+  font-size: 0.7rem !important;
+  line-height: 1.32;
+  margin: 0;
+  max-width: 18rem;
+}
+
 .edit-activity__procurement .data-grid,
 .edit-activity__engagement .data-grid,
 .edit-activity__milestones .data-grid {
@@ -5075,6 +5526,333 @@
 /* 2-column layout for procurement status radios */
 .create-activity__radio--status .radio-group__options {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* Procurement drawer aligned with milestone drawer */
+.side-drawer__panel:has(.edit-activity__procurement-drawer) {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: -10px 0 34px rgba(15, 23, 42, 0.1);
+  width: min(35rem, calc(100vw - 1.5rem));
+}
+
+.side-drawer__panel:has(.edit-activity__procurement-drawer) .side-drawer__header {
+  padding: 0.85rem 1rem;
+}
+
+.side-drawer__panel:has(.edit-activity__procurement-drawer) .side-drawer__header::after {
+  display: none;
+}
+
+.side-drawer__panel:has(.edit-activity__procurement-drawer) .side-drawer__header h2 {
+  font-size: 0.9rem !important;
+  font-weight: var(--font-weight-semibold) !important;
+  line-height: 1.2;
+}
+
+.side-drawer__panel:has(.edit-activity__procurement-drawer) .side-drawer__body {
+  padding: 0.9rem;
+}
+
+.side-drawer__panel:has(.edit-activity__procurement-drawer) .side-drawer__footer {
+  padding: 0.75rem 0.9rem;
+}
+
+.edit-activity__procurement-drawer-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 0.85rem;
+  box-shadow: none;
+  display: grid;
+  overflow: hidden;
+}
+
+.edit-activity__procurement-drawer-header {
+  border-radius: 0;
+  padding: 0.85rem 0.95rem;
+}
+
+.edit-activity__procurement-drawer-header .create-activity__section-header-inner > div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.edit-activity__procurement-drawer-header h2 {
+  color: var(--color-text-primary);
+  font-size: 0.9rem !important;
+  font-weight: var(--font-weight-semibold) !important;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.edit-activity__procurement-drawer-header p {
+  color: var(--color-text-secondary);
+  font-size: 0.72rem !important;
+  font-weight: var(--font-weight-regular) !important;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.edit-activity__procurement-drawer-section {
+  display: grid;
+  gap: 0.68rem;
+  padding: 0.85rem 0.95rem 0.95rem;
+}
+
+.edit-activity__procurement-drawer-section .field,
+.edit-activity__procurement-drawer-section .select-field,
+.edit-activity__procurement-drawer-section .radio-group {
+  gap: 0.22rem;
+}
+
+.edit-activity__procurement-drawer-section .field__label,
+.edit-activity__procurement-drawer-section .select-field__label,
+.edit-activity__procurement-drawer-section .radio-group > .field__label {
+  color: var(--color-text-secondary);
+  font-size: 0.7rem !important;
+  font-weight: var(--font-weight-medium) !important;
+  letter-spacing: 0;
+  line-height: 1.25;
+  text-transform: none;
+}
+
+.edit-activity__procurement-drawer-section .field__required {
+  font-weight: var(--font-weight-medium) !important;
+}
+
+.edit-activity__procurement-drawer-section .field__control,
+.edit-activity__procurement-drawer-section .select-field__control,
+.edit-activity__procurement-drawer-section .date-picker__trigger {
+  font-size: 0.76rem !important;
+  font-weight: var(--font-weight-regular) !important;
+  min-height: 2.15rem;
+  padding: 0 0.6rem;
+}
+
+.edit-activity__procurement-drawer-section .field__control--textarea {
+  font-size: 0.76rem !important;
+  line-height: 1.45;
+  min-height: 5.2rem;
+  padding: 0.55rem 0.6rem;
+}
+
+.edit-activity__procurement-drawer-section .radio-group__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.edit-activity__procurement-drawer-section .radio-group .choice {
+  background: var(--control-bg);
+  border-color: var(--control-border);
+  border-radius: 0.68rem;
+  box-shadow: none;
+  flex: 0 0 auto;
+  font-size: 0.76rem !important;
+  min-height: 2.05rem;
+  padding: 0.34rem 0.62rem;
+  transform: none;
+  width: auto;
+}
+
+.edit-activity__procurement-drawer-section .radio-group .choice:hover,
+.edit-activity__procurement-drawer-section .radio-group .choice:not(:has(input:checked)):hover {
+  background: #ebefff;
+  border-color: var(--color-primary-border);
+  box-shadow: none;
+  transform: none;
+}
+
+.edit-activity__procurement-drawer-section .choice__copy,
+.edit-activity__procurement-drawer-section .choice__copy > span,
+.edit-activity__procurement-drawer-section .choice__copy span {
+  color: var(--color-text-primary);
+  font-size: 0.76rem !important;
+  font-weight: var(--font-weight-regular) !important;
+  line-height: 1.25;
+}
+
+.edit-activity__procurement-drawer-section .choice:has(input:checked) .choice__copy,
+.edit-activity__procurement-drawer-section .choice:has(input:checked) .choice__copy > span {
+  color: var(--color-primary);
+  font-weight: var(--font-weight-medium) !important;
+}
+
+.edit-activity__procurement-drawer-section .create-activity__date-range {
+  gap: 0.45rem;
+}
+
+.edit-activity__procurement-drawer-section .edit-activity__file-upload {
+  background: var(--control-bg);
+  border-color: var(--control-border);
+  border-radius: 0.68rem;
+  box-shadow: none;
+  min-height: 3.35rem;
+  padding: 0.65rem;
+  transform: none;
+}
+
+.edit-activity__procurement-drawer-section .edit-activity__file-upload:hover:not(:disabled) {
+  background: var(--control-bg-hover);
+  border-color: var(--control-border-hover);
+  box-shadow: none;
+  transform: none;
+}
+
+.edit-activity__procurement-drawer-section .edit-activity__file-upload-icon {
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
+  border-radius: 0.58rem;
+  height: 2.15rem;
+  width: 2.15rem;
+}
+
+.edit-activity__procurement-drawer-section .edit-activity__file-upload-copy strong {
+  font-size: 0.78rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.edit-activity__procurement-drawer-section .edit-activity__file-upload-copy span,
+.edit-activity__procurement-drawer-section .edit-activity__file-upload-action {
+  font-size: 0.72rem;
+}
+
+.edit-activity__procurement-drawer-section .edit-activity__file-upload-action {
+  background: var(--color-surface-muted);
+  border-radius: 999px;
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+  min-height: 1.7rem;
+  padding: 0 0.62rem;
+}
+
+.edit-activity__procurement-drawer-section .edit-activity__file-upload-meta {
+  align-items: center;
+  background: color-mix(in srgb, var(--color-primary) 2%, var(--color-surface));
+  border-color: var(--color-border);
+  border-radius: 0.68rem;
+  box-shadow: none;
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-top: 0.5rem;
+  padding: 0.55rem 0.65rem;
+}
+
+.edit-activity__procurement-drawer-section .edit-activity__file-upload-file strong {
+  font-size: 0.76rem;
+  font-weight: var(--font-weight-medium);
+}
+
+.edit-activity__procurement-drawer-section .edit-activity__file-upload-file span {
+  font-size: 0.7rem;
+}
+
+.edit-activity__procurement-drawer-actions {
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.edit-activity__procurement-drawer-button.button {
+  border-radius: 0.68rem;
+  font-size: 0.78rem !important;
+  font-weight: var(--font-weight-semibold) !important;
+  min-height: 2.05rem;
+  padding: 0.34rem 0.7rem;
+}
+
+.edit-activity__procurement-drawer-readonly {
+  background: transparent;
+  border-top: 0;
+  border-radius: 0;
+  padding: 0.8rem 0.9rem 0.95rem;
+}
+
+.edit-activity__procurement-drawer-readonly .create-activity__readonly-grid {
+  gap: 0.55rem;
+}
+
+.edit-activity__procurement-drawer-readonly .create-activity__readonly-item,
+.edit-activity__procurement-drawer-readonly .create-activity__readonly-item--narrative,
+.edit-activity__procurement-drawer-readonly .create-activity__readonly-item--requirement,
+.edit-activity__procurement-drawer-readonly .create-activity__readonly-item--date,
+.edit-activity__procurement-drawer-readonly .create-activity__readonly-item--identity,
+.edit-activity__procurement-drawer-readonly .create-activity__readonly-item--organization,
+.edit-activity__procurement-drawer-readonly .create-activity__readonly-item--classification,
+.edit-activity__procurement-drawer-readonly .create-activity__readonly-item--person {
+  background: color-mix(in srgb, var(--color-primary) 2%, var(--color-surface));
+  border: 1px solid var(--color-border);
+  border-radius: 0.72rem;
+  box-shadow: none;
+  min-height: 0;
+  padding: 0.58rem 0.65rem;
+  transform: none;
+}
+
+.edit-activity__procurement-drawer-readonly .create-activity__readonly-item:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 18%, var(--color-border));
+  box-shadow: none;
+  transform: none;
+}
+
+.edit-activity__procurement-drawer-readonly .create-activity__readonly-item dt {
+  color: var(--color-text-secondary);
+  font-size: 0.66rem !important;
+  font-weight: var(--font-weight-medium) !important;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.edit-activity__procurement-drawer-readonly .create-activity__readonly-item dd {
+  color: var(--color-text-primary);
+  font-size: 0.76rem !important;
+  font-weight: var(--font-weight-medium) !important;
+  line-height: 1.4;
+}
+
+.edit-activity__procurement-drawer-readonly .create-activity__readonly-item--narrative dd {
+  font-weight: var(--font-weight-regular) !important;
+  line-height: 1.5;
+}
+
+:root[data-theme='dark'] .side-drawer__panel:has(.edit-activity__procurement-drawer) {
+  background: var(--color-surface);
+  box-shadow: -10px 0 42px rgba(0, 0, 0, 0.34);
+}
+
+:root[data-theme='dark'] .edit-activity__procurement-drawer-section .radio-group .choice:hover,
+:root[data-theme='dark'] .edit-activity__procurement-drawer-section .radio-group .choice:not(:has(input:checked)):hover {
+  background: color-mix(in srgb, var(--color-primary) 16%, var(--color-surface-secondary));
+}
+
+:root[data-theme='dark'] .edit-activity__procurement-drawer-readonly .create-activity__readonly-item,
+:root[data-theme='dark'] .edit-activity__procurement-drawer-readonly .create-activity__readonly-item--narrative,
+:root[data-theme='dark'] .edit-activity__procurement-drawer-readonly .create-activity__readonly-item--requirement,
+:root[data-theme='dark'] .edit-activity__procurement-drawer-readonly .create-activity__readonly-item--date,
+:root[data-theme='dark'] .edit-activity__procurement-drawer-readonly .create-activity__readonly-item--identity,
+:root[data-theme='dark'] .edit-activity__procurement-drawer-readonly .create-activity__readonly-item--organization,
+:root[data-theme='dark'] .edit-activity__procurement-drawer-readonly .create-activity__readonly-item--classification,
+:root[data-theme='dark'] .edit-activity__procurement-drawer-readonly .create-activity__readonly-item--person {
+  background: color-mix(in srgb, var(--color-primary) 5%, var(--color-surface));
+  border-color: var(--color-border);
+}
+
+@media (max-width: 560px) {
+  .side-drawer__panel:has(.edit-activity__procurement-drawer) {
+    border-radius: 0.75rem;
+    height: calc(100% - 1rem);
+    max-width: calc(100vw - 1rem);
+    right: 0.5rem;
+    top: 0.5rem;
+    width: calc(100vw - 1rem);
+  }
+
+  .edit-activity__procurement-drawer-actions {
+    flex-direction: column-reverse;
+  }
+
+  .edit-activity__procurement-drawer-button.button {
+    width: 100%;
+  }
 }
 
 /* DataGrid within procurement uses same styles as deps table */
@@ -9686,6 +10464,124 @@
   overflow-x: visible;
 }
 
+.side-drawer__panel:has(.edit-activity__procurement-drawer) .edit-activity__drawer-tabs {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+  gap: 1rem;
+  padding: 0;
+}
+
+.side-drawer__panel:has(.edit-activity__procurement-drawer) .edit-activity__drawer-tab {
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--color-text-secondary);
+  font-size: 0.74rem !important;
+  font-weight: var(--font-weight-medium) !important;
+  min-height: 2rem;
+  min-width: 0;
+  padding: 0 0 0.45rem;
+}
+
+.side-drawer__panel:has(.edit-activity__procurement-drawer) .edit-activity__drawer-tab--active {
+  background: transparent;
+  box-shadow: inset 0 -2px 0 var(--color-primary);
+  color: var(--color-primary);
+}
+
+.side-drawer__panel:has(.edit-activity__procurement-drawer) .edit-activity__record-logs-grid {
+  overflow-x: visible;
+}
+
+.edit-activity__procurement-drawer-section .radio-group__options {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.42rem;
+  margin-top: 0.38rem;
+}
+
+.edit-activity__procurement-drawer-section .radio-group .choice,
+.edit-activity__procurement-drawer-section .radio-group .choice:has(input:checked):not(:has(input:disabled)) {
+  --choice-accent: #286cff !important;
+  --choice-accent-border: #b8d2ff !important;
+  --choice-accent-soft: #edf4ff !important;
+  --choice-focus-ring: rgb(40 108 255 / 22%) !important;
+  align-items: center;
+  background: var(--color-surface) !important;
+  border: 1px solid var(--control-border) !important;
+  border-radius: 0.62rem;
+  box-shadow: none !important;
+  flex: 0 1 auto;
+  gap: 0.55rem;
+  max-width: 100%;
+  min-height: 2.35rem;
+  padding: 0.5rem 0.6rem;
+  transform: none !important;
+  width: fit-content;
+}
+
+.edit-activity__procurement-drawer-section .radio-group .choice:not(:has(input:checked)):not(:has(input:disabled)):hover,
+.edit-activity__procurement-drawer-section .radio-group .choice:not(:has(input:checked)):hover {
+  background: var(--choice-accent-soft) !important;
+  border-color: var(--choice-accent) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.edit-activity__procurement-drawer-section .radio-group .choice:has(input:checked) {
+  background: var(--choice-accent-soft) !important;
+  border-color: var(--choice-accent) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.edit-activity__procurement-drawer-section .radio-group .choice__copy {
+  max-width: min(32rem, 100%);
+  min-width: 0;
+  width: max-content;
+}
+
+.edit-activity__procurement-drawer-section .radio-group .choice__copy > span,
+.edit-activity__procurement-drawer-section .radio-group .choice__copy span {
+  color: var(--color-text-primary);
+  font-size: 0.74rem !important;
+  font-weight: var(--font-weight-regular) !important;
+  line-height: 1.25;
+}
+
+.edit-activity__procurement-drawer-section .radio-group > .field__label {
+  color: var(--color-text-secondary);
+  font-size: 0.74rem !important;
+  font-weight: var(--font-weight-regular) !important;
+  letter-spacing: 0 !important;
+  line-height: 1.3;
+}
+
+.edit-activity__procurement-drawer-section .choice__box {
+  flex-shrink: 0;
+}
+
+:root[data-theme='dark'] .edit-activity__procurement-drawer-section .radio-group .choice,
+:root[data-theme='dark'] .edit-activity__procurement-drawer-section .radio-group .choice:has(input:checked):not(:has(input:disabled)) {
+  --choice-accent: #5a95ff !important;
+  --choice-accent-border: rgb(90 149 255 / 48%) !important;
+  --choice-accent-soft: rgb(40 108 255 / 18%) !important;
+  --choice-focus-ring: rgb(90 149 255 / 26%) !important;
+  background: var(--color-surface) !important;
+  border-color: var(--control-border) !important;
+}
+
+:root[data-theme='dark'] .edit-activity__procurement-drawer-section .radio-group .choice:not(:has(input:checked)):not(:has(input:disabled)):hover,
+:root[data-theme='dark'] .edit-activity__procurement-drawer-section .radio-group .choice:not(:has(input:checked)):hover,
+:root[data-theme='dark'] .edit-activity__procurement-drawer-section .radio-group .choice:has(input:checked) {
+  background: var(--choice-accent-soft) !important;
+  border-color: var(--choice-accent) !important;
+  box-shadow: none !important;
+}
+
 :root[data-theme='dark'] .edit-activity__milestone-quarter-summary,
 :root[data-theme='dark'] .edit-activity__milestone-quarter-body .edit-activity__milestone-card {
   background: var(--color-surface);
@@ -9916,18 +10812,6 @@
 
 .edit-activity__milestone-progress--actual .edit-activity__milestone-progress-meta strong {
   color: var(--color-success);
-}
-
-:root[data-theme='dark'] .edit-activity__milestone-quarter-metric--primary {
-  background: color-mix(in srgb, var(--color-primary) 20%, var(--color-surface)) !important;
-}
-
-:root[data-theme='dark'] .edit-activity__milestone-quarter-metric--warning {
-  background: color-mix(in srgb, var(--color-warning) 18%, var(--color-surface)) !important;
-}
-
-:root[data-theme='dark'] .edit-activity__milestone-quarter-metric--success {
-  background: color-mix(in srgb, var(--color-success) 16%, var(--color-surface)) !important;
 }
 
 @media (max-width: 900px) {

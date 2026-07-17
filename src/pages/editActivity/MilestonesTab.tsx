@@ -283,6 +283,12 @@ function sortMilestonesByEndDate(a: Milestone, b: Milestone) {
   return a.plannedEndDate.localeCompare(b.plannedEndDate) || a.name.localeCompare(b.name)
 }
 
+function getQuarterBadgeClass(quarter: string) {
+  const quarterKey = quarter.replace(/\s+/g, '-').toLowerCase()
+
+  return `edit-activity__milestone-quarter-badge edit-activity__milestone-quarter-badge--${quarterKey}`
+}
+
 type MilestoneReadOnlyKind = 'identity' | 'date' | 'classification' | 'requirement' | 'narrative'
 
 function renderReadOnlyValue(value?: string | number | null) {
@@ -1267,6 +1273,7 @@ export function MilestonesTab({
       <div className={`edit-activity__milestone-list-grid${isAdeoVisible ? '' : ' edit-activity__milestone-list-grid--no-weightage'}`}>
         <div className="edit-activity__milestone-list-row edit-activity__milestone-list-row--header">
           <div className="edit-activity__milestone-list-cell">Name</div>
+          <div className="edit-activity__milestone-list-cell">Quarter</div>
           <div className="edit-activity__milestone-list-cell">Timeline</div>
           {isAdeoVisible ? <div className="edit-activity__milestone-list-cell">Weightage</div> : null}
           <div className="edit-activity__milestone-list-cell">{isExecutionPhase ? 'Actual Progress' : 'Planned Progress'}</div>
@@ -1285,6 +1292,11 @@ export function MilestonesTab({
               >
                 {milestone.name || 'Untitled milestone'}
               </button>
+            </div>
+            <div className="edit-activity__milestone-list-cell edit-activity__milestone-list-cell--quarter" data-label="Quarter">
+              <span className={getQuarterBadgeClass(milestone.quarter)}>
+                {milestone.quarter}
+              </span>
             </div>
             <div className="edit-activity__milestone-list-cell edit-activity__milestone-list-cell--timeline" data-label="Timeline">
               {formatDateDisplay(milestone.plannedStartDate)} → {formatDateDisplay(milestone.plannedEndDate)}

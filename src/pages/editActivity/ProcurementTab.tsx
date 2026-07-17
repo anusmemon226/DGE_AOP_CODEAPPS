@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
-import { FileText, LockKeyhole, Upload, X } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronUp, FileText, LayoutGrid, List, LockKeyhole, Plus, Upload, X } from 'lucide-react'
 import {
   Badge,
   Button,
   ConfirmationDialog,
+  CurrencyDisplay,
   CurrencyInput,
   DatePicker,
   Input,
@@ -238,6 +239,8 @@ const CATEGORY_CODES: Record<string, string> = {
 }
 
 // ── Status capsule helpers ──
+
+const PROCUREMENT_QUARTERS = ['Quarter 1', 'Quarter 2', 'Quarter 3', 'Quarter 4'] as const
 
 const STATUS_TONES: Record<string, 'neutral' | 'info' | 'success' | 'warning'> = {
   '17': 'neutral',  // Not Floated
@@ -853,6 +856,8 @@ export function ProcurementTab({
   const [isDeletingProcurement, setIsDeletingProcurement] = useState(false)
   const [localProjectRelatedChanges, setLocalProjectRelatedChanges] = useState<{ projectId: string; value: string } | null>(null)
   const [procurementError, setProcurementError] = useState('')
+  const [viewMode, setViewMode] = useState<'quarter' | 'list'>('quarter')
+  const [expandedProcurementQuarter, setExpandedProcurementQuarter] = useState<string | null>(null)
 
   // ── CRUD state ──
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
@@ -1063,6 +1068,44 @@ export function ProcurementTab({
     if (isExecutionTenderRequired && executionForm.tenderType === '2') return PROCUREMENT_STATUS_YES_NOT_RAISED
     return []
   }, [executionForm.tenderRequired, executionForm.tenderType, isExecutionTenderRequired])
+  const procurementsByQuarter = useMemo(() => {
+    const grouped: Record<(typeof PROCUREMENT_QUARTERS)[number], Procurement[]> = {
+      'Quarter 1': [],
+      'Quarter 2': [],
+      'Quarter 3': [],
+      'Quarter 4': [],
+    }
+
+    procurements.forEach((procurement) => {
+      const quarter = getQuarter(procurement.plannedPrCreationDate)
+      if (quarter in grouped) {
+        grouped[quarter as (typeof PROCUREMENT_QUARTERS)[number]].push(procurement)
+      }
+    })
+
+    return grouped
+  }, [procurements])
+  const procurementQuarterSummaries = useMemo(() => {
+    return PROCUREMENT_QUARTERS.reduce((summaries, quarter) => {
+      const records = procurementsByQuarter[quarter]
+
+      summaries[quarter] = {
+        noTenderCount: records.filter((record) => record.tenderRequired === '0').length,
+        prExpectedValue2026: records.reduce((total, record) => total + (currencyToNumber(record.prExpectedValue2026) ?? 0), 0),
+        tenderCount: records.length,
+        totalEstimatedValue: records.reduce((total, record) => total + (currencyToNumber(record.totalEstimatedValue) ?? 0), 0),
+        yesTenderCount: records.filter((record) => record.tenderRequired === '1').length,
+      }
+
+      return summaries
+    }, {} as Record<(typeof PROCUREMENT_QUARTERS)[number], {
+      noTenderCount: number
+      prExpectedValue2026: number
+      tenderCount: number
+      totalEstimatedValue: number
+      yesTenderCount: number
+    }>)
+  }, [procurementsByQuarter])
 
   // ── DataGrid columns ──
 
@@ -1188,6 +1231,392 @@ export function ProcurementTab({
   ] as const
 
   // ── Helpers ──
+
+  function toggleProcurementQuarter(quarter: string) {
+    setExpandedProcurementQuarter((current) => current === quarter ? null : quarter)
+  }
+
+  function getProcurementCapsuleToneClass(tone: 'neutral' | 'info' | 'warning' | 'success' | 'error') {
+    return `edit-activity__procurement-capsule edit-activity__procurement-capsule--${tone}`
+  }
+
+  function getTenderTypeTone(value: TenderTypeValue) {
+    if (value === '1') return 'success'
+    if (value === '2') return 'warning'
+    return 'neutral'
+  }
+
+  function getProcurementStatusTone(value: string): 'neutral' | 'info' | 'warning' | 'success' | 'error' {
+    switch (value) {
+      case '2':
+      case '7':
+      case '8':
+      case '14':
+      case '15':
+        return 'success'
+      case '1':
+      case '3':
+      case '4':
+      case '16':
+        return 'info'
+      case '5':
+      case '6':
+      case '10':
+      case '13':
+        return 'warning'
+      case '12':
+        return 'error'
+      default:
+        return 'neutral'
+    }
+  }
+
+  function renderProcurementCapsule(label: string, tone: 'neutral' | 'info' | 'warning' | 'success' | 'error') {
+    return (
+      <span className={getProcurementCapsuleToneClass(tone)}>
+        {label}
+      </span>
+    )
+  }
+
+  function renderProcurementQuarterRow(row: Procurement) {
+    const tenderRequiredLabel = row.tenderRequired === '1'
+      ? 'Yes'
+      : row.tenderRequired === '0'
+        ? 'No'
+        : '—'
+    const tenderRequiredTone = row.tenderRequired === '1'
+      ? 'success'
+      : row.tenderRequired === '0'
+        ? 'error'
+        : 'neutral'
+    const tenderTypeLabel = row.tenderType
+      ? getOptionLabel(TENDER_TYPE_OPTIONS, row.tenderType)
+      : '—'
+    const statusLabel = getStatusLabel(row.procurementStatus)
+    const requestTypeLabel = getOptionLabel(REQUEST_TYPE_OPTIONS, row.requestType)
+    const tenderingMethodLabel = getOptionLabel(TENDERING_METHOD_OPTIONS, row.tenderingMethod)
+
+    return (
+      <div className="edit-activity__procurement-quarter-row" key={row.id}>
+        <div className="edit-activity__procurement-quarter-cell edit-activity__procurement-quarter-cell--name" data-label="Name">
+          <button
+            className="edit-activity__procurement-name-btn"
+            onClick={() => handleOpenEdit(row)}
+            title={`Edit procurement: ${row.procurementName}`}
+            type="button"
+          >
+            <span className="edit-activity__procurement-name">{row.procurementName || 'Untitled procurement'}</span>
+          </button>
+        </div>
+        <div className="edit-activity__procurement-quarter-cell" data-label="Tender Required">
+          {renderProcurementCapsule(tenderRequiredLabel, tenderRequiredTone)}
+        </div>
+        <div className="edit-activity__procurement-quarter-cell" data-label="Tender Type">
+          {row.tenderType ? renderProcurementCapsule(tenderTypeLabel, getTenderTypeTone(row.tenderType)) : <span className="edit-activity__procurement-na">—</span>}
+        </div>
+        <div className="edit-activity__procurement-quarter-cell" data-label="Status">
+          {renderProcurementCapsule(statusLabel, getProcurementStatusTone(row.procurementStatus))}
+        </div>
+        <div className="edit-activity__procurement-quarter-cell" data-label="Request Type">
+          {requestTypeLabel || '—'}
+        </div>
+        <div className="edit-activity__procurement-quarter-cell" data-label="Tendering Method">
+          {tenderingMethodLabel || '—'}
+        </div>
+        <div className="edit-activity__procurement-quarter-cell edit-activity__procurement-quarter-cell--currency" data-label="Total Activity Estimated Value">
+          <CurrencyDisplay value={row.totalEstimatedValue} />
+        </div>
+        <div className="edit-activity__procurement-quarter-cell edit-activity__procurement-quarter-cell--currency" data-label="PR Expected Value in 2026">
+          <CurrencyDisplay value={row.prExpectedValue2026} />
+        </div>
+        <div className="edit-activity__procurement-quarter-cell" data-label="Planned PR Creation Date">
+          {formatDate(row.plannedPrCreationDate) || '—'}
+        </div>
+        <div className="edit-activity__procurement-quarter-cell" data-label="Expected Awarding Date">
+          {formatDate(row.expectedAwardingDate) || '—'}
+        </div>
+        <div className="edit-activity__procurement-quarter-cell edit-activity__procurement-quarter-cell--actions" data-label="Actions">
+          <div className="edit-activity__procurement-actions">
+            <button
+              aria-label="Edit procurement"
+              className="edit-activity__procurement-action-btn"
+              onClick={() => handleOpenEdit(row)}
+              type="button"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+            </button>
+            {!isReadOnly ? (
+              <button
+                aria-label="Delete procurement"
+                className="edit-activity__procurement-action-btn edit-activity__procurement-action-btn--danger"
+                onClick={() => setProcurementToDelete(row)}
+                type="button"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  function renderProcurementListRow(row: Procurement) {
+    const quarter = getQuarter(row.plannedPrCreationDate)
+    const tenderRequiredLabel = row.tenderRequired === '1'
+      ? 'Yes'
+      : row.tenderRequired === '0'
+        ? 'No'
+        : '—'
+    const tenderRequiredTone = row.tenderRequired === '1'
+      ? 'success'
+      : row.tenderRequired === '0'
+        ? 'error'
+        : 'neutral'
+    const tenderTypeLabel = row.tenderType
+      ? getOptionLabel(TENDER_TYPE_OPTIONS, row.tenderType)
+      : '—'
+    const statusLabel = getStatusLabel(row.procurementStatus)
+    const requestTypeLabel = getOptionLabel(REQUEST_TYPE_OPTIONS, row.requestType)
+    const tenderingMethodLabel = getOptionLabel(TENDERING_METHOD_OPTIONS, row.tenderingMethod)
+
+    return (
+      <div className="edit-activity__procurement-list-row" key={row.id}>
+        <div className="edit-activity__procurement-list-cell edit-activity__procurement-list-cell--name" data-label="Name">
+          <button
+            className="edit-activity__procurement-list-name-btn"
+            onClick={() => handleOpenEdit(row)}
+            title={`Edit procurement: ${row.procurementName}`}
+            type="button"
+          >
+            {row.procurementName || 'Untitled procurement'}
+          </button>
+        </div>
+        <div className="edit-activity__procurement-list-cell edit-activity__procurement-list-cell--quarter" data-label="Quarter">
+          {quarter ? renderProcurementCapsule(quarter, 'info') : <span className="edit-activity__procurement-na">—</span>}
+        </div>
+        <div className="edit-activity__procurement-list-cell" data-label="Tender Required">
+          {renderProcurementCapsule(tenderRequiredLabel, tenderRequiredTone)}
+        </div>
+        <div className="edit-activity__procurement-list-cell" data-label="Tender Type">
+          {row.tenderType ? renderProcurementCapsule(tenderTypeLabel, getTenderTypeTone(row.tenderType)) : <span className="edit-activity__procurement-na">—</span>}
+        </div>
+        <div className="edit-activity__procurement-list-cell" data-label="Status">
+          {renderProcurementCapsule(statusLabel, getProcurementStatusTone(row.procurementStatus))}
+        </div>
+        <div className="edit-activity__procurement-list-cell" data-label="Request Type">
+          {requestTypeLabel || '—'}
+        </div>
+        <div className="edit-activity__procurement-list-cell" data-label="Tendering Method">
+          {tenderingMethodLabel || '—'}
+        </div>
+        <div className="edit-activity__procurement-list-cell edit-activity__procurement-list-cell--currency" data-label="Total Activity Estimated Value">
+          <CurrencyDisplay value={row.totalEstimatedValue} />
+        </div>
+        <div className="edit-activity__procurement-list-cell edit-activity__procurement-list-cell--currency" data-label="PR Expected Value in 2026">
+          <CurrencyDisplay value={row.prExpectedValue2026} />
+        </div>
+        <div className="edit-activity__procurement-list-cell" data-label="Planned PR Creation Date">
+          {formatDate(row.plannedPrCreationDate) || '—'}
+        </div>
+        <div className="edit-activity__procurement-list-cell" data-label="Expected Awarding Date">
+          {formatDate(row.expectedAwardingDate) || '—'}
+        </div>
+        <div className="edit-activity__procurement-list-cell edit-activity__procurement-list-cell--actions" data-label="Actions">
+          <div className="edit-activity__procurement-actions">
+            <button
+              aria-label="Edit procurement"
+              className="edit-activity__procurement-action-btn"
+              onClick={() => handleOpenEdit(row)}
+              type="button"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+            </button>
+            {!isReadOnly ? (
+              <button
+                aria-label="Delete procurement"
+                className="edit-activity__procurement-action-btn edit-activity__procurement-action-btn--danger"
+                onClick={() => setProcurementToDelete(row)}
+                type="button"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  function renderProcurementGridForLaterUse() {
+    return (
+      <div className="data-grid">
+        <table>
+          <thead>
+            <tr>
+              {gridColumns.map((col) => (
+                <th key={col.key}>{col.header}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {procurements.map((row) => (
+              <tr key={row.id}>
+                {gridColumns.map((col) => (
+                  <td key={col.key}>{col.render(row)}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
+  function renderProcurementQuarterView() {
+    return (
+      <div className="edit-activity__procurement-quarter-grid">
+        {PROCUREMENT_QUARTERS.map((quarter, index) => {
+          const quarterProcurements = procurementsByQuarter[quarter]
+          const summary = procurementQuarterSummaries[quarter]
+          const isExpanded = expandedProcurementQuarter === quarter
+          const quarterRange = index === 0
+            ? 'Jan - Mar'
+            : index === 1
+              ? 'Apr - Jun'
+              : index === 2
+                ? 'Jul - Sep'
+                : 'Oct - Dec'
+
+          return (
+            <section className={`edit-activity__procurement-quarter${isExpanded ? ' edit-activity__procurement-quarter--expanded' : ''}`} key={quarter}>
+              <button
+                aria-expanded={isExpanded}
+                className="edit-activity__procurement-quarter-summary"
+                onClick={() => toggleProcurementQuarter(quarter)}
+                type="button"
+              >
+                <div className="edit-activity__milestone-quarter-heading">
+                  <span className="edit-activity__milestone-quarter-number">Q{index + 1}</span>
+                  <div>
+                    <h3>{quarter}</h3>
+                    <span className="edit-activity__milestone-quarter-range">
+                      {quarterRange}
+                    </span>
+                  </div>
+                </div>
+                <div className="edit-activity__procurement-quarter-metrics">
+                  <span className="edit-activity__procurement-quarter-metric edit-activity__procurement-quarter-metric--tender">
+                    <strong>
+                      <span>Yes {summary.yesTenderCount}</span>
+                      <i aria-hidden="true" />
+                      <span>No {summary.noTenderCount}</span>
+                    </strong>
+                    Tender Required
+                  </span>
+                  <span className="edit-activity__procurement-quarter-metric edit-activity__procurement-quarter-metric--estimated">
+                    <strong><CurrencyDisplay value={summary.totalEstimatedValue} /></strong>
+                    Total Activity Estimated Value
+                  </span>
+                  <span className="edit-activity__procurement-quarter-metric edit-activity__procurement-quarter-metric--expected">
+                    <strong><CurrencyDisplay value={summary.prExpectedValue2026} /></strong>
+                    PR Expected Value in 2026
+                  </span>
+                </div>
+                <span className="edit-activity__milestone-quarter-toggle" aria-hidden="true">
+                  {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                </span>
+              </button>
+              {isExpanded ? (
+                <div className="edit-activity__procurement-quarter-body">
+                  {quarterProcurements.length > 0 ? (
+                    <div className="edit-activity__procurement-quarter-scroll">
+                      <div className="edit-activity__procurement-quarter-table">
+                        <div className="edit-activity__procurement-quarter-row edit-activity__procurement-quarter-row--head">
+                          <div>Name</div>
+                          <div>Tender Required</div>
+                          <div>Tender Type</div>
+                          <div>Status</div>
+                          <div>Request Type</div>
+                          <div>Tendering Method</div>
+                          <div>Total Activity Estimated Value</div>
+                          <div>PR Expected Value in 2026</div>
+                          <div>Planned PR Creation Date</div>
+                          <div>Expected Awarding Date</div>
+                          <div>Actions</div>
+                        </div>
+                        {quarterProcurements.map(renderProcurementQuarterRow)}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="edit-activity__procurement-quarter-empty">
+                      <FileText size={22} strokeWidth={1.5} color='#286cff'/>
+                      <strong>No procurement records yet</strong>
+                      <span>Add a procurement with a planned PR creation date in this quarter.</span>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </section>
+          )
+        })}
+      </div>
+    )
+  }
+
+  function renderProcurementListView() {
+    const shouldRenderExistingGrid = false
+
+    if (shouldRenderExistingGrid) {
+      return renderProcurementGridForLaterUse()
+    }
+
+    if (procurements.length === 0) {
+      return (
+        <div className="edit-activity__members-empty">
+          <FileText size={40} strokeWidth={1.2} />
+          <h3>No procurement records yet</h3>
+          <p>Add a procurement record to start tracking procurement planning.</p>
+        </div>
+      )
+    }
+
+    return (
+      <div className="edit-activity__procurement-list-scroll">
+        <div className="edit-activity__procurement-list-grid">
+          <div className="edit-activity__procurement-list-row edit-activity__procurement-list-row--header">
+            <div className="edit-activity__procurement-list-cell">Name</div>
+            <div className="edit-activity__procurement-list-cell">Quarter</div>
+            <div className="edit-activity__procurement-list-cell">Tender Required</div>
+            <div className="edit-activity__procurement-list-cell">Tender Type</div>
+            <div className="edit-activity__procurement-list-cell">Status</div>
+            <div className="edit-activity__procurement-list-cell">Request Type</div>
+            <div className="edit-activity__procurement-list-cell">Tendering Method</div>
+            <div className="edit-activity__procurement-list-cell">Total Activity Estimated Value</div>
+            <div className="edit-activity__procurement-list-cell">PR Expected Value in 2026</div>
+            <div className="edit-activity__procurement-list-cell">Planned PR Creation Date</div>
+            <div className="edit-activity__procurement-list-cell">Expected Awarding Date</div>
+            <div className="edit-activity__procurement-list-cell edit-activity__procurement-list-cell--actions">Actions</div>
+          </div>
+
+          {procurements.map(renderProcurementListRow)}
+        </div>
+      </div>
+    )
+  }
 
   function handleFieldChange(fields: Partial<ProcurementFormData>) {
     if (isReadOnly) return
@@ -1701,12 +2130,12 @@ export function ProcurementTab({
     return (
       <SideDrawer
         actions={
-          <div className="edit-activity__procurement-drawer-actions">
-            <Button onClick={handleCloseDrawer} variant="secondary">
+          <div className="edit-activity__procurement-drawer-actions edit-activity__milestones-drawer-actions">
+            <Button className="edit-activity__procurement-drawer-button edit-activity__milestones-drawer-button" onClick={handleCloseDrawer} variant="secondary">
               Cancel
             </Button>
             {!isDrawerLogsTab ? (
-              <Button disabled={!canSaveProcurement || isSavingProcurement} onClick={handleSave}>
+              <Button className="edit-activity__procurement-drawer-button edit-activity__milestones-drawer-button" disabled={!canSaveProcurement || isSavingProcurement} onClick={handleSave}>
                 {isSavingProcurement ? 'Saving...' : editingProcurement ? 'Update Procurement' : 'Create Procurement'}
               </Button>
             ) : null}
@@ -1718,8 +2147,14 @@ export function ProcurementTab({
       >
         <div className="edit-activity__procurement-drawer">
           {isFutureQuarterLocked ? (
-            <div className="create-activity__notice create-activity__notice--warning">
-              This procurement is scheduled for a future quarter. You can review the details now, but execution updates will be enabled when that quarter starts.
+            <div className="edit-activity__milestone-warning" role="status">
+              <span className="edit-activity__milestone-warning-icon" aria-hidden="true">
+                <AlertTriangle size={15} />
+              </span>
+              <div>
+                <strong>Future quarter procurement</strong>
+                <p>This procurement is scheduled for a future quarter. You can review the details now, but execution updates will be enabled when that quarter starts.</p>
+              </div>
             </div>
           ) : null}
 
@@ -1760,12 +2195,13 @@ export function ProcurementTab({
               projectId={projectId}
               recordId={editingProcurement.id}
               recordName={editingProcurement.procurementName}
+              variant="compact"
             />
           ) : (
             <>
           {!isExecutionPhase ? (
-          <div className="edit-activity__procurement-section">
-              <div className="create-activity__section-header">
+          <div className="edit-activity__procurement-section edit-activity__procurement-drawer-card">
+              <div className="create-activity__section-header edit-activity__procurement-drawer-header">
                 <div className="create-activity__section-header-inner">
                   <span className="create-activity__section-header-icon" aria-hidden="true">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -1775,8 +2211,8 @@ export function ProcurementTab({
                     </svg>
                   </span>
                   <div>
-                    <span>Tender Information</span>
                     <h2>Tender & Status</h2>
+                    <p>Set tender requirement, tender type, and procurement status.</p>
                   </div>
                 </div>
               </div>
@@ -1826,8 +2262,8 @@ export function ProcurementTab({
           ) : null}
 
           {isExecutionPhase ? (
-            <div className="edit-activity__procurement-section edit-activity__procurement-section--execution">
-              <div className="create-activity__section-header">
+            <div className="edit-activity__procurement-section edit-activity__procurement-section--execution edit-activity__procurement-drawer-card">
+              <div className="create-activity__section-header edit-activity__procurement-drawer-header">
                 <div className="create-activity__section-header-inner">
                   <span className="create-activity__section-header-icon" aria-hidden="true">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -1837,8 +2273,8 @@ export function ProcurementTab({
                     </svg>
                   </span>
                   <div>
-                    <span>Execution Tracking</span>
                     <h2>Tender & Contract Updates</h2>
+                    <p>Capture procurement execution updates, contract values, stage dates, and supporting evidence.</p>
                   </div>
                 </div>
               </div>
@@ -2018,8 +2454,8 @@ export function ProcurementTab({
           ) : null}
 
           {/* ── Procurement Details ── */}
-          <div className="edit-activity__procurement-section">
-            <div className="create-activity__section-header">
+          <div className="edit-activity__procurement-section edit-activity__procurement-drawer-card">
+            <div className="create-activity__section-header edit-activity__procurement-drawer-header">
               <div className="create-activity__section-header-inner">
                 <span className="create-activity__section-header-icon" aria-hidden="true">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -2029,14 +2465,14 @@ export function ProcurementTab({
                   </svg>
                 </span>
                 <div>
-                  <span>Procurement Details</span>
                   <h2>Procurement Information</h2>
+                  <p>Define procurement details, sourcing method, cost center, category, and outcome.</p>
                 </div>
               </div>
             </div>
 
             {showPlanningReadOnlyView ? (
-              <div className="create-activity__readonly-panel">
+              <div className="create-activity__readonly-panel edit-activity__procurement-drawer-readonly">
                 {renderProcurementReadOnlyDetails([
                   { label: 'Procurement Name', value: form.procurementName, kind: 'identity', columns: 6 },
                   { label: 'Request Type', value: getOptionLabel(REQUEST_TYPE_OPTIONS, form.requestType), kind: 'classification', columns: 6 },
@@ -2190,8 +2626,8 @@ export function ProcurementTab({
           </div>
 
           {/* ── Financial Details ── */}
-          <div className="edit-activity__procurement-section">
-            <div className="create-activity__section-header">
+          <div className="edit-activity__procurement-section edit-activity__procurement-drawer-card">
+            <div className="create-activity__section-header edit-activity__procurement-drawer-header">
               <div className="create-activity__section-header-inner">
                 <span className="create-activity__section-header-icon" aria-hidden="true">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -2201,14 +2637,14 @@ export function ProcurementTab({
                   </svg>
                 </span>
                 <div>
-                  <span>Financial Details</span>
                   <h2>Budget & Timeline</h2>
+                  <p>Maintain estimated values, contract duration, PR creation date, and expected awarding date.</p>
                 </div>
               </div>
             </div>
 
             {showPlanningReadOnlyView ? (
-              <div className="create-activity__readonly-panel">
+              <div className="create-activity__readonly-panel edit-activity__procurement-drawer-readonly">
                 {renderProcurementReadOnlyDetails([
                   { label: 'End User Comments', value: form.endUserComments, type: 'long', kind: 'narrative', columns: 6 },
                   { label: 'Item/Service Description', value: form.itemServiceDescription, type: 'long', kind: 'narrative', columns: 6 },
@@ -2346,20 +2782,34 @@ export function ProcurementTab({
       {/* Header */}
       <div className="edit-activity__members-header">
         <div className="edit-activity__members-header-text">
-          <h2>
-            Procurements
-            <span className="edit-activity__members-count-badge">{procurements.length} Records</span>
-          </h2>
+          <h2>Procurements</h2>
           <p>Manage procurement requests for this activity.</p>
         </div>
-        <Button icon={
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-        } disabled={isReadOnly || !projectId || isProcurementsLoading} onClick={handleOpenCreate}>
-          Add Procurement
-        </Button>
+        <div className="edit-activity__milestone-header-actions">
+          <Button disabled={isReadOnly || !projectId || isProcurementsLoading} icon={<Plus size={15} />} onClick={handleOpenCreate}>
+            Add Procurement
+          </Button>
+          <div className="edit-activity__milestone-view-switch" aria-label="Procurement view switch">
+            <button
+              aria-label="Quarter view"
+              className={`edit-activity__milestone-view-switch-btn ${viewMode === 'quarter' ? 'edit-activity__milestone-view-switch-btn--active' : ''}`}
+              onClick={() => setViewMode('quarter')}
+              title="Quarter view"
+              type="button"
+            >
+              <LayoutGrid size={15} />
+            </button>
+            <button
+              aria-label="List view"
+              className={`edit-activity__milestone-view-switch-btn ${viewMode === 'list' ? 'edit-activity__milestone-view-switch-btn--active' : ''}`}
+              onClick={() => setViewMode('list')}
+              title="List view"
+              type="button"
+            >
+              <List size={15} />
+            </button>
+          </div>
+        </div>
       </div>
 
       {procurementError ? (
@@ -2368,40 +2818,17 @@ export function ProcurementTab({
         </div>
       ) : null}
 
-      {/* Table */}
+      {/* Procurement content */}
       {isProcurementsLoading ? (
         <div className="edit-activity__members-empty">
           <FileText size={40} strokeWidth={1.2} />
           <h3>Loading procurement plans...</h3>
           <p>Fetching procurement records for this activity.</p>
         </div>
-      ) : procurements.length > 0 ? (
-        <div className="data-grid">
-          <table>
-            <thead>
-              <tr>
-                {gridColumns.map((col) => (
-                  <th key={col.key}>{col.header}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {procurements.map((row) => (
-                <tr key={row.id}>
-                  {gridColumns.map((col) => (
-                    <td key={col.key}>{col.render(row)}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      ) : viewMode === 'list' ? (
+        renderProcurementListView()
       ) : (
-        <div className="edit-activity__members-empty">
-          <FileText size={40} strokeWidth={1.2} />
-          <h3>No procurement records yet</h3>
-          <p>Click <strong>Add Procurement</strong> to create a procurement record.</p>
-        </div>
+        renderProcurementQuarterView()
       )}
 
       {/* Create/Edit Drawer */}
