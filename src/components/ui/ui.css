@@ -1162,7 +1162,7 @@
 .checkbox-group .choice:has(input:checked):not(:has(input:disabled)) {
   background: var(--choice-accent-soft, var(--color-primary-soft));
   border-color: var(--choice-accent, var(--color-primary));
-  box-shadow: 0 0 0 3px var(--choice-focus-ring, var(--focus-ring));
+  box-shadow: none;
 }
 
 .radio-group .choice:has(input:checked):not(:has(input:disabled)) .choice__box {
@@ -1209,7 +1209,7 @@
 .choice:has(input:disabled:checked) {
   background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface-muted));
   border-color: color-mix(in srgb, var(--color-primary) 46%, var(--color-border));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 14%, transparent);
+  box-shadow: none;
 }
 
 .radio-group--disabled .choice:has(input:checked) .choice__box,

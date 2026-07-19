@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, ChevronDown, ChevronUp, Edit3, FileText, LayoutGrid, List, LockKeyhole, Plus, Trash2, Upload, X } from 'lucide-react'
+import { AlertTriangle, ChevronDown, ChevronUp, Edit3, FileText, LayoutGrid, List, LockKeyhole, Plus, Sparkles, Trash2, Upload, X } from 'lucide-react'
 import {
   Badge,
   Button,
@@ -38,6 +38,7 @@ type SolicitationChannelValue = '' | '1' | '2' | '3' | '4' | '5'
 type OpexCapexValue = '' | '1' | '2'
 type StrategicPlanValue = '' | '1' | '0'
 type OutcomeValue = '' | '1' | '2'
+type ProcurementQuarterStatus = 'no-procurements' | 'on-track' | 'at-risk' | 'completed'
 
 type Procurement = {
   id: string
@@ -150,8 +151,8 @@ const EMPTY_EXECUTION_FORM: ExecutionProcurementFormData = {
 }
 
 const TENDER_REQUIRED_OPTIONS = [
-  { label: 'Yes', value: '1' },
-  { label: 'No', value: '0' },
+  { className: 'choice--yes', label: 'Yes', value: '1' },
+  { className: 'choice--no', label: 'No', value: '0' },
 ] as const
 
 const TENDER_TYPE_OPTIONS = [
@@ -224,8 +225,8 @@ const OPEX_CAPEX_OPTIONS = [
 ] as const
 
 const STRATEGIC_PLAN_OPTIONS = [
-  { label: 'Yes', value: '1' },
-  { label: 'No', value: '0' },
+  { className: 'choice--yes', label: 'Yes', value: '1' },
+  { className: 'choice--no', label: 'No', value: '0' },
 ] as const
 
 const OUTCOME_OPTIONS = [
@@ -241,6 +242,13 @@ const CATEGORY_CODES: Record<string, string> = {
 // ── Status capsule helpers ──
 
 const PROCUREMENT_QUARTERS = ['Quarter 1', 'Quarter 2', 'Quarter 3', 'Quarter 4'] as const
+
+const PROCUREMENT_QUARTER_STATUS_LABELS: Record<ProcurementQuarterStatus, string> = {
+  'at-risk': 'At risk',
+  completed: 'Completed',
+  'no-procurements': 'No procurements',
+  'on-track': 'On track',
+}
 
 const STATUS_TONES: Record<string, 'neutral' | 'info' | 'success' | 'warning'> = {
   '17': 'neutral',  // Not Floated
@@ -1236,6 +1244,19 @@ export function ProcurementTab({
     setExpandedProcurementQuarter((current) => current === quarter ? null : quarter)
   }
 
+  function getProcurementQuarterStatus(quarterProcurements: Procurement[]): ProcurementQuarterStatus {
+    if (quarterProcurements.length === 0) return 'no-procurements'
+    if (quarterProcurements.every((procurement) => procurement.procurementStatus === '15')) return 'completed'
+    if (quarterProcurements.some((procurement) => ['5', '6', '10', '12', '13'].includes(procurement.procurementStatus))) return 'at-risk'
+
+    return 'on-track'
+  }
+
+  function getProcurementQuarterStatusClass(status: ProcurementQuarterStatus) {
+    if (status === 'no-procurements') return 'no-milestones'
+    return status
+  }
+
   function getProcurementCapsuleToneClass(tone: 'neutral' | 'info' | 'warning' | 'success' | 'error') {
     return `edit-activity__procurement-capsule edit-activity__procurement-capsule--${tone}`
   }
@@ -1481,6 +1502,7 @@ export function ProcurementTab({
           const quarterProcurements = procurementsByQuarter[quarter]
           const summary = procurementQuarterSummaries[quarter]
           const isExpanded = expandedProcurementQuarter === quarter
+          const quarterStatus = getProcurementQuarterStatus(quarterProcurements)
           const quarterRange = index === 0
             ? 'Jan - Mar'
             : index === 1
@@ -1490,46 +1512,85 @@ export function ProcurementTab({
                 : 'Oct - Dec'
 
           return (
-            <section className={`edit-activity__procurement-quarter${isExpanded ? ' edit-activity__procurement-quarter--expanded' : ''}`} key={quarter}>
-              <button
+            <section
+              className={`edit-activity__milestone-quarter edit-activity__procurement-quarter${isExpanded ? ' edit-activity__milestone-quarter--expanded edit-activity__procurement-quarter--expanded' : ''}`}
+              key={quarter}
+            >
+              <div
+                aria-label={`${quarter} procurement summary`}
                 aria-expanded={isExpanded}
-                className="edit-activity__procurement-quarter-summary"
+                className="edit-activity__milestone-quarter-summary edit-activity__procurement-quarter-summary"
                 onClick={() => toggleProcurementQuarter(quarter)}
-                type="button"
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    toggleProcurementQuarter(quarter)
+                  }
+                }}
+                role="button"
+                tabIndex={0}
               >
-                <div className="edit-activity__milestone-quarter-heading">
-                  <span className="edit-activity__milestone-quarter-number">Q{index + 1}</span>
-                  <div>
-                    <h3>{quarter}</h3>
-                    <span className="edit-activity__milestone-quarter-range">
-                      {quarterRange}
+                <div className="edit-activity__milestone-quarter-top">
+                  <div className="edit-activity__milestone-quarter-heading">
+                    <span className="edit-activity__milestone-quarter-number">Q{index + 1}</span>
+                    <div>
+                      <h3>{quarter}</h3>
+                      <span className="edit-activity__milestone-quarter-range">
+                        {quarterRange}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="edit-activity__milestone-quarter-controls">
+                    <span className={`edit-activity__milestone-quarter-status edit-activity__milestone-quarter-status--${getProcurementQuarterStatusClass(quarterStatus)}`}>
+                      {PROCUREMENT_QUARTER_STATUS_LABELS[quarterStatus]}
+                    </span>
+                    <button
+                      aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${quarter}`}
+                      className="edit-activity__milestone-quarter-toggle"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        toggleProcurementQuarter(quarter)
+                      }}
+                      type="button"
+                    >
+                      {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="edit-activity__milestone-quarter-ai-summary">
+                  <div className="edit-activity__milestone-quarter-ai-icon" aria-hidden="true">
+                    <Sparkles size={14} />
+                  </div>
+                  <div className="edit-activity__milestone-quarter-ai-copy">
+                    <span className="edit-activity__milestone-quarter-ai-label">Quarterly AI Summary</span>
+                    <p>AI summary is not available for this quarter yet.</p>
+                  </div>
+                </div>
+
+                <div className="edit-activity__procurement-quarter-insights">
+                  <div className="edit-activity__procurement-quarter-metrics">
+                    <span className="edit-activity__procurement-quarter-metric edit-activity__procurement-quarter-metric--tender">
+                      <small>Tender Required</small>
+                      <strong>
+                        <span>Yes {summary.yesTenderCount}</span>
+                        <i aria-hidden="true" />
+                        <span>No {summary.noTenderCount}</span>
+                      </strong>
+                    </span>
+                    <span className="edit-activity__procurement-quarter-metric edit-activity__procurement-quarter-metric--estimated">
+                      <small>Total Activity Estimated Value</small>
+                      <strong><CurrencyDisplay value={summary.totalEstimatedValue} /></strong>
+                    </span>
+                    <span className="edit-activity__procurement-quarter-metric edit-activity__procurement-quarter-metric--expected">
+                      <small>PR Expected Value in 2026</small>
+                      <strong><CurrencyDisplay value={summary.prExpectedValue2026} /></strong>
                     </span>
                   </div>
                 </div>
-                <div className="edit-activity__procurement-quarter-metrics">
-                  <span className="edit-activity__procurement-quarter-metric edit-activity__procurement-quarter-metric--tender">
-                    <strong>
-                      <span>Yes {summary.yesTenderCount}</span>
-                      <i aria-hidden="true" />
-                      <span>No {summary.noTenderCount}</span>
-                    </strong>
-                    Tender Required
-                  </span>
-                  <span className="edit-activity__procurement-quarter-metric edit-activity__procurement-quarter-metric--estimated">
-                    <strong><CurrencyDisplay value={summary.totalEstimatedValue} /></strong>
-                    Total Activity Estimated Value
-                  </span>
-                  <span className="edit-activity__procurement-quarter-metric edit-activity__procurement-quarter-metric--expected">
-                    <strong><CurrencyDisplay value={summary.prExpectedValue2026} /></strong>
-                    PR Expected Value in 2026
-                  </span>
-                </div>
-                <span className="edit-activity__milestone-quarter-toggle" aria-hidden="true">
-                  {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </span>
-              </button>
+              </div>
               {isExpanded ? (
-                <div className="edit-activity__procurement-quarter-body">
+                <div className="edit-activity__milestone-quarter-body edit-activity__procurement-quarter-body">
                   {quarterProcurements.length > 0 ? (
                     <div className="edit-activity__procurement-quarter-scroll">
                       <div className="edit-activity__procurement-quarter-table">
@@ -1550,8 +1611,8 @@ export function ProcurementTab({
                       </div>
                     </div>
                   ) : (
-                    <div className="edit-activity__procurement-quarter-empty">
-                      <FileText size={22} strokeWidth={1.5} color='#286cff'/>
+                    <div className="edit-activity__milestone-quarter-empty edit-activity__procurement-quarter-empty">
+                      <FileText size={22} strokeWidth={1.5} />
                       <strong>No procurement records yet</strong>
                       <span>Add a procurement with a planned PR creation date in this quarter.</span>
                     </div>

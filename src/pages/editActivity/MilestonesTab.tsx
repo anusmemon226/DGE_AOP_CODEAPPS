@@ -10,6 +10,7 @@ import {
   LayoutGrid,
   List,
   Plus,
+  Sparkles,
   Trash2,
   Upload,
   X,
@@ -57,6 +58,7 @@ import type { EditActivityOperationNotifier } from './types/operationAlert'
 // ── Types ──
 
 type MilestoneStatus = 'not-started' | 'in-progress' | 'completed' | 'delayed' | 'cancelled'
+type QuarterHealthStatus = 'no-milestones' | 'on-track' | 'at-risk' | 'behind' | 'completed'
 type ExecutionMilestoneStatusValue = '1' | '776140001' | '776140002' | '776140003' | '576610001'
 type UploadedFile = {
   file: File
@@ -121,6 +123,14 @@ const MILESTONE_STATUS_LABELS: Record<MilestoneStatus, string> = {
   completed: 'Completed',
   delayed: 'Delayed',
   cancelled: 'Cancelled',
+}
+
+const QUARTER_HEALTH_LABELS: Record<QuarterHealthStatus, string> = {
+  'no-milestones': 'No Milestones',
+  'on-track': 'On Track',
+  'at-risk': 'At Risk',
+  behind: 'Behind',
+  completed: 'Completed',
 }
 
 function formatMilestoneStatusLogValue(value: unknown) {
@@ -1160,10 +1170,25 @@ export function MilestonesTab({
     )
   }
 
+  function getQuarterHealthStatus(
+    quarterMilestones: Milestone[],
+    summary: (typeof quarterSummaries)[(typeof QUARTERS)[number]],
+  ): QuarterHealthStatus {
+    if (quarterMilestones.length === 0) return 'no-milestones'
+    if (quarterMilestones.every((milestone) => milestone.status === 'completed')) return 'completed'
+    if (isExecutionPhase && summary.actualProgress + 10 < summary.plannedProgress) return 'behind'
+    if (summary.dueSoonCount > 0 || quarterMilestones.some((milestone) => milestone.status === 'delayed')) return 'at-risk'
+
+    return 'on-track'
+  }
+
   function renderQuarterCard(quarter: (typeof QUARTERS)[number], index: number) {
     const quarterMilestones = milestonesByQuarter[quarter]
     const summary = quarterSummaries[quarter]
     const isExpanded = expandedQuarter === quarter
+    const quarterHealthStatus = getQuarterHealthStatus(quarterMilestones, summary)
+    const progressLabel = isExecutionPhase ? 'Actual Progress' : 'Planned Progress'
+    const progressValue = isExecutionPhase ? summary.actualProgress : summary.plannedProgress
     const quarterRange = index === 0
       ? 'Jan - Mar'
       : index === 1
@@ -1174,55 +1199,96 @@ export function MilestonesTab({
 
     return (
       <section className={`edit-activity__milestone-quarter${isExpanded ? ' edit-activity__milestone-quarter--expanded' : ''}`} key={quarter}>
-        <button
+        <div
+          aria-label={`${quarter} summary`}
           aria-expanded={isExpanded}
           className="edit-activity__milestone-quarter-summary"
           onClick={() => toggleQuarter(quarter)}
-          type="button"
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              toggleQuarter(quarter)
+            }
+          }}
+          role="button"
+          tabIndex={0}
         >
-          <div className="edit-activity__milestone-quarter-heading">
-            <span className="edit-activity__milestone-quarter-number">Q{index + 1}</span>
-            <div>
-              <h3>{quarter}</h3>
-              <span className="edit-activity__milestone-quarter-range">
-                {quarterRange}
-              </span>
-            </div>
-          </div>
-          <div className="edit-activity__milestone-quarter-metrics">
-            <span className="edit-activity__milestone-quarter-metric edit-activity__milestone-quarter-metric--primary">
-              <strong>{summary.milestoneCount}</strong>
-              Milestones
-            </span>
-            <span className="edit-activity__milestone-quarter-metric edit-activity__milestone-quarter-metric--warning">
-              <strong>{summary.dueSoonCount}</strong>
-              Due Soon
-            </span>
-            {isAdeoVisible ? (
-              <span className="edit-activity__milestone-quarter-metric edit-activity__milestone-quarter-metric--success">
-                <strong>{summary.totalWeightage}%</strong>
-                Weightage
-              </span>
-            ) : null}
-          </div>
-          <div className="edit-activity__milestone-quarter-progress-group">
-            <div className="edit-activity__milestone-quarter-progress">
-              <span>Planned</span>
-              <strong>{Math.round(summary.plannedProgress)}%</strong>
-              <div aria-hidden="true"><i style={{ width: `${summary.plannedProgress}%` }} /></div>
-            </div>
-            {isExecutionPhase ? (
-              <div className="edit-activity__milestone-quarter-progress edit-activity__milestone-quarter-progress--actual">
-                <span>Actual</span>
-                <strong>{Math.round(summary.actualProgress)}%</strong>
-                <div aria-hidden="true"><i style={{ width: `${summary.actualProgress}%` }} /></div>
+          <div className="edit-activity__milestone-quarter-top">
+            <div className="edit-activity__milestone-quarter-heading">
+              <span className="edit-activity__milestone-quarter-number">Q{index + 1}</span>
+              <div>
+                <h3>{quarter}</h3>
+                <span className="edit-activity__milestone-quarter-range">
+                  {quarterRange}
+                </span>
               </div>
-            ) : null}
+            </div>
+            <div className="edit-activity__milestone-quarter-controls">
+              <span className={`edit-activity__milestone-quarter-status edit-activity__milestone-quarter-status--${quarterHealthStatus}`}>
+                {QUARTER_HEALTH_LABELS[quarterHealthStatus]}
+              </span>
+              <button
+                aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${quarter}`}
+                className="edit-activity__milestone-quarter-toggle"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  toggleQuarter(quarter)
+                }}
+                type="button"
+              >
+                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </button>
+            </div>
           </div>
-          <span className="edit-activity__milestone-quarter-toggle" aria-hidden="true">
-            {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-          </span>
-        </button>
+
+          <div className="edit-activity__milestone-quarter-ai-summary">
+            <div className="edit-activity__milestone-quarter-ai-icon" aria-hidden="true">
+              <Sparkles size={14} />
+            </div>
+            <div className="edit-activity__milestone-quarter-ai-copy">
+              <span className="edit-activity__milestone-quarter-ai-label">Quarterly AI Summary</span>
+              <p>AI summary is not available for this quarter yet.</p>
+            </div>
+          </div>
+
+          <div className={`edit-activity__milestone-quarter-insights${isAdeoVisible ? '' : ' edit-activity__milestone-quarter-insights--no-weightage'}`}>
+            <div className="edit-activity__milestone-quarter-metrics">
+              <span className="edit-activity__milestone-quarter-metric">
+                <small>Milestones</small>
+                <strong>{summary.milestoneCount}</strong>
+              </span>
+              <span className="edit-activity__milestone-quarter-metric">
+                <small>Due Soon</small>
+                <strong>{summary.dueSoonCount}</strong>
+              </span>
+              {isAdeoVisible ? (
+                <span className="edit-activity__milestone-quarter-metric">
+                  <small>Weightage</small>
+                  <strong>{summary.totalWeightage}%</strong>
+                </span>
+              ) : null}
+            </div>
+            <div className={`edit-activity__milestone-quarter-progress-layout${isExecutionPhase ? ' edit-activity__milestone-quarter-progress-split' : ''}`}>
+              {isExecutionPhase ? (
+                <div className="edit-activity__milestone-quarter-progress">
+                  <div className="edit-activity__milestone-quarter-progress-meta">
+                    <span>Planned Progress</span>
+                    <strong>{Math.round(summary.plannedProgress)}%</strong>
+                  </div>
+                  <div aria-hidden="true"><i style={{ width: `${summary.plannedProgress}%` }} /></div>
+                </div>
+              ) : null}
+              {isExecutionPhase ? <span className="edit-activity__milestone-quarter-progress-divider" aria-hidden="true" /> : null}
+              <div className={`edit-activity__milestone-quarter-progress${isExecutionPhase ? ' edit-activity__milestone-quarter-progress--actual' : ''}`}>
+                <div className="edit-activity__milestone-quarter-progress-meta">
+                  <span>{progressLabel}</span>
+                  <strong>{Math.round(progressValue)}%</strong>
+                </div>
+                <div aria-hidden="true"><i style={{ width: `${progressValue}%` }} /></div>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {isExpanded ? (
           <div className="edit-activity__milestone-quarter-body">

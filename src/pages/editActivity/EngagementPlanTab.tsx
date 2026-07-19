@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useState } from 'react'
-import { Handshake, LockKeyhole } from 'lucide-react'
+import { ChevronDown, ChevronUp, Edit3, Handshake, LayoutGrid, List, Plus, Sparkles, Trash2 } from 'lucide-react'
 import {
   Badge,
   Button,
@@ -30,6 +30,7 @@ import {
   PUBLISH_STATUS_TONES,
 } from './data/adgesData'
 import { EngagementVisibilityPicker, type SectorDivision } from './components/EngagementVisibilityPicker'
+import { formatDate } from './helpers/sharedHelpers'
 import type { EditActivityOperationNotifier } from './types/operationAlert'
 
 // ── Types ──
@@ -81,6 +82,34 @@ type EngagementFormData = Omit<
   'id' | 'creatorHierarchyId' | 'creatorSectorName' | 'creatorDivisionName' | 'engagementTypeName' | 'engagementSubTypeName' | 'notesByGRTeam'
 >
 type FormErrors = Partial<Record<keyof EngagementFormData, string>>
+type EngagementCapsuleTone = 'neutral' | 'info' | 'warning' | 'success' | 'error'
+type EngagementReadOnlyKind = 'identity' | 'date' | 'classification' | 'requirement' | 'narrative' | 'organization' | 'person'
+type EngagementTimingStatus = 'upcoming' | 'inProgress' | 'completed' | 'unscheduled'
+type EngagementGroupStatus = 'no-engagements' | 'completed' | 'in-progress' | 'upcoming'
+
+type EngagementGroupSummary = {
+  completedCount: number
+  inProgressCount: number
+  nextEngagement: EngagementPlan | null
+  progress: number
+  totalCount: number
+  upcomingCount: number
+}
+
+type EngagementSubTypeGroup = EngagementLookup & EngagementGroupSummary & {
+  records: EngagementPlan[]
+}
+
+type EngagementTypeGroup = EngagementLookup & EngagementGroupSummary & {
+  subTypes: EngagementSubTypeGroup[]
+}
+
+const ENGAGEMENT_GROUP_STATUS_LABELS: Record<EngagementGroupStatus, string> = {
+  completed: 'Completed',
+  'in-progress': 'In progress',
+  'no-engagements': 'No engagements',
+  upcoming: 'Upcoming',
+}
 
 // ── Props ──
 
@@ -200,6 +229,70 @@ function toDateOnly(value?: string | null) {
   return value.includes('T') ? value.split('T')[0] : value
 }
 
+function parseDateOnly(value?: string | null) {
+  const dateOnly = toDateOnly(value)
+  if (!dateOnly) return null
+
+  const [year, month, day] = dateOnly.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function getTodayDateOnly() {
+  const today = new Date()
+  return new Date(today.getFullYear(), today.getMonth(), today.getDate())
+}
+
+function getEngagementTimingStatus(plan: EngagementPlan, today = getTodayDateOnly()): EngagementTimingStatus {
+  const startDate = parseDateOnly(plan.engagementStartDate)
+  const endDate = parseDateOnly(plan.engagementEndDate)
+
+  if (!startDate || !endDate) return 'unscheduled'
+  if (today < startDate) return 'upcoming'
+  if (today > endDate) return 'completed'
+  return 'inProgress'
+}
+
+function getEngagementDateProgress(plan: EngagementPlan, today = getTodayDateOnly()) {
+  const startDate = parseDateOnly(plan.engagementStartDate)
+  const endDate = parseDateOnly(plan.engagementEndDate)
+
+  if (!startDate || !endDate || endDate < startDate) return 0
+  if (today < startDate) return 0
+  if (today > endDate) return 100
+
+  const durationMs = Math.max(1, endDate.getTime() - startDate.getTime())
+  const elapsedMs = today.getTime() - startDate.getTime()
+
+  return Math.min(100, Math.max(0, Math.round((elapsedMs / durationMs) * 100)))
+}
+
+function buildEngagementGroupSummary(records: EngagementPlan[], today = getTodayDateOnly()): EngagementGroupSummary {
+  const timedRecords = records
+    .map((record) => ({
+      progress: getEngagementDateProgress(record, today),
+      record,
+      startDate: parseDateOnly(record.engagementStartDate),
+      status: getEngagementTimingStatus(record, today),
+    }))
+
+  const activeOrUpcoming = timedRecords
+    .filter((item) => item.startDate && (item.status === 'upcoming' || item.status === 'inProgress'))
+    .sort((a, b) => a.startDate!.getTime() - b.startDate!.getTime())
+
+  return {
+    completedCount: timedRecords.filter((item) => item.status === 'completed').length,
+    inProgressCount: timedRecords.filter((item) => item.status === 'inProgress').length,
+    nextEngagement: activeOrUpcoming[0]?.record ?? null,
+    progress: timedRecords.length > 0
+      ? Math.round(timedRecords.reduce((sum, item) => sum + item.progress, 0) / timedRecords.length)
+      : 0,
+    totalCount: records.length,
+    upcomingCount: timedRecords.filter((item) => item.status === 'upcoming').length,
+  }
+}
+
 function toBind(entitySetName: string, id: string) {
   return `/${entitySetName}(${normalizeId(id)})`
 }
@@ -236,6 +329,41 @@ function formatLookupOptions(items: EngagementLookup[], placeholder: string): Se
 
 function getOptionLabel(options: readonly SelectOption<string>[], value: string) {
   return options.find((option) => option.value === value)?.label ?? value
+}
+
+function renderReadOnlyValue(value?: string | number | null) {
+  const text = String(value ?? '').trim()
+  return text || '-'
+}
+
+function renderEngagementReadOnlyDetails(items: Array<{
+  label: string
+  value?: string | number | null
+  type?: 'long'
+  kind?: EngagementReadOnlyKind
+  columns?: 3 | 4 | 6 | 9 | 12
+}>) {
+  return (
+    <dl className="create-activity__readonly-grid create-activity__readonly-grid--3">
+      {items.map((item) => {
+        const kind = item.kind ?? (item.type === 'long' ? 'narrative' : 'identity')
+        const spanClass = item.type === 'long' ? 'create-activity__readonly-item--wide' : ''
+        const columnClass = item.columns ? `create-activity__readonly-item--span-${item.columns}` : ''
+
+        return (
+          <div
+            className={`create-activity__readonly-item create-activity__readonly-item--${kind} ${spanClass} ${columnClass}`.trim()}
+            key={item.label}
+          >
+            <div className="create-activity__readonly-item-content">
+              <dt>{item.label}</dt>
+              <dd>{renderReadOnlyValue(item.value)}</dd>
+            </div>
+          </div>
+        )
+      })}
+    </dl>
+  )
 }
 
 function getAccountName(accounts: Accounts[], id: string) {
@@ -449,6 +577,9 @@ export function EngagementPlanTab({
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [error, setError] = useState('')
+  const [viewMode, setViewMode] = useState<'type' | 'list'>('type')
+  const [expandedEngagementTypeId, setExpandedEngagementTypeId] = useState<string | null>(null)
+  const [expandedEngagementSubTypeId, setExpandedEngagementSubTypeId] = useState<string | null>(null)
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [editingPlan, setEditingPlan] = useState<EngagementPlan | null>(null)
@@ -486,6 +617,31 @@ export function EngagementPlanTab({
   const adgeOptions = useMemo<SelectOption<string>[]>(() => accounts
     .filter((account) => account.accountid && account.name)
     .map((account) => ({ label: account.name, value: account.accountid })), [accounts])
+
+  const engagementTypeGroups = useMemo<EngagementTypeGroup[]>(() => {
+    const today = getTodayDateOnly()
+
+    return engagementTypes.map((type) => {
+      const typeRecords = engagementPlans.filter((plan) => normalizeId(plan.engagementType) === normalizeId(type.id))
+      const subTypes = engagementSubTypes
+        .filter((subType) => normalizeId(subType.parentTypeId) === normalizeId(type.id))
+        .map((subType) => {
+          const records = typeRecords.filter((plan) => normalizeId(plan.engagementSubType) === normalizeId(subType.id))
+
+          return {
+            ...subType,
+            ...buildEngagementGroupSummary(records, today),
+            records,
+          }
+        })
+
+      return {
+        ...type,
+        ...buildEngagementGroupSummary(typeRecords, today),
+        subTypes,
+      }
+    })
+  }, [engagementPlans, engagementSubTypes, engagementTypes])
 
   const loadLookups = useCallback(async () => {
     setIsLookupLoading(true)
@@ -725,6 +881,18 @@ export function EngagementPlanTab({
     },
   ] as const
 
+  function getEngagementCapsuleToneClass(tone: EngagementCapsuleTone) {
+    return `edit-activity__procurement-capsule edit-activity__procurement-capsule--${tone}`
+  }
+
+  function renderEngagementCapsule(label: string, tone: EngagementCapsuleTone) {
+    return (
+      <span className={`${getEngagementCapsuleToneClass(tone)} edit-activity__engagement-list-capsule`}>
+        {label || '-'}
+      </span>
+    )
+  }
+
   function handleFieldChange(fields: Partial<EngagementFormData>) {
     const next = { ...form, ...fields }
 
@@ -954,8 +1122,8 @@ export function EngagementPlanTab({
 
   function renderAutoPopulatedFields() {
     return (
-      <div className="edit-activity__engagement-section">
-        <div className="create-activity__section-header">
+      <div className="edit-activity__procurement-section edit-activity__procurement-drawer-card">
+        <div className="create-activity__section-header edit-activity__procurement-drawer-header">
           <div className="create-activity__section-header-inner">
             <span className="create-activity__section-header-icon" aria-hidden="true">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -965,24 +1133,19 @@ export function EngagementPlanTab({
               </svg>
             </span>
             <div>
-              <span>Activity Information</span>
-              <h2>Auto Populated Fields</h2>
+              <h2>Activity Information</h2>
+              <p>Review the activity context linked to this engagement plan.</p>
             </div>
           </div>
         </div>
-        <div className="edit-activity__engagement-drawer-section">
-          <div className="create-activity__form-row create-activity__form-row--two">
-            <Input disabled label="Sector" required rightIcon={<LockKeyhole size={15} />} value={form.sectorName} />
-            <Input disabled label="Division" required rightIcon={<LockKeyhole size={15} />} value={form.divisionName} />
-          </div>
-          <div className="create-activity__form-row create-activity__form-row--two">
-            <Input disabled label="Activity Name" required rightIcon={<LockKeyhole size={15} />} value={form.activityName} />
-            <Input disabled label="Activity Lead" required rightIcon={<LockKeyhole size={15} />} value={form.activityLeadName} />
-          </div>
-          <div className="field__input-wrap">
-            <Textarea disabled label="Activity Summary" required rows={3} value={form.activitySummary} />
-            <span className="field__right-icon"><LockKeyhole size={15} /></span>
-          </div>
+        <div className="create-activity__readonly-panel edit-activity__procurement-drawer-readonly">
+          {renderEngagementReadOnlyDetails([
+            { label: 'Sector', value: form.sectorName, kind: 'organization', columns: 6 },
+            { label: 'Division', value: form.divisionName, kind: 'organization', columns: 6 },
+            { label: 'Activity Name', value: form.activityName, kind: 'identity', columns: 6 },
+            { label: 'Activity Lead', value: form.activityLeadName, kind: 'person', columns: 6 },
+            { label: 'Activity Summary', value: form.activitySummary, type: 'long', kind: 'narrative', columns: 12 },
+          ])}
         </div>
       </div>
     )
@@ -990,8 +1153,8 @@ export function EngagementPlanTab({
 
   function renderEngagementDetails() {
     return (
-      <div className="edit-activity__engagement-section">
-        <div className="create-activity__section-header">
+      <div className="edit-activity__procurement-section edit-activity__procurement-drawer-card">
+        <div className="create-activity__section-header edit-activity__procurement-drawer-header">
           <div className="create-activity__section-header-inner">
             <span className="create-activity__section-header-icon" aria-hidden="true">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -1001,12 +1164,12 @@ export function EngagementPlanTab({
               </svg>
             </span>
             <div>
-              <span>Engagement Details</span>
               <h2>Engagement Information</h2>
+              <p>Define the engagement name, description, type, and sub-type.</p>
             </div>
           </div>
         </div>
-        <div className="edit-activity__engagement-drawer-section">
+        <div className="edit-activity__procurement-drawer-section">
           <Input
             error={formErrors.engagementName}
             label="Engagement Name"
@@ -1051,8 +1214,8 @@ export function EngagementPlanTab({
 
   function renderEngagementVisibility() {
     return (
-      <div className="edit-activity__engagement-section">
-        <div className="create-activity__section-header">
+      <div className="edit-activity__procurement-section edit-activity__procurement-drawer-card">
+        <div className="create-activity__section-header edit-activity__procurement-drawer-header">
           <div className="create-activity__section-header-inner">
             <span className="create-activity__section-header-icon" aria-hidden="true">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -1062,12 +1225,12 @@ export function EngagementPlanTab({
               </svg>
             </span>
             <div>
-              <span>Engagement Visibility</span>
               <h2>Sectors & Divisions</h2>
+              <p>Select the sectors and divisions that can view this engagement plan.</p>
             </div>
           </div>
         </div>
-        <div className="edit-activity__engagement-drawer-section">
+        <div className="edit-activity__procurement-drawer-section">
           <EngagementVisibilityPicker
             error={formErrors.engagementVisibility}
             label="Engagement Visibility"
@@ -1083,8 +1246,8 @@ export function EngagementPlanTab({
 
   function renderTimelineAndSupport() {
     return (
-      <div className="edit-activity__engagement-section">
-        <div className="create-activity__section-header">
+      <div className="edit-activity__procurement-section edit-activity__procurement-drawer-card">
+        <div className="create-activity__section-header edit-activity__procurement-drawer-header">
           <div className="create-activity__section-header-inner">
             <span className="create-activity__section-header-icon" aria-hidden="true">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -1096,12 +1259,12 @@ export function EngagementPlanTab({
               </svg>
             </span>
             <div>
-              <span>Timeline & Support</span>
               <h2>Engagement Period</h2>
+              <p>Set the engagement dates and GR support notes.</p>
             </div>
           </div>
         </div>
-        <div className="edit-activity__engagement-drawer-section">
+        <div className="edit-activity__procurement-drawer-section">
           <div className="create-activity__date-range">
             <DatePicker
               error={formErrors.engagementStartDate}
@@ -1156,8 +1319,8 @@ export function EngagementPlanTab({
 
   function renderADGEsAndEntities() {
     return (
-      <div className="edit-activity__engagement-section">
-        <div className="create-activity__section-header">
+      <div className="edit-activity__procurement-section edit-activity__procurement-drawer-card">
+        <div className="create-activity__section-header edit-activity__procurement-drawer-header">
           <div className="create-activity__section-header-inner">
             <span className="create-activity__section-header-icon" aria-hidden="true">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -1169,12 +1332,12 @@ export function EngagementPlanTab({
               </svg>
             </span>
             <div>
-              <span>ADGEs & Entities</span>
               <h2>Involvement Details</h2>
+              <p>Capture ADGE, AD company, and federal entity involvement.</p>
             </div>
           </div>
         </div>
-        <div className="edit-activity__engagement-drawer-section">
+        <div className="edit-activity__procurement-drawer-section">
           <RadioGroup
             className="radio-group--adges"
             error={formErrors.adgesInvolved}
@@ -1278,17 +1441,436 @@ export function EngagementPlanTab({
     )
   }
 
+  function renderEngagementGridForLaterUse() {
+    return (
+      <div className="data-grid">
+        <table>
+          <thead>
+            <tr>
+              {gridColumns.map((col) => (
+                <th key={col.key}>{col.header}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {engagementPlans.map((row) => (
+              <tr key={row.id}>
+                {gridColumns.map((col) => (
+                  <td key={col.key}>{col.render(row)}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
+  function toggleEngagementType(typeId: string) {
+    setExpandedEngagementTypeId((current) => {
+      const nextTypeId = current === typeId ? null : typeId
+      if (nextTypeId !== current) {
+        setExpandedEngagementSubTypeId(null)
+      }
+      return nextTypeId
+    })
+  }
+
+  function toggleEngagementSubType(subTypeId: string) {
+    setExpandedEngagementSubTypeId((current) => current === subTypeId ? null : subTypeId)
+  }
+
+  function getEngagementGroupStatus(summary: EngagementGroupSummary): EngagementGroupStatus {
+    if (summary.totalCount === 0) return 'no-engagements'
+    if (summary.completedCount === summary.totalCount) return 'completed'
+    if (summary.inProgressCount > 0) return 'in-progress'
+    return 'upcoming'
+  }
+
+  function getNextEngagementLabel(nextEngagement: EngagementPlan | null) {
+    if (!nextEngagement) return '-'
+
+    const startDate = formatDate(toDateOnly(nextEngagement.engagementStartDate))
+    return `${nextEngagement.engagementName || 'Untitled engagement plan'} - ${startDate || '-'}`
+  }
+
+  function renderNextEngagementLink(nextEngagement: EngagementPlan | null) {
+    return (
+      <div className="edit-activity__engagement-type-next">
+        <span>Next Engagement</span>
+        {nextEngagement ? (
+          <button
+            aria-label={`Open engagement plan: ${nextEngagement.engagementName || 'Untitled engagement plan'}`}
+            className="edit-activity__engagement-type-next-btn"
+            onClick={(event) => {
+              event.stopPropagation()
+              handleOpenEdit(nextEngagement)
+            }}
+            onKeyDown={(event) => {
+              event.stopPropagation()
+            }}
+            title={`Open engagement plan: ${nextEngagement.engagementName || 'Untitled engagement plan'}`}
+            type="button"
+          >
+            {getNextEngagementLabel(nextEngagement)}
+          </button>
+        ) : (
+          <strong>-</strong>
+        )}
+      </div>
+    )
+  }
+
+  function renderEngagementTypeMetric(label: string, value: number, tone: 'total' | 'upcoming' | 'progressing' | 'completed') {
+    return (
+      <span className={`edit-activity__engagement-type-metric edit-activity__engagement-type-metric--${tone}`}>
+        <small>{label}</small>
+        <strong>{value}</strong>
+      </span>
+    )
+  }
+
+  function renderEngagementTypeProgress(summary: EngagementGroupSummary) {
+    return (
+      <div className="edit-activity__milestone-quarter-progress edit-activity__engagement-type-progress">
+        <div className="edit-activity__milestone-quarter-progress-meta edit-activity__engagement-type-progress-meta">
+          <span>Progress</span>
+          <strong>{summary.progress}%</strong>
+        </div>
+        <div aria-hidden="true">
+          <i style={{ width: `${summary.progress}%` }} />
+        </div>
+      </div>
+    )
+  }
+
+  function renderEngagementSummaryCardContent(
+    summary: EngagementGroupSummary,
+    title: string,
+    marker: string,
+    isExpanded: boolean,
+    onToggle: () => void,
+    aiTitle: string,
+    aiText: string,
+    controlsLabel: string,
+  ) {
+    const status = getEngagementGroupStatus(summary)
+
+    return (
+      <>
+        <div className="edit-activity__milestone-quarter-top">
+          <div className="edit-activity__engagement-type-identity">
+            <span className={marker.length <= 2 ? 'edit-activity__milestone-quarter-number' : 'edit-activity__engagement-subtype-marker'}>{marker}</span>
+            <div>
+              <h3>{title}</h3>
+              {renderNextEngagementLink(summary.nextEngagement)}
+            </div>
+          </div>
+          <div className="edit-activity__milestone-quarter-controls">
+            <span className={`edit-activity__milestone-quarter-status edit-activity__engagement-type-status edit-activity__engagement-type-status--${status}`}>
+              {ENGAGEMENT_GROUP_STATUS_LABELS[status]}
+            </span>
+            <button
+              aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${controlsLabel}`}
+              className="edit-activity__milestone-quarter-toggle"
+              onClick={(event) => {
+                event.stopPropagation()
+                onToggle()
+              }}
+              type="button"
+            >
+              {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+          </div>
+        </div>
+
+        <div className="edit-activity__milestone-quarter-ai-summary edit-activity__engagement-type-ai-summary">
+          <div className="edit-activity__milestone-quarter-ai-icon" aria-hidden="true">
+            <Sparkles size={14} />
+          </div>
+          <div className="edit-activity__milestone-quarter-ai-copy">
+            <span className="edit-activity__milestone-quarter-ai-label">{aiTitle}</span>
+            <p>{aiText}</p>
+          </div>
+        </div>
+
+        <div className="edit-activity__milestone-quarter-insights edit-activity__engagement-type-insights">
+          <div className="edit-activity__milestone-quarter-metrics edit-activity__engagement-type-metrics">
+            {renderEngagementTypeMetric('Total', summary.totalCount, 'total')}
+            {renderEngagementTypeMetric('Upcoming', summary.upcomingCount, 'upcoming')}
+            {renderEngagementTypeMetric('In progress', summary.inProgressCount, 'progressing')}
+            {renderEngagementTypeMetric('Completed', summary.completedCount, 'completed')}
+          </div>
+          <div className="edit-activity__milestone-quarter-progress-layout edit-activity__engagement-type-progress-wrap">
+            {renderEngagementTypeProgress(summary)}
+          </div>
+        </div>
+      </>
+    )
+  }
+
+  function renderEngagementNestedGrid(records: EngagementPlan[], emptyText: string) {
+    if (records.length === 0) {
+      return (
+        <div className="edit-activity__procurement-quarter-empty">
+          <Handshake size={22} strokeWidth={1.5} color="#286cff" />
+          <strong>No engagement plans yet</strong>
+          <span>{emptyText}</span>
+        </div>
+      )
+    }
+
+    return (
+      <div className="edit-activity__procurement-list-scroll">
+        <div className="edit-activity__procurement-list-grid edit-activity__engagement-list-grid">
+          <div className="edit-activity__procurement-list-row edit-activity__procurement-list-row--header">
+            <div className="edit-activity__procurement-list-cell">Engagement Name</div>
+            <div className="edit-activity__procurement-list-cell">Sectors</div>
+            <div className="edit-activity__procurement-list-cell">Divisions</div>
+            <div className="edit-activity__procurement-list-cell">Engagement Description</div>
+            <div className="edit-activity__procurement-list-cell">Type</div>
+            <div className="edit-activity__procurement-list-cell">Sub-Type</div>
+            <div className="edit-activity__procurement-list-cell">Activity Status</div>
+            <div className="edit-activity__procurement-list-cell">Activity Included</div>
+            <div className="edit-activity__procurement-list-cell">Publish Status</div>
+            <div className="edit-activity__procurement-list-cell">ADGEs</div>
+            <div className="edit-activity__procurement-list-cell edit-activity__procurement-list-cell--actions">Actions</div>
+          </div>
+
+          {records.map(renderEngagementListRow)}
+        </div>
+      </div>
+    )
+  }
+
+  function renderEngagementTypeView() {
+    if (engagementTypeGroups.length === 0) {
+      return (
+        <div className="edit-activity__procurement-list-placeholder">
+          <Handshake size={40} strokeWidth={1.2} />
+          <h3>No engagement types found</h3>
+          <p>Engagement type lookup data will appear here once available.</p>
+        </div>
+      )
+    }
+
+    return (
+      <div className="edit-activity__engagement-type-grid">
+        {engagementTypeGroups.map((typeGroup, typeIndex) => {
+          const isTypeExpanded = expandedEngagementTypeId === typeGroup.id
+
+          return (
+            <section className={`edit-activity__engagement-type-card${isTypeExpanded ? ' edit-activity__engagement-type-card--expanded' : ''}`} key={typeGroup.id}>
+              <div
+                aria-expanded={isTypeExpanded}
+                className="edit-activity__engagement-type-summary"
+                onClick={() => toggleEngagementType(typeGroup.id)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    toggleEngagementType(typeGroup.id)
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+              >
+                {renderEngagementSummaryCardContent(
+                  typeGroup,
+                  typeGroup.label,
+                  `T${typeIndex + 1}`,
+                  isTypeExpanded,
+                  () => toggleEngagementType(typeGroup.id),
+                  'Engagement Type AI Summary',
+                  'AI summary is not available for this engagement type yet.',
+                  typeGroup.label,
+                )}
+              </div>
+
+              {isTypeExpanded ? (
+                <div className="edit-activity__engagement-type-body">
+                  {typeGroup.subTypes.length > 0 ? (
+                    <div className="edit-activity__engagement-subtype-grid">
+                      {typeGroup.subTypes.map((subTypeGroup) => {
+                        const isSubTypeExpanded = expandedEngagementSubTypeId === subTypeGroup.id
+
+                        return (
+                          <section className={`edit-activity__engagement-subtype-card${isSubTypeExpanded ? ' edit-activity__engagement-subtype-card--expanded' : ''}`} key={subTypeGroup.id}>
+                            <div
+                              aria-expanded={isSubTypeExpanded}
+                              className="edit-activity__engagement-subtype-summary"
+                              onClick={() => toggleEngagementSubType(subTypeGroup.id)}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                  event.preventDefault()
+                                  toggleEngagementSubType(subTypeGroup.id)
+                                }
+                              }}
+                              role="button"
+                              tabIndex={0}
+                            >
+                              {renderEngagementSummaryCardContent(
+                                subTypeGroup,
+                                subTypeGroup.label,
+                                'Sub',
+                                isSubTypeExpanded,
+                                () => toggleEngagementSubType(subTypeGroup.id),
+                                'Engagement Sub-Type AI Summary',
+                                'AI summary is not available for this engagement sub-type yet.',
+                                subTypeGroup.label,
+                              )}
+                            </div>
+
+                            {isSubTypeExpanded ? (
+                              <div className="edit-activity__engagement-subtype-body">
+                                {renderEngagementNestedGrid(
+                                  subTypeGroup.records,
+                                  'Add an engagement plan with this sub-type to start tracking engagement planning.',
+                                )}
+                              </div>
+                            ) : null}
+                          </section>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="edit-activity__procurement-quarter-empty">
+                      <Handshake size={22} strokeWidth={1.5} color="#286cff" />
+                      <strong>No sub-types found</strong>
+                      <span>Active engagement sub-types for this type will appear here.</span>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </section>
+          )
+        })}
+      </div>
+    )
+  }
+
+  function renderEngagementListRow(row: EngagementPlan) {
+    const sectorLabel = row.creatorSectorName !== '-' ? row.creatorSectorName : '-'
+    const divisionLabel = row.creatorDivisionName !== '-' ? row.creatorDivisionName : '-'
+    const activityStatusLabel = getOptionLabel(ACTIVITY_STATUS_OPTIONS, row.activityStatus)
+    const activityStatusTone = (ACTIVITY_STATUS_TONES[row.activityStatus] ?? 'neutral') as EngagementCapsuleTone
+    const publishStatusTone = (PUBLISH_STATUS_TONES_DYNAMIC[row.publishStatus] ?? PUBLISH_STATUS_TONES[row.publishStatus] ?? 'neutral') as EngagementCapsuleTone
+
+    return (
+      <div className="edit-activity__procurement-list-row" key={row.id}>
+        <div className="edit-activity__procurement-list-cell edit-activity__procurement-list-cell--name" data-label="Engagement Name">
+          <button
+            className="edit-activity__procurement-list-name-btn edit-activity__engagement-list-name-btn"
+            onClick={() => handleOpenEdit(row)}
+            title={`Edit engagement plan: ${row.engagementName || 'Untitled engagement plan'}`}
+            type="button"
+          >
+            {row.engagementName || 'Untitled engagement plan'}
+          </button>
+        </div>
+        <div className="edit-activity__procurement-list-cell" data-label="Sectors">
+          {sectorLabel}
+        </div>
+        <div className="edit-activity__procurement-list-cell" data-label="Divisions">
+          {divisionLabel}
+        </div>
+        <div className="edit-activity__procurement-list-cell" data-label="Engagement Description">
+          <span className="edit-activity__engagement-list-description">
+            {row.engagementDescription || '-'}
+          </span>
+        </div>
+        <div className="edit-activity__procurement-list-cell" data-label="Type">
+          {renderEngagementCapsule(row.engagementTypeName, 'info')}
+        </div>
+        <div className="edit-activity__procurement-list-cell" data-label="Sub-Type">
+          {renderEngagementCapsule(row.engagementSubTypeName, 'neutral')}
+        </div>
+        <div className="edit-activity__procurement-list-cell" data-label="Activity Status">
+          {renderEngagementCapsule(activityStatusLabel, activityStatusTone)}
+        </div>
+        <div className="edit-activity__procurement-list-cell" data-label="Activity Included">
+          {renderEngagementCapsule(row.activityIncluded === '1' ? 'Yes' : 'No', row.activityIncluded === '1' ? 'success' : 'error')}
+        </div>
+        <div className="edit-activity__procurement-list-cell" data-label="Publish Status">
+          {renderEngagementCapsule(getOptionLabel(PUBLISH_STATUS_OPTIONS_DYNAMIC, row.publishStatus), publishStatusTone)}
+        </div>
+        <div className="edit-activity__procurement-list-cell" data-label="ADGEs">
+          {renderEngagementCapsule(row.adgesInvolved === '1' ? 'Yes' : 'No', row.adgesInvolved === '1' ? 'success' : 'error')}
+        </div>
+        <div className="edit-activity__procurement-list-cell edit-activity__procurement-list-cell--actions" data-label="Actions">
+          <div className="edit-activity__milestone-list-actions">
+            <button
+              aria-label="Edit engagement plan"
+              className="edit-activity__milestone-action-btn"
+              onClick={() => handleOpenEdit(row)}
+              type="button"
+            >
+              <Edit3 size={14} />
+            </button>
+            <button
+              aria-label="Delete engagement plan"
+              className="edit-activity__milestone-action-btn edit-activity__milestone-action-btn--danger"
+              onClick={() => setPlanToDelete(row)}
+              type="button"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  function renderEngagementListView() {
+    const shouldRenderExistingGrid = false
+
+    if (shouldRenderExistingGrid) {
+      return renderEngagementGridForLaterUse()
+    }
+
+    if (engagementPlans.length === 0) {
+      return (
+        <div className="edit-activity__members-empty">
+          <Handshake size={40} strokeWidth={1.2} />
+          <h3>No engagement plans yet</h3>
+          <p>Add an engagement plan to start tracking engagement planning.</p>
+        </div>
+      )
+    }
+
+    return (
+      <div className="edit-activity__procurement-list-scroll">
+        <div className="edit-activity__procurement-list-grid edit-activity__engagement-list-grid">
+          <div className="edit-activity__procurement-list-row edit-activity__procurement-list-row--header">
+            <div className="edit-activity__procurement-list-cell">Engagement Name</div>
+            <div className="edit-activity__procurement-list-cell">Sectors</div>
+            <div className="edit-activity__procurement-list-cell">Divisions</div>
+            <div className="edit-activity__procurement-list-cell">Engagement Description</div>
+            <div className="edit-activity__procurement-list-cell">Type</div>
+            <div className="edit-activity__procurement-list-cell">Sub-Type</div>
+            <div className="edit-activity__procurement-list-cell">Activity Status</div>
+            <div className="edit-activity__procurement-list-cell">Activity Included</div>
+            <div className="edit-activity__procurement-list-cell">Publish Status</div>
+            <div className="edit-activity__procurement-list-cell">ADGEs</div>
+            <div className="edit-activity__procurement-list-cell edit-activity__procurement-list-cell--actions">Actions</div>
+          </div>
+
+          {engagementPlans.map(renderEngagementListRow)}
+        </div>
+      </div>
+    )
+  }
+
   function renderDrawerForm() {
     const title = editingPlan ? 'Edit Engagement Plan' : 'Create Engagement Plan'
 
     return (
       <SideDrawer
         actions={
-          <div className="edit-activity__engagement-drawer-actions">
-            <Button disabled={isSaving} onClick={handleCloseDrawer} variant="secondary">
+          <div className="edit-activity__procurement-drawer-actions edit-activity__engagement-drawer-actions">
+            <Button className="edit-activity__procurement-drawer-button" disabled={isSaving} onClick={handleCloseDrawer} variant="secondary">
               Cancel
             </Button>
-            <Button disabled={isSaving || isLookupLoading} onClick={handleSave}>
+            <Button className="edit-activity__procurement-drawer-button" disabled={isSaving || isLookupLoading} onClick={handleSave}>
               {isSaving ? 'Saving...' : editingPlan ? 'Update Engagement Plan' : 'Create Engagement Plan'}
             </Button>
           </div>
@@ -1314,21 +1896,33 @@ export function EngagementPlanTab({
     <div className="edit-activity__engagement">
       <div className="edit-activity__members-header">
         <div className="edit-activity__members-header-text">
-          <h2>
-            Engagement Plans
-            <span className="edit-activity__members-count-badge">{engagementPlans.length} Records</span>
-          </h2>
+          <h2>Engagement Plans</h2>
           <p>Manage engagement plans for this activity.</p>
         </div>
-        <div className="edit-activity__engagement-header-actions">
-          <Button disabled={isLookupLoading || !projectId} icon={
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-          } onClick={handleOpenCreate}>
+        <div className="edit-activity__milestone-header-actions">
+          <Button disabled={isLookupLoading || !projectId} icon={<Plus size={15} />} onClick={handleOpenCreate}>
             Add Engagement Plan
           </Button>
+          <div className="edit-activity__milestone-view-switch" aria-label="Engagement view switch">
+            <button
+              aria-label="Type view"
+              className={`edit-activity__milestone-view-switch-btn ${viewMode === 'type' ? 'edit-activity__milestone-view-switch-btn--active' : ''}`}
+              onClick={() => setViewMode('type')}
+              title="Type view"
+              type="button"
+            >
+              <LayoutGrid size={15} />
+            </button>
+            <button
+              aria-label="List view"
+              className={`edit-activity__milestone-view-switch-btn ${viewMode === 'list' ? 'edit-activity__milestone-view-switch-btn--active' : ''}`}
+              onClick={() => setViewMode('list')}
+              title="List view"
+              type="button"
+            >
+              <List size={15} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1342,33 +1936,10 @@ export function EngagementPlanTab({
           <h3>Loading engagement plans...</h3>
           <p>Fetching engagement plans, types, sub-types, and ADGE accounts.</p>
         </div>
-      ) : engagementPlans.length > 0 ? (
-        <div className="data-grid">
-          <table>
-            <thead>
-              <tr>
-                {gridColumns.map((col) => (
-                  <th key={col.key}>{col.header}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {engagementPlans.map((row) => (
-                <tr key={row.id}>
-                  {gridColumns.map((col) => (
-                    <td key={col.key}>{col.render(row)}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      ) : viewMode === 'list' ? (
+        renderEngagementListView()
       ) : (
-        <div className="edit-activity__members-empty">
-          <Handshake size={40} strokeWidth={1.2} />
-          <h3>No engagement plans yet</h3>
-          <p>Click <strong>Add Engagement Plan</strong> to create an engagement plan.</p>
-        </div>
+        renderEngagementTypeView()
       )}
 
       {renderDrawerForm()}
